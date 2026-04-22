@@ -154,6 +154,79 @@ const FC      = 'https://api.fantasycalc.com';
 const POS_ORDER = ['QB','RB','WR','TE'];
 const ORDINALS  = ['1st','2nd','3rd','4th'];
 
+const _fcCache = {};
+const fetchFcCached = async (url) => {
+  if(_fcCache[url]) return _fcCache[url];
+  const p = fetch(url).then(r=>r.json()).catch(()=>[]);
+  _fcCache[url] = p;
+  return p;
+};
+
+const computeArcForLeague = async (lg, userId) => {
+  try {
+    const [rs, tp] = await Promise.all([
+      fetch(`${SLEEPER}/league/${lg.league_id}/rosters`).then(r=>r.json()).catch(()=>[]),
+      fetch(`${SLEEPER}/league/${lg.league_id}/traded_picks`).then(r=>r.json()).catch(()=>[])
+    ]);
+    if(!Array.isArray(rs) || !rs.length) return null;
+    const teams = rs.length;
+    const rp = lg.roster_positions||[];
+    const numQbs = rp.includes('SUPER_FLEX') ? 2 : 1;
+    const ppr = lg.scoring_settings?.rec ?? 1;
+    const fcUrl = d=>`${FC}/values/current?isDynasty=${d}&numQbs=${numQbs}&ppr=${ppr}&numTeams=${teams}`;
+    const [dyn, red] = await Promise.all([fetchFcCached(fcUrl(true)), fetchFcCached(fcUrl(false))]);
+    if(!Array.isArray(dyn) || !dyn.length) return null;
+    const rdftById = {};
+    (Array.isArray(red)?red:[]).forEach(v=>{ const sid=v.player?.sleeperId; if(sid) rdftById[String(sid)]=v.redraftValue||v.value||0; });
+    const fcMap = {}, pickRound = {}, pickFuture = {};
+    dyn.forEach(v=>{
+      const sid=v.player?.sleeperId; if(!sid) return;
+      const merged={...v, redraftValue: rdftById[String(sid)] ?? v.redraftValue ?? 0};
+      fcMap[String(sid)] = merged;
+      if(v.player?.position==='PICK'){
+        const dpM=sid.match(/^DP_(\d+)_(\d+)$/);
+        if(dpM){ const rd=Number(dpM[1])+1, sl=Number(dpM[2])+1; pickRound[rd]=pickRound[rd]||{}; pickRound[rd][sl]=v.value||0; return; }
+        const fpM=sid.match(/^FP_(\d{4})_(\d+)$/);
+        if(fpM) pickFuture[`${fpM[1]}_${fpM[2]}`]=v.value||0;
+      }
+    });
+    const now=new Date(); const startYr=now.getFullYear()+(now.getMonth()>=8?1:0);
+    const yrs=[startYr,startYr+1,startYr+2];
+    const standingsOrder=[...rs].sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0)||(b.settings?.losses||0)-(a.settings?.losses||0)||a.roster_id-b.roster_id).map(r=>r.roster_id);
+    const own={};
+    rs.forEach(r=>{ yrs.forEach(y=>{ [1,2,3,4].forEach(rd=>{ own[`${y}_${rd}_${r.roster_id}`]=r.roster_id; }); }); });
+    (Array.isArray(tp)?tp:[]).forEach(t=>{ const y=Number(t.season); if(yrs.includes(y)) own[`${y}_${t.round}_${t.roster_id}`]=t.owner_id; });
+    const avgRd = rd=>{ const vs=Object.values(pickRound[rd]||{}); return vs.length?Math.round(vs.reduce((s,v)=>s+v,0)/vs.length):0; };
+    const pickDVal={};
+    Object.entries(own).forEach(([k,o])=>{
+      const [yr,rd,orig]=k.split('_').map(Number); if(rd>4) return;
+      let val=0;
+      if(yr===startYr){
+        const slot=standingsOrder.indexOf(orig)+1||null;
+        val=(slot && pickRound[rd]?.[slot]) || avgRd(rd);
+      } else val=pickFuture[`${yr}_${rd}`]||0;
+      pickDVal[o]=(pickDVal[o]||0)+val;
+    });
+    const stats = rs.map(r=>{
+      const active=r.players||[]; const allP=[...active,...(r.taxi||[])];
+      let dVal=0, rVal=0;
+      allP.forEach(pid=>{ const v=fcMap[String(pid)]; if(v) dVal+=v.value||0; });
+      dVal+=(pickDVal[r.roster_id]||0);
+      active.forEach(pid=>{ const v=fcMap[String(pid)]; if(v) rVal+=v.redraftValue||0; });
+      return {roster_id:r.roster_id, owner_id:r.owner_id, dVal, rVal};
+    });
+    const byD=[...stats].sort((a,b)=>b.dVal-a.dVal);
+    const byR=[...stats].sort((a,b)=>b.rVal-a.rVal);
+    const n=stats.length;
+    const di=byD.findIndex(x=>x.owner_id===userId);
+    const ri=byR.findIndex(x=>x.owner_id===userId);
+    if(di<0||ri<0) return null;
+    const dPct=n===1?100:((n-1-di)/(n-1))*100;
+    const rPct=n===1?100:((n-1-ri)/(n-1))*100;
+    return classifyTeam(dPct,rPct);
+  } catch { return null; }
+};
+
 const fetchLeagueChampionships = async (lg) => {
   const history = [];
   try {
@@ -226,6 +299,7 @@ function TeamTab() {
   const [lastFetched, setLastFetched]     = useState(null);
   const [viewMode, setViewMode]           = useState('dynasty');
   const [selectedOtherRid, setSelectedOtherRid] = useState(null);
+  const [leagueArcs, setLeagueArcs] = useState({});
   const inp2 = ex=>({padding:'7px 10px',background:'#0d0d0d',border:'1px solid #333',borderRadius:7,color:'#fff',fontSize:13,fontFamily:'inherit',...ex});
 
   const connectUser = async () => {
@@ -265,6 +339,22 @@ function TeamTab() {
       connectUser();
     }
   },[username,sleeperUser,loading]);
+
+  useEffect(()=>{
+    if(!sleeperUser||!leagues.length) return;
+    let cancelled=false;
+    const uid=sleeperUser.user_id;
+    (async()=>{
+      for(const lg of leagues){
+        if(cancelled) return;
+        if(leagueArcs[lg.league_id]) continue;
+        const arc = await computeArcForLeague(lg, uid);
+        if(cancelled) return;
+        if(arc) setLeagueArcs(prev=>({...prev,[lg.league_id]:arc}));
+      }
+    })();
+    return ()=>{ cancelled=true; };
+  },[leagues,sleeperUser]);
 
   const NO_CACHE = {cache:'no-store'};
 
@@ -653,11 +743,13 @@ function TeamTab() {
             {leagues.map(lg=>{
               const type=lg.settings?.type===2?'Dynasty':lg.settings?.type===1?'Keeper':'Redraft';
               const active=league?.league_id===lg.league_id;
+              const arc=leagueArcs[lg.league_id];
               return (
                 <button key={lg.league_id} onClick={()=>selectLeague(lg)}
-                  style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:active?'#141414':'#080808',border:'1px solid '+(active?'#FFD700':'#222'),borderRadius:9,cursor:'pointer',textAlign:'left',width:'100%'}}>
+                  style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:active?'#141414':'#080808',border:'1px solid '+(active?'#FFD700':'#222'),borderRadius:9,cursor:'pointer',textAlign:'left',width:'100%',flexWrap:'wrap'}}>
                   <span style={{padding:'2px 8px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:type==='Dynasty'?'#FFD700':type==='Keeper'?'#3b82f6':'#aaa',border:'1px solid '+(type==='Dynasty'?'#FFD700':type==='Keeper'?'#3b82f6':'#555'),flexShrink:0}}>{type}</span>
-                  <span style={{fontWeight:700,fontSize:13,color:active?'#FFD700':'#f0f0f0',flex:1}}>{lg.name}</span>
+                  {arc&&<span style={{padding:'2px 8px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:arc.color,border:'1px solid '+arc.color,flexShrink:0}}>{arc.emoji} {arc.label}</span>}
+                  <span style={{fontWeight:700,fontSize:13,color:active?'#FFD700':'#f0f0f0',flex:1,minWidth:120}}>{lg.name}</span>
                   <span style={{fontSize:11,color:'#555'}}>{lg.total_rosters} teams</span>
                   {active&&<span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>●</span>}
                 </button>
