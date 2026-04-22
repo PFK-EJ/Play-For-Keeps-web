@@ -399,14 +399,16 @@ function TeamTab() {
       const avgSlot2026=Object.keys(slotValues).length?Math.round(Object.values(slotValues).reduce((s,v)=>s+v,0)/Object.keys(slotValues).length):0;
       Object.entries(own).forEach(([key,ownRid])=>{
         const [yr,rd,origRid]=key.split('_').map(Number);
-        if(rd!==1) return; // FC only values 1st round picks
-        let val=0;
-        if(yr===startYr){ // 2026: use specific slot if known
+        if(rd>2) return; // value 1st and 2nd round picks
+        let baseFirst=0;
+        if(yr===startYr){
           const slot=draftSlots[origRid];
-          val=slot?(slotValues[slot]||0):avgSlot2026;
+          baseFirst=slot?(slotValues[slot]||0):avgSlot2026;
         } else {
-          val=futureValues[`${yr}_1`]||0;
+          baseFirst=futureValues[`${yr}_1`]||0;
         }
+        // FC doesn't value 2nds explicitly; estimate at 30% of a 1st for that year
+        const val = rd===1 ? baseFirst : Math.round(baseFirst*0.30);
         pickDVal[ownRid]=(pickDVal[ownRid]||0)+val;
       });
     }
@@ -457,8 +459,8 @@ function TeamTab() {
     return rankMap;
   },[ranked,fcMap]);
 
-  const myPicks = useMemo(()=>{
-    if(!myTeam||!rosters.length) return [];
+  const picksByRoster = useMemo(()=>{
+    if(!rosters.length) return {};
     const now2=new Date(); const startYr=now2.getFullYear()+(now2.getMonth()>=8?1:0);
     const yrs=[startYr,startYr+1,startYr+2];
     const own={};
@@ -469,28 +471,23 @@ function TeamTab() {
       own[`${y}_${tp.round}_${tp.roster_id}`]=tp.owner_id;
     });
     const n=rosters.length||1;
-    // Standings-based order for projecting tier of future picks (worst record = pick 1)
     const standingsOrder=[...rosters]
       .sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0)||(b.settings?.losses||0)-(a.settings?.losses||0)||a.roster_id-b.roster_id)
       .map(r=>r.roster_id);
-    return Object.entries(own)
-      .filter(([,oid])=>oid===myTeam.roster_id)
-      .map(([key])=>{
-        const [year,round,origRid]=key.split('_').map(Number);
-        const isCurrent = year===startYr;
-        // 2026: use real Sleeper draft order if available, else standings
-        // 2027+: use current standings to project tier
-        const slotNum = isCurrent
-          ? (draftSlots[origRid] || standingsOrder.indexOf(origRid)+1 || null)
-          : null; // no specific slot for future years
-        const slotStr = slotNum ? String(slotNum).padStart(2,'0') : null;
-        // Tier from standings for FC lookup (all years)
-        const standPos = standingsOrder.indexOf(origRid)+1 || Math.ceil(n/2);
-        const tier = standPos<=Math.ceil(n/3)?'early':standPos<=Math.ceil(2*n/3)?'mid':'late';
-        return{year,round,origRid,isOwn:origRid===myTeam.roster_id,isCurrent,slotNum,slotStr,tier};
-      })
-      .sort((a,b)=>a.year-b.year||a.round-b.round||(a.slotNum||99)-(b.slotNum||99));
-  },[myTeam,rosters,tradedPicks,draftSlots]);
+    const byRid={};
+    rosters.forEach(r=>{ byRid[r.roster_id]=[]; });
+    Object.entries(own).forEach(([key,ownRid])=>{
+      const [year,round,origRid]=key.split('_').map(Number);
+      const isCurrent=year===startYr;
+      const slotNum=isCurrent?(draftSlots[origRid]||standingsOrder.indexOf(origRid)+1||null):null;
+      const slotStr=slotNum?String(slotNum).padStart(2,'0'):null;
+      const standPos=standingsOrder.indexOf(origRid)+1||Math.ceil(n/2);
+      const tier=standPos<=Math.ceil(n/3)?'early':standPos<=Math.ceil(2*n/3)?'mid':'late';
+      (byRid[ownRid]=byRid[ownRid]||[]).push({year,round,origRid,isOwn:origRid===ownRid,isCurrent,slotNum,slotStr,tier});
+    });
+    Object.values(byRid).forEach(arr=>arr.sort((a,b)=>a.year-b.year||a.round-b.round||(a.slotNum||99)-(b.slotNum||99)));
+    return byRid;
+  },[rosters,tradedPicks,draftSlots]);
 
   useEffect(()=>{
     if(ranked.length&&sleeperUser){
@@ -501,7 +498,8 @@ function TeamTab() {
   },[ranked]);
 
   // ── Grouped roster renderer ──
-  const RosterSection = ({ team, showPicks }) => {
+  const RosterSection = ({ team }) => {
+    const picks = picksByRoster[team?.roster_id]||[];
     if (!team) return null;
     const hasFc = fcValues.length > 0;
     const byPos = {};
@@ -582,14 +580,14 @@ function TeamTab() {
         })}
 
         {/* Draft Capital */}
-        {showPicks&&myPicks.length>0&&(
+        {picks.length>0&&(
           <div style={{marginTop:4}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 10px',background:'#111',borderLeft:'3px solid #FFD700',borderRadius:'5px 5px 0 0',marginBottom:3}}>
               <span style={{fontWeight:900,color:'#FFD700',fontSize:11,letterSpacing:1}}>DRAFT CAPITAL</span>
-              <span style={{fontSize:10,color:'#FFD700'}}>({myPicks.length} picks)</span>
+              <span style={{fontSize:10,color:'#FFD700'}}>({picks.length} picks)</span>
             </div>
             {Object.entries(
-              myPicks.reduce((acc,p)=>{ if(!acc[p.year])acc[p.year]=[]; acc[p.year].push(p); return acc; },{})
+              picks.reduce((acc,p)=>{ if(!acc[p.year])acc[p.year]=[]; acc[p.year].push(p); return acc; },{})
             ).map(([year,picks])=>(
               <div key={year}>
                 <div style={{fontSize:10,color:'#444',fontWeight:700,letterSpacing:1,padding:'8px 12px 4px',background:'#0a0a0a',borderTop:'1px solid #181818'}}>{year} ROOKIE PICKS</div>
@@ -716,7 +714,7 @@ function TeamTab() {
             </div>
           )}
           {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:11,color:'#f59e0b',marginBottom:14}}>⚠️ FantasyCalc values unavailable — showing Sleeper roster only.</div>}
-          <RosterSection team={myTeam} showPicks={true}/>
+          <RosterSection team={myTeam}/>
         </div>
       )}
 
@@ -826,7 +824,7 @@ function TeamTab() {
               </div>
               <button onClick={()=>setSelectedOtherRid(null)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:11,fontWeight:700}}>✕ Close</button>
             </div>
-            <RosterSection team={other} showPicks={false}/>
+            <RosterSection team={other}/>
           </div>
         );
       })()}
