@@ -914,9 +914,8 @@ function TradePollsTab({session,onRequestSignIn}){
   const [myVotes,setMyVotes]=useState({});
   const [loading,setLoading]=useState(true);
   const [showCreate,setShowCreate]=useState(false);
-  const [newTitle,setNewTitle]=useState('');
   const [newOpts,setNewOpts]=useState(['','']);
-  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',tep:'1.0',passTd:'6'});
+  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',tep:'1.0',passTd:'6',ppc:'0'});
   const [err,setErr]=useState('');
 
   const load=useCallback(async()=>{
@@ -958,13 +957,12 @@ function TradePollsTab({session,onRequestSignIn}){
 
   const createPoll=async()=>{
     setErr('');
-    const title=newTitle.trim();
     const opts=newOpts.map(o=>o.trim()).filter(Boolean);
-    if(!title||opts.length<2){ setErr('Need a title and at least 2 options.'); return; }
-    const settings={ teams:Number(newSettings.teams)||null, format:newSettings.format, tep:Number(newSettings.tep), passTd:Number(newSettings.passTd)||null };
-    const { data, error } = await sb.from('polls').insert({created_by:session.user.id,title,options:opts,settings}).select().single();
+    if(opts.length<2){ setErr('Need at least 2 options.'); return; }
+    const settings={ teams:Number(newSettings.teams)||null, format:newSettings.format, tep:Number(newSettings.tep), passTd:Number(newSettings.passTd)||null, ppc:Number(newSettings.ppc)||0 };
+    const { data, error } = await sb.from('polls').insert({created_by:session.user.id,title:'',options:opts,settings}).select().single();
     if(error){ setErr(error.message); return; }
-    setNewTitle(''); setNewOpts(['','']); setShowCreate(false);
+    setNewOpts(['','']); setShowCreate(false);
     setPolls(prev=>[{...data,counts:Array(opts.length).fill(0),total:0,poll_votes:[]},...prev]);
   };
 
@@ -988,7 +986,6 @@ function TradePollsTab({session,onRequestSignIn}){
 
       {showCreate&&(
         <div style={{background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:16,marginBottom:18}}>
-          <input autoFocus value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="Trade details (e.g., 'I give Bijan for CMC + 2026 1st')" style={{width:'100%',padding:10,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,marginBottom:10}}/>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:12}}>
             <div style={{display:'flex',flexDirection:'column',gap:3}}>
               <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TEAMS</label>
@@ -1007,6 +1004,10 @@ function TradePollsTab({session,onRequestSignIn}){
             <div style={{display:'flex',flexDirection:'column',gap:3}}>
               <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PASS TD</label>
               <input value={newSettings.passTd} onChange={e=>setNewSettings({...newSettings,passTd:e.target.value})} placeholder="6" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PT / CARRY</label>
+              <input value={newSettings.ppc} onChange={e=>setNewSettings({...newSettings,ppc:e.target.value})} placeholder="0" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
             </div>
           </div>
           {newOpts.map((o,i)=>(
@@ -1034,13 +1035,14 @@ function TradePollsTab({session,onRequestSignIn}){
             const voted=myIdx!==undefined;
             return (
               <div key={p.id} style={{background:'#0f0f0f',border:'1px solid #222',borderRadius:10,padding:16}}>
-                <div style={{fontWeight:700,fontSize:14,marginBottom:8,color:'#eee'}}>{p.title}</div>
+                {p.title&&<div style={{fontWeight:700,fontSize:14,marginBottom:8,color:'#eee'}}>{p.title}</div>}
                 {p.settings&&(
                   <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
-                    {p.settings.teams&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.teams}-team</span>}
-                    {p.settings.format&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.format}</span>}
-                    {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.tep} TEP</span>}
-                    {p.settings.passTd&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
+                    {p.settings.teams&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.teams}-team</span>}
+                    {p.settings.format&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.format}</span>}
+                    {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.tep} TEP</span>}
+                    {p.settings.passTd&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
+                    {p.settings.ppc>0&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.ppc} pt/carry</span>}
                   </div>
                 )}
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
