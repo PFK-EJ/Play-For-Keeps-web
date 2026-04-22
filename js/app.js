@@ -915,7 +915,7 @@ function TradePollsTab({session,onRequestSignIn}){
   const [loading,setLoading]=useState(true);
   const [showCreate,setShowCreate]=useState(false);
   const [newOpts,setNewOpts]=useState(['','']);
-  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',ppr:'1.0',tep:'1.0',passTd:'6',ppc:'0',status:''});
+  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',ppr:'1.0',tep:'0.5',passTd:'6',ppc:'0',status:''});
   const [err,setErr]=useState('');
 
   const load=useCallback(async()=>{
