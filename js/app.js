@@ -1371,10 +1371,11 @@ function AdminApp(){
   const onRemove=(id)=>{ pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
   const onSavePlayer=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===editingPlayer?{...x,...playerDraft}:x)); setEditingPlayer(null); };
   const onCancelEdit=()=>setEditingPlayer(null);
-  const onRenameStart=(n)=>{ setRenamingTier(n); setTierNameDraft(n); };
+  const onRenameStart=(id,name)=>{ setRenamingTier(id); setTierNameDraft(name); };
   const onRenameCancel=()=>setRenamingTier(null);
-  const onRenameSave=()=>{ pushHist(); setList(prev=>prev.map(x=>x.type==='tier'&&x.name===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
-  const onDeleteTier=(n)=>{ pushHist(); setList(prev=>prev.filter(x=>!(x.type==='tier'&&x.name===n))); };
+  const onRenameSave=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
+  const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
+  const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; pushHist(); setList(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
 
   if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
 
@@ -1406,6 +1407,7 @@ function AdminApp(){
           <div style={{fontSize:10,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:12,fontWeight:700}}>+ Tier</button>
           <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:12}}>↶ Undo</button>
           <button onClick={publish} style={{padding:'8px 16px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>PUBLISH</button>
           <button onClick={logout} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:12}}>Sign out</button>
