@@ -722,7 +722,11 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
   const [ghostOff,setGhostOff] = useState({x:0,y:0});
   const fl = posFilter.size>=4?src:src.filter(x=>x.type==="tier"||posFilter.has(x.pos));
 
-  useEffect(()=>{ document.body.style.cursor=draggingId?"grabbing":""; return()=>{ document.body.style.cursor=""; }; },[draggingId]);
+  useEffect(()=>{
+    if(draggingId) document.body.classList.add('pfk-dragging');
+    else document.body.classList.remove('pfk-dragging');
+    return ()=>document.body.classList.remove('pfk-dragging');
+  },[draggingId]);
 
   const calcInsert = useCallback((clientY,excludeId)=>{
     const rows=Object.entries(rowRefs.current)
@@ -1253,8 +1257,8 @@ function AdminApp(){
   const pushHist=()=>setHistory(h=>[...h.slice(-20),list]);
   const undo=()=>{ if(!history.length) return; setList(history[history.length-1]); setHistory(h=>h.slice(0,-1)); };
 
-  const onReorder=(from,to)=>{ pushHist(); setList(prev=>{ const n=[...prev]; const [m]=n.splice(from,1); n.splice(to,0,m); return n; }); };
-  const onMove=(id,dir)=>{ pushHist(); setList(prev=>{ const i=prev.findIndex(x=>x.id===id); if(i<0) return prev; const j=dir==='up'?i-1:i+1; if(j<0||j>=prev.length) return prev; const n=[...prev]; [n[i],n[j]]=[n[j],n[i]]; return n; }); };
+  const onReorder=(fromId,beforeId)=>{ pushHist(); setList(prev=>{ const l=[...prev], fi=l.findIndex(x=>x.id===fromId); if(fi<0) return prev; const [item]=l.splice(fi,1); if(beforeId===null){ l.push(item); }else{ const ti=l.findIndex(x=>x.id===beforeId); l.splice(ti!==-1?ti:l.length,0,item); } return l; }); };
+  const onMove=(id,dir)=>{ pushHist(); setList(prev=>{ const l=[...prev], i=l.findIndex(x=>x.id===id), sw=i+dir; if(sw<0||sw>=l.length) return l; [l[i],l[sw]]=[l[sw],l[i]]; return l; }); };
   const onEdit=(p)=>{ setEditingPlayer(p.id); setPlayerDraft({...p}); };
   const onRemove=(id)=>{ pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
   const onSavePlayer=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===editingPlayer?{...x,...playerDraft}:x)); setEditingPlayer(null); };
