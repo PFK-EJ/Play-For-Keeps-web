@@ -4,10 +4,11 @@ const SUPABASE_URL = 'https://ymwoabgesjqrojurdxmv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8z6jTCr6BPKmltRnNvEVzA_do7BmXKe';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-const DEFAULT_SETTINGS = { tep:0.5, ppr:1.0, passTd:6, ppc:0 };
+const DEFAULT_SETTINGS = { format:'Superflex', tep:0.5, ppr:1.0, passTd:6, ppc:0 };
+const FORMAT_CHOICES=['1QB','Superflex'];
 const TEP_CHOICES=[0,0.5,0.75,1.0], PPR_CHOICES=[0,0.5,1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0,0.25,0.5];
 
-const sameSettings = (a,b)=> a && b && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
+const sameSettings = (a,b)=> a && b && (a.format||'Superflex')===(b.format||'Superflex') && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
 
 const fetchOfficialRankings = async (wanted) => {
   if(!sb) return null;
@@ -49,6 +50,7 @@ function SettingsToggleBar({value,onChange,compact}){
   );
   return (
     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+      <Group label="FORMAT" choices={FORMAT_CHOICES} suffix="" current={value.format||'Superflex'} field="format"/>
       <Group label="TEP" choices={TEP_CHOICES} suffix="" current={value.tep} field="tep"/>
       <Group label="PPR" choices={PPR_CHOICES} suffix="" current={value.ppr} field="ppr"/>
       <Group label="PASS TD" choices={PTD_CHOICES} suffix="pt" current={value.passTd} field="passTd"/>
@@ -1558,7 +1560,7 @@ function AdminApp(){
   const [showAddPlayer,setShowAddPlayer]=useState(false);
   const [newP,setNewP]=useState({name:'',pos:'WR',college:''});
 
-  const sigOf=s=>`${s.tep}|${s.ppr}|${s.passTd}|${s.ppc}`;
+  const sigOf=s=>`${s.format||'Superflex'}|${s.tep}|${s.ppr}|${s.passTd}|${s.ppc}`;
   const currentSig=sigOf(adminSettings);
   const bucket=sets[currentSig];
   const list=bucket?.items||[];
