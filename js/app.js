@@ -1,5 +1,26 @@
 const { useState, useRef, useCallback, useEffect, useMemo } = React;
 
+const SUPABASE_URL = 'https://ymwoabgesjqrojurdxmv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_8z6jTCr6BPKmltRnNvEVzA_do7BmXKe';
+const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+const fetchOfficialRankings = async () => {
+  if(!sb) return null;
+  try{
+    const { data, error } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false}).limit(1).maybeSingle();
+    if(error||!data) return null;
+    return data;
+  }catch{ return null; }
+};
+
+const publishOfficialRankings = async (items) => {
+  if(!sb) return { error: 'Supabase not loaded' };
+  const { data:userData } = await sb.auth.getUser();
+  const email = userData?.user?.email || 'PFK Staff';
+  const { error } = await sb.from('pfk_rankings').insert({ data: items, updated_by: email });
+  return { error };
+};
+
 const TIER_COLORS = ["#FFD700","#FFC107","#FFAA00","#E09000","#d97706","#c2840a","#a37820","#8B6914","#a3a3a3","#7c8896"];
 const POS_COLORS = { WR:"#3b82f6", RB:"#10b981", TE:"#f59e0b", QB:"#ef4444" };
 const INITIAL_TIERS = ["Untouchable","X-Factor","Super-Star","Star","Starter","Good Depth","Bench Player","Roster Clogger","Taxi Squad","Waivers"];
@@ -1004,6 +1025,20 @@ function App(){
   const [picks,setPicks]=useState(()=>loadStorage("pfk_picks",[]));
   const [newTeamPlayer,setNewTeamPlayer]=useState({name:"",pos:"WR",age:""});
   const [saved,setSaved]=useState(false);
+  const [officialUpdated,setOfficialUpdated]=useState(null);
+  const [officialList,setOfficialList]=useState(null);
+
+  useEffect(()=>{
+    fetchOfficialRankings().then(row=>{
+      if(!row?.data||!Array.isArray(row.data)) return;
+      setOfficialUpdated(row.updated_at);
+      setOfficialList(row.data);
+      const hadSaved=loadStorage('pfk_saved_lists',null);
+      if(!hadSaved){
+        setSavedLists([{id:'list_1',name:'My Rankings',items:row.data}]);
+      }
+    });
+  },[]);
 
   const list=useMemo(()=>savedLists.find(l=>l.id===activeListId)?.items||buildInitialList(),[savedLists,activeListId]);
   const setList=useCallback(updater=>{
@@ -1089,11 +1124,11 @@ function App(){
           <div>
             <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
               <span style={{fontSize:18}}>👑</span>
-              <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:11,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class · PFK Staff Rankings</div></div>
+              <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:11,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
             </div>
             <FilterBar/>
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',margin:'0 -2px'}}>
-              <RenderList src={PFK_LIST} allowEdit={false} {...commonProps}/>
+              <RenderList src={officialList||PFK_LIST} allowEdit={false} {...commonProps}/>
             </div>
           </div>
         )}
@@ -1168,4 +1203,109 @@ function App(){
   );
 }
 
-ReactDOM.render(<App/>, document.getElementById("root"));
+function AdminApp(){
+  const [session,setSession]=useState(null);
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  const [loginErr,setLoginErr]=useState('');
+  const [loading,setLoading]=useState(true);
+  const [list,setList]=useState(()=>buildInitialList());
+  const [history,setHistory]=useState([]);
+  const [editingPlayer,setEditingPlayer]=useState(null);
+  const [playerDraft,setPlayerDraft]=useState({});
+  const [renamingTier,setRenamingTier]=useState(null);
+  const [tierNameDraft,setTierNameDraft]=useState("");
+  const [posFilter,setPosFilter]=useState(()=>new Set(["WR","RB","TE","QB"]));
+  const [publishMsg,setPublishMsg]=useState('');
+  const [lastUpdated,setLastUpdated]=useState(null);
+
+  useEffect(()=>{
+    if(!sb){ setLoading(false); return; }
+    sb.auth.getSession().then(({data})=>{ setSession(data.session); setLoading(false); });
+    const { data:sub } = sb.auth.onAuthStateChange((_e,s)=>setSession(s));
+    return ()=>sub?.subscription?.unsubscribe?.();
+  },[]);
+
+  useEffect(()=>{
+    if(!session) return;
+    fetchOfficialRankings().then(row=>{
+      if(row?.data && Array.isArray(row.data)){ setList(row.data); setLastUpdated(row.updated_at); }
+    });
+  },[session]);
+
+  const login=async()=>{
+    setLoginErr('');
+    if(!sb){ setLoginErr('Supabase not loaded'); return; }
+    const { error } = await sb.auth.signInWithPassword({email,password});
+    if(error) setLoginErr(error.message);
+  };
+  const logout=async()=>{ await sb.auth.signOut(); };
+
+  const publish=async()=>{
+    setPublishMsg('Publishing...');
+    const { error } = await publishOfficialRankings(list);
+    if(error){ setPublishMsg('Error: '+(error.message||error)); return; }
+    setPublishMsg('Published! Live on the site.');
+    setLastUpdated(new Date().toISOString());
+    setTimeout(()=>setPublishMsg(''),3000);
+  };
+
+  const pushHist=()=>setHistory(h=>[...h.slice(-20),list]);
+  const undo=()=>{ if(!history.length) return; setList(history[history.length-1]); setHistory(h=>h.slice(0,-1)); };
+
+  const onReorder=(from,to)=>{ pushHist(); setList(prev=>{ const n=[...prev]; const [m]=n.splice(from,1); n.splice(to,0,m); return n; }); };
+  const onMove=(id,dir)=>{ pushHist(); setList(prev=>{ const i=prev.findIndex(x=>x.id===id); if(i<0) return prev; const j=dir==='up'?i-1:i+1; if(j<0||j>=prev.length) return prev; const n=[...prev]; [n[i],n[j]]=[n[j],n[i]]; return n; }); };
+  const onEdit=(p)=>{ setEditingPlayer(p.id); setPlayerDraft({...p}); };
+  const onRemove=(id)=>{ pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
+  const onSavePlayer=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===editingPlayer?{...x,...playerDraft}:x)); setEditingPlayer(null); };
+  const onCancelEdit=()=>setEditingPlayer(null);
+  const onRenameStart=(n)=>{ setRenamingTier(n); setTierNameDraft(n); };
+  const onRenameCancel=()=>setRenamingTier(null);
+  const onRenameSave=()=>{ pushHist(); setList(prev=>prev.map(x=>x.type==='tier'&&x.name===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
+  const onDeleteTier=(n)=>{ pushHist(); setList(prev=>prev.filter(x=>!(x.type==='tier'&&x.name===n))); };
+
+  if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
+
+  if(!session){
+    return (
+      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+        <div style={{width:'100%',maxWidth:380,background:'#111',border:'1px solid #333',borderRadius:12,padding:28}}>
+          <div style={{textAlign:'center',marginBottom:20}}>
+            <div style={{fontWeight:900,fontSize:22,letterSpacing:3,color:'#FFD700'}}>PFK ADMIN</div>
+            <div style={{fontSize:11,color:'#888',marginTop:4}}>Staff login</div>
+          </div>
+          <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={{width:'100%',padding:10,marginBottom:10,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
+          <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()} style={{width:'100%',padding:10,marginBottom:14,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
+          <button onClick={login} style={{width:'100%',padding:12,background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN IN</button>
+          {loginErr&&<div style={{color:'#ef4444',fontSize:12,marginTop:10,textAlign:'center'}}>{loginErr}</div>}
+          <div style={{textAlign:'center',marginTop:16}}><a href="/" style={{fontSize:11,color:'#666',textDecoration:'none'}}>← Back to site</a></div>
+        </div>
+      </div>
+    );
+  }
+
+  const commonProps={ onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter };
+
+  return (
+    <div style={{minHeight:'100vh',paddingBottom:40}}>
+      <div style={{position:'sticky',top:0,zIndex:100,background:'#080808',borderBottom:'2px solid #FFD700',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontWeight:900,fontSize:16,letterSpacing:2,color:'#FFD700'}}>PFK ADMIN</div>
+          <div style={{fontSize:10,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:12}}>↶ Undo</button>
+          <button onClick={publish} style={{padding:'8px 16px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>PUBLISH</button>
+          <button onClick={logout} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:12}}>Sign out</button>
+        </div>
+      </div>
+      {publishMsg&&<div style={{padding:'8px 16px',background:publishMsg.startsWith('Error')?'#3a1010':'#103a10',color:publishMsg.startsWith('Error')?'#ef4444':'#10b981',fontSize:12,fontWeight:700}}>{publishMsg}</div>}
+      <div style={{padding:'16px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+        <RenderList src={list} allowEdit={true} {...commonProps}/>
+      </div>
+    </div>
+  );
+}
+
+const isAdminRoute = window.location.pathname.replace(/\/$/,'').endsWith('/admin');
+ReactDOM.render(isAdminRoute ? <AdminApp/> : <App/>, document.getElementById("root"));
