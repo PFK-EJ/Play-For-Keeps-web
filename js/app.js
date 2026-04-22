@@ -915,7 +915,7 @@ function TradePollsTab({session,onRequestSignIn}){
   const [loading,setLoading]=useState(true);
   const [showCreate,setShowCreate]=useState(false);
   const [newOpts,setNewOpts]=useState(['','']);
-  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',ppr:'1.0',tep:'1.0',passTd:'6',ppc:'0'});
+  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',ppr:'1.0',tep:'1.0',passTd:'6',ppc:'0',status:''});
   const [err,setErr]=useState('');
 
   const load=useCallback(async()=>{
@@ -959,7 +959,7 @@ function TradePollsTab({session,onRequestSignIn}){
     setErr('');
     const opts=newOpts.map(o=>o.trim()).filter(Boolean);
     if(opts.length<2){ setErr('Need at least 2 options.'); return; }
-    const settings={ teams:Number(newSettings.teams)||null, format:newSettings.format, ppr:Number(newSettings.ppr), tep:Number(newSettings.tep), passTd:Number(newSettings.passTd)||null, ppc:Number(newSettings.ppc)||0 };
+    const settings={ teams:Number(newSettings.teams)||null, format:newSettings.format, ppr:Number(newSettings.ppr), tep:Number(newSettings.tep), passTd:Number(newSettings.passTd)||null, ppc:Number(newSettings.ppc)||0, status:newSettings.status||null };
     const { data, error } = await sb.from('polls').insert({created_by:session.user.id,title:'',options:opts,settings}).select().single();
     if(error){ setErr(error.message); return; }
     setNewOpts(['','']); setShowCreate(false);
@@ -1013,6 +1013,14 @@ function TradePollsTab({session,onRequestSignIn}){
               <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PPC</label>
               <input value={newSettings.ppc} onChange={e=>setNewSettings({...newSettings,ppc:e.target.value})} placeholder="0" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
             </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TEAM STATUS (optional)</label>
+              <select value={newSettings.status} onChange={e=>setNewSettings({...newSettings,status:e.target.value})} style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}>
+                <option value="">—</option>
+                <option>Contender</option>
+                <option>Rebuilding</option>
+              </select>
+            </div>
           </div>
           {newOpts.map((o,i)=>(
             <div key={i} style={{display:'flex',gap:6,marginBottom:6}}>
@@ -1048,6 +1056,7 @@ function TradePollsTab({session,onRequestSignIn}){
                     {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.tep} TEP</span>}
                     {p.settings.passTd&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
                     {p.settings.ppc>0&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.ppc} PPC</span>}
+                    {p.settings.status&&<span style={{padding:'4px 10px',background:'#FFD700',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#000',fontWeight:800}}>{p.settings.status}</span>}
                   </div>
                 )}
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
