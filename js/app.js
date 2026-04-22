@@ -4,22 +4,58 @@ const SUPABASE_URL = 'https://ymwoabgesjqrojurdxmv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8z6jTCr6BPKmltRnNvEVzA_do7BmXKe';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-const fetchOfficialRankings = async () => {
+const DEFAULT_SETTINGS = { tep:0.5, ppr:1.0, passTd:6, ppc:0 };
+const TEP_CHOICES=[0,0.5,1.0], PPR_CHOICES=[0,0.5,1.0], PTD_CHOICES=[4,6], PPC_CHOICES=[0,0.25,0.5];
+
+const sameSettings = (a,b)=> a && b && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
+
+const fetchOfficialRankings = async (wanted) => {
   if(!sb) return null;
   try{
-    const { data, error } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false}).limit(1).maybeSingle();
-    if(error||!data) return null;
-    return data;
+    const { data, error } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
+    if(error||!data?.length) return null;
+    if(wanted){
+      const exact = data.find(r=>sameSettings(r.settings,wanted));
+      if(exact) return exact;
+    }
+    return data[0];
   }catch{ return null; }
 };
 
-const publishOfficialRankings = async (items) => {
+const publishOfficialRankings = async (items, settings) => {
   if(!sb) return { error: 'Supabase not loaded' };
   const { data:userData } = await sb.auth.getUser();
   const email = userData?.user?.email || 'PFK Staff';
-  const { error } = await sb.from('pfk_rankings').insert({ data: items, updated_by: email });
+  const { data:existing } = await sb.from('pfk_rankings').select('id,settings').order('updated_at',{ascending:false});
+  const match = (existing||[]).find(r=>sameSettings(r.settings,settings));
+  if(match){
+    const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings }).eq('id',match.id);
+    return { error };
+  }
+  const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings });
   return { error };
 };
+
+function SettingsToggleBar({value,onChange,compact}){
+  const Group = ({label,choices,suffix,current,field})=>(
+    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+      <div style={{fontSize:9,color:'#777',letterSpacing:1,fontWeight:700}}>{label}</div>
+      <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}}>
+        {choices.map(c=>(
+          <button key={c} onClick={()=>onChange({...value,[field]:c})} style={{padding:compact?'3px 8px':'5px 10px',background:current===c?'#FFD700':'transparent',color:current===c?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:11,fontWeight:700}}>{c}{suffix}</button>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+      <Group label="TEP" choices={TEP_CHOICES} suffix="" current={value.tep} field="tep"/>
+      <Group label="PPR" choices={PPR_CHOICES} suffix="" current={value.ppr} field="ppr"/>
+      <Group label="PASS TD" choices={PTD_CHOICES} suffix="pt" current={value.passTd} field="passTd"/>
+      <Group label="PPC" choices={PPC_CHOICES} suffix="" current={value.ppc} field="ppc"/>
+    </div>
+  );
+}
 
 const TIER_COLORS = ["#FFD700","#FFC107","#FFAA00","#E09000","#d97706","#c2840a","#a37820","#8B6914","#a3a3a3","#7c8896"];
 const POS_COLORS = { WR:"#3b82f6", RB:"#10b981", TE:"#f59e0b", QB:"#ef4444" };
@@ -1219,6 +1255,8 @@ function App(){
   const [saved,setSaved]=useState(false);
   const [officialUpdated,setOfficialUpdated]=useState(null);
   const [officialList,setOfficialList]=useState(null);
+  const [pfkSettings,setPfkSettings]=useState(DEFAULT_SETTINGS);
+  const [pfkMissing,setPfkMissing]=useState(false);
   const [session,setSession]=useState(null);
   const [userRow,setUserRow]=useState(null);
   const [authOpen,setAuthOpen]=useState(false);
@@ -1268,8 +1306,9 @@ function App(){
   const doLogout=async()=>{ if(sb) await sb.auth.signOut(); };
 
   useEffect(()=>{
-    fetchOfficialRankings().then(row=>{
-      if(!row?.data||!Array.isArray(row.data)) return;
+    fetchOfficialRankings(pfkSettings).then(row=>{
+      if(!row?.data||!Array.isArray(row.data)){ setPfkMissing(true); setOfficialList(null); setOfficialUpdated(null); return; }
+      setPfkMissing(!sameSettings(row.settings,pfkSettings));
       setOfficialUpdated(row.updated_at);
       setOfficialList(row.data);
       const hadSaved=loadStorage('pfk_saved_lists',null);
@@ -1277,7 +1316,7 @@ function App(){
         setSavedLists([{id:'list_1',name:'My Rankings',items:row.data}]);
       }
     });
-  },[]);
+  },[pfkSettings]);
 
   const list=useMemo(()=>savedLists.find(l=>l.id===activeListId)?.items||buildInitialList(),[savedLists,activeListId]);
   const setList=useCallback(updater=>{
@@ -1420,6 +1459,10 @@ function App(){
               <span style={{fontSize:18}}>👑</span>
               <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:11,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
             </div>
+            <div style={{marginBottom:14,padding:'10px 12px',background:'#0a0a0a',border:'1px solid #222',borderRadius:10}}>
+              <SettingsToggleBar value={pfkSettings} onChange={setPfkSettings}/>
+              {pfkMissing&&<div style={{fontSize:10,color:'#d97706',marginTop:8}}>No ranking published yet for this combo — showing most recent.</div>}
+            </div>
             <FilterBar/>
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',margin:'0 -2px'}}>
               <RenderList src={officialList||PFK_LIST} allowEdit={false} {...commonProps}/>
@@ -1513,6 +1556,8 @@ function AdminApp(){
   const [posFilter,setPosFilter]=useState(()=>new Set(["WR","RB","TE","QB"]));
   const [publishMsg,setPublishMsg]=useState('');
   const [lastUpdated,setLastUpdated]=useState(null);
+  const [adminSettings,setAdminSettings]=useState(DEFAULT_SETTINGS);
+  const [adminMissing,setAdminMissing]=useState(false);
   const [showAddPlayer,setShowAddPlayer]=useState(false);
   const [newP,setNewP]=useState({name:'',pos:'WR',college:''});
 
@@ -1525,10 +1570,17 @@ function AdminApp(){
 
   useEffect(()=>{
     if(!session) return;
-    fetchOfficialRankings().then(row=>{
-      if(row?.data && Array.isArray(row.data)){ setList(row.data); setLastUpdated(row.updated_at); }
+    fetchOfficialRankings(adminSettings).then(row=>{
+      if(row?.data && Array.isArray(row.data)){
+        setList(row.data);
+        setLastUpdated(row.updated_at);
+        setAdminMissing(!sameSettings(row.settings,adminSettings));
+      } else {
+        setLastUpdated(null);
+        setAdminMissing(true);
+      }
     });
-  },[session]);
+  },[session,adminSettings]);
 
   const login=async()=>{
     setLoginErr('');
@@ -1540,10 +1592,11 @@ function AdminApp(){
 
   const publish=async()=>{
     setPublishMsg('Publishing...');
-    const { error } = await publishOfficialRankings(list);
+    const { error } = await publishOfficialRankings(list, adminSettings);
     if(error){ setPublishMsg('Error: '+(error.message||error)); return; }
     setPublishMsg('Published! Live on the site.');
     setLastUpdated(new Date().toISOString());
+    setAdminMissing(false);
     setTimeout(()=>setPublishMsg(''),3000);
   };
 
@@ -1601,6 +1654,11 @@ function AdminApp(){
         </div>
       </div>
       {publishMsg&&<div style={{padding:'8px 16px',background:publishMsg.startsWith('Error')?'#3a1010':'#103a10',color:publishMsg.startsWith('Error')?'#ef4444':'#10b981',fontSize:12,fontWeight:700}}>{publishMsg}</div>}
+      <div style={{padding:'12px 16px',background:'#0a0a0a',borderBottom:'1px solid #222'}}>
+        <div style={{fontSize:10,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
+        <SettingsToggleBar value={adminSettings} onChange={setAdminSettings}/>
+        {adminMissing&&<div style={{fontSize:11,color:'#d97706',marginTop:8}}>⚠ No ranking published for this combo yet. Editing will start from the most recent ranking — hit PUBLISH to create a new set for these settings.</div>}
+      </div>
       {showAddPlayer&&(
         <div style={{padding:'12px 16px',background:'#0f0f0f',borderBottom:'1px solid #222',display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
           <div style={{display:'flex',flexDirection:'column',gap:3,flex:'1 1 200px',minWidth:140}}>
