@@ -159,6 +159,15 @@ const fetchLeagueChampionships = async (lg) => {
 
 function TeamTab() {
   const [username, setUsername]           = useState(()=>loadStorage('pfk_sleeper_user',''));
+  useEffect(()=>{
+    if(username||!sb) return;
+    sb.auth.getSession().then(({data})=>{
+      const uid=data.session?.user?.id; if(!uid) return;
+      sb.from('users').select('sleeper_username').eq('id',uid).maybeSingle().then(({data:u})=>{
+        if(u?.sleeper_username) setUsername(u.sleeper_username);
+      });
+    });
+  },[]);
   const [sleeperUser, setSleeperUser]     = useState(()=>loadStorage('pfk_sleeper_obj',null));
   const [leagues, setLeagues]             = useState([]);
   const [league, setLeague]               = useState(null);
@@ -1031,6 +1040,50 @@ function App(){
   const [saved,setSaved]=useState(false);
   const [officialUpdated,setOfficialUpdated]=useState(null);
   const [officialList,setOfficialList]=useState(null);
+  const [session,setSession]=useState(null);
+  const [userRow,setUserRow]=useState(null);
+  const [authOpen,setAuthOpen]=useState(false);
+  const [authMode,setAuthMode]=useState('signin');
+  const [authEmail,setAuthEmail]=useState('');
+  const [authPassword,setAuthPassword]=useState('');
+  const [authSleeper,setAuthSleeper]=useState('');
+  const [authMsg,setAuthMsg]=useState('');
+
+  useEffect(()=>{
+    if(!sb) return;
+    sb.auth.getSession().then(({data})=>setSession(data.session));
+    const { data:sub } = sb.auth.onAuthStateChange((_e,s)=>setSession(s));
+    return ()=>sub?.subscription?.unsubscribe?.();
+  },[]);
+
+  useEffect(()=>{
+    if(!session||!sb){ setUserRow(null); return; }
+    sb.from('users').select('*').eq('id',session.user.id).maybeSingle().then(({data})=>{
+      if(data) setUserRow(data);
+    });
+  },[session]);
+
+  const doAuth=async()=>{
+    setAuthMsg('');
+    if(!sb){ setAuthMsg('Backend not loaded'); return; }
+    if(authMode==='signup'){
+      const { data, error } = await sb.auth.signUp({email:authEmail,password:authPassword});
+      if(error){ setAuthMsg(error.message); return; }
+      const uid = data.user?.id;
+      if(uid){
+        await sb.from('users').upsert({ id:uid, email:authEmail, sleeper_username:authSleeper||null });
+      }
+      setAuthMsg('Account created! Check your email to verify, then log in.');
+      setAuthMode('signin');
+    }else{
+      const { error } = await sb.auth.signInWithPassword({email:authEmail,password:authPassword});
+      if(error){ setAuthMsg(error.message); return; }
+      setAuthOpen(false);
+      setAuthEmail(''); setAuthPassword(''); setAuthSleeper('');
+    }
+  };
+
+  const doLogout=async()=>{ if(sb) await sb.auth.signOut(); };
 
   useEffect(()=>{
     fetchOfficialRankings().then(row=>{
@@ -1050,6 +1103,32 @@ function App(){
   },[activeListId]);
 
   useEffect(()=>{ localStorage.setItem("pfk_saved_lists",JSON.stringify(savedLists)); },[savedLists]);
+
+  useEffect(()=>{
+    if(!session||!sb) return;
+    sb.from('user_rankings').select('*').eq('user_id',session.user.id).then(({data})=>{
+      if(data&&data.length){
+        setSavedLists(data.map(r=>({id:'cloud_'+r.id,cloudId:r.id,name:r.name,items:r.items})));
+        setActiveListId('cloud_'+data[0].id);
+      }
+    });
+  },[session]);
+
+  useEffect(()=>{
+    if(!session||!sb) return;
+    const t=setTimeout(()=>{
+      savedLists.forEach(l=>{
+        if(l.cloudId){
+          sb.from('user_rankings').update({name:l.name,items:l.items,updated_at:new Date().toISOString()}).eq('id',l.cloudId);
+        }else{
+          sb.from('user_rankings').insert({user_id:session.user.id,name:l.name,items:l.items}).select().single().then(({data})=>{
+            if(data) setSavedLists(prev=>prev.map(x=>x.id===l.id?{...x,id:'cloud_'+data.id,cloudId:data.id}:x));
+          });
+        }
+      });
+    },1000);
+    return ()=>clearTimeout(t);
+  },[savedLists,session]);
   useEffect(()=>{ localStorage.setItem("pfk_active_list_id",activeListId); },[activeListId]);
   useEffect(()=>{ localStorage.setItem("pfk_roster",JSON.stringify(teamRoster)); },[teamRoster]);
   useEffect(()=>{ localStorage.setItem("pfk_picks",JSON.stringify(picks)); },[picks]);
@@ -1108,6 +1187,22 @@ function App(){
 
   return(
     <div style={{background:"#080808",minHeight:"100vh",color:"#f0f0f0",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      {authOpen&&(
+        <div onClick={()=>setAuthOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:380,background:"#111",border:"1px solid #FFD700",borderRadius:12,padding:24}}>
+            <div style={{display:"flex",gap:4,marginBottom:18,background:"#0a0a0a",borderRadius:8,padding:4}}>
+              <button onClick={()=>setAuthMode('signin')} style={{flex:1,padding:"8px",background:authMode==='signin'?"#FFD700":"transparent",color:authMode==='signin'?"#000":"#888",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1}}>SIGN IN</button>
+              <button onClick={()=>setAuthMode('signup')} style={{flex:1,padding:"8px",background:authMode==='signup'?"#FFD700":"transparent",color:authMode==='signup'?"#000":"#888",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1}}>SIGN UP</button>
+            </div>
+            <input placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} style={{width:"100%",padding:10,marginBottom:10,background:"#000",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
+            <input type="password" placeholder="Password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doAuth()} style={{width:"100%",padding:10,marginBottom:10,background:"#000",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
+            {authMode==='signup'&&<input placeholder="Sleeper username (optional)" value={authSleeper} onChange={e=>setAuthSleeper(e.target.value)} style={{width:"100%",padding:10,marginBottom:10,background:"#000",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>}
+            <button onClick={doAuth} style={{width:"100%",padding:12,background:"#FFD700",color:"#000",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",letterSpacing:1,fontSize:12}}>{authMode==='signup'?'CREATE ACCOUNT':'SIGN IN'}</button>
+            {authMsg&&<div style={{color:authMsg.includes('created')?"#10b981":"#ef4444",fontSize:11,marginTop:10,textAlign:"center"}}>{authMsg}</div>}
+            <div style={{textAlign:"center",marginTop:14}}><button onClick={()=>setAuthOpen(false)} style={{background:"none",border:"none",color:"#666",fontSize:11,cursor:"pointer"}}>Close</button></div>
+          </div>
+        </div>
+      )}
       <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
           <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:54,height:54,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
@@ -1120,6 +1215,19 @@ function App(){
             {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ My 2026 Rookies"],["team","📊 Power Rankings"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {session?(
+              <>
+                <div style={{fontSize:11,color:"#FFD700",fontWeight:700,textAlign:"right"}}>
+                  <div style={{fontSize:10}}>{session.user.email}</div>
+                  {userRow?.sleeper_username&&<div style={{fontSize:9,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
+                </div>
+                <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11}}>Sign out</button>
+              </>
+            ):(
+              <button onClick={()=>{setAuthMode('signin');setAuthOpen(true);}} style={{padding:"8px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:11,letterSpacing:1}}>SIGN IN</button>
+            )}
           </div>
         </div>
       </div>
