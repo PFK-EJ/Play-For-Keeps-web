@@ -549,10 +549,11 @@ function TeamTab() {
                 {hasFc&&posTotalD>0&&(()=>{
                   const pr=posRanks[team.roster_id]?.[pos];
                   const n=ranked.length;
+                  if(!pr?.dRank) return null;
                   return (
-                    <span style={{marginLeft:'auto',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                      <span style={{fontSize:10,color:'#FFD700',fontWeight:700}}>DYN {(posTotalD/1000).toFixed(1)}k{pr?.dRank?` · #${pr.dRank}/${n}`:''}</span>
-                      <span style={{fontSize:10,color:'#3b82f6',fontWeight:700}}>RDFT {(posTotalR/1000).toFixed(1)}k{pr?.rRank?` · #${pr.rRank}/${n}`:''}</span>
+                    <span style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                      <span style={{fontSize:13,color:'#FFD700',fontWeight:900,letterSpacing:0.5}}>DYN #{pr.dRank}/{n}</span>
+                      <span style={{fontSize:13,color:'#3b82f6',fontWeight:900,letterSpacing:0.5}}>RDFT #{pr.rRank}/{n}</span>
                     </span>
                   );
                 })()}
