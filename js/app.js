@@ -224,6 +224,7 @@ function TeamTab() {
   const [error, setError]                 = useState('');
   const [fcError, setFcError]             = useState(false);
   const [lastFetched, setLastFetched]     = useState(null);
+  const [viewMode, setViewMode]           = useState('dynasty');
   const inp2 = ex=>({padding:'7px 10px',background:'#0d0d0d',border:'1px solid #333',borderRadius:7,color:'#fff',fontSize:13,fontFamily:'inherit',...ex});
 
   const connectUser = async () => {
@@ -475,8 +476,9 @@ function TeamTab() {
       if(pos&&byPos[pos]) byPos[pos].push({pid,fc});
       else if(fc) byPos['WR']?.push({pid,fc}); // fallback for flex/unknown
     });
-    // Sort each group by dynasty value desc
-    POS_ORDER.forEach(p=>{ byPos[p].sort((a,b)=>(b.fc?.value||0)-(a.fc?.value||0)); });
+    // Sort each group by chosen value desc
+    const valKey = viewMode==='redraft' ? 'redraftValue' : 'value';
+    POS_ORDER.forEach(p=>{ byPos[p].sort((a,b)=>(b.fc?.[valKey]||0)-(a.fc?.[valKey]||0)); });
 
     const myChamps = champCounts[sleeperUser?.user_id]||0;
 
@@ -683,11 +685,16 @@ function TeamTab() {
         <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
             <span style={{fontSize:13,fontWeight:900,color:'#FFD700',textTransform:'uppercase',letterSpacing:1}}>📊 League Standings</span>
-            {championships.length>0&&<span style={{fontSize:10,color:'#555',marginLeft:4}}>🏆 = league titles</span>}
+            <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2,marginLeft:'auto'}}>
+              {['dynasty','redraft'].map(m=>(
+                <button key={m} onClick={()=>setViewMode(m)} style={{padding:'4px 10px',background:viewMode===m?(m==='dynasty'?'#FFD700':'#3b82f6'):'transparent',color:viewMode===m?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:1,textTransform:'uppercase'}}>{m}</button>
+              ))}
+            </div>
+            {championships.length>0&&<span style={{fontSize:10,color:'#555',width:'100%'}}>🏆 = league titles</span>}
           </div>
           {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:11,color:'#f59e0b',marginBottom:12}}>⚠️ FantasyCalc unavailable — showing Sleeper rosters only.</div>}
           <div style={{display:'flex',flexDirection:'column',gap:5}}>
-            {ranked.map((t,i)=>{
+            {[...ranked].sort((a,b)=>viewMode==='redraft'?a.rRank-b.rRank:a.dRank-b.dRank).map((t,i)=>{
               const isMe=t.owner_id===sleeperUser?.user_id;
               const rings=champCounts[t.owner_id]||0;
               return (
@@ -700,7 +707,7 @@ function TeamTab() {
                     <div style={{display:'flex',gap:10,flexShrink:0,alignItems:'center'}}>
                       <span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>D {(t.dVal/1000).toFixed(1)}k</span>
                       <span style={{fontSize:11,color:'#3b82f6',fontWeight:700}}>R {(t.rVal/1000).toFixed(1)}k</span>
-                      <span style={{fontSize:10,color:'#555'}}>Rdft #{t.rRank}</span>
+                      <span style={{fontSize:10,color:'#555'}}>{viewMode==='redraft'?`Dyn #${t.dRank}`:`Rdft #${t.rRank}`}</span>
                     </div>
                   )}
                 </div>
