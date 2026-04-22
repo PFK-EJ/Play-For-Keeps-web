@@ -909,6 +909,186 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
   );
 }
 
+function TradePollsTab({session,onRequestSignIn}){
+  const [polls,setPolls]=useState([]);
+  const [myVotes,setMyVotes]=useState({});
+  const [loading,setLoading]=useState(true);
+  const [showCreate,setShowCreate]=useState(false);
+  const [newOpts,setNewOpts]=useState(['','']);
+  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',ppr:'1.0',tep:'0.5',passTd:'6',ppc:'0',status:''});
+  const [err,setErr]=useState('');
+
+  const load=useCallback(async()=>{
+    if(!sb){ setLoading(false); return; }
+    setLoading(true);
+    const { data:polls } = await sb.from('polls').select('id,title,options,settings,created_at,poll_votes(option_index,user_id)').order('created_at',{ascending:false}).limit(100);
+    const list=(polls||[]).map(p=>{
+      const counts=Array(p.options.length).fill(0);
+      (p.poll_votes||[]).forEach(v=>{ if(counts[v.option_index]!==undefined) counts[v.option_index]++; });
+      return {...p, counts, total:(p.poll_votes||[]).length};
+    });
+    setPolls(list);
+    if(session){
+      const mine={};
+      (polls||[]).forEach(p=>{
+        const v=(p.poll_votes||[]).find(x=>x.user_id===session.user.id);
+        if(v) mine[p.id]=v.option_index;
+      });
+      setMyVotes(mine);
+    }else{ setMyVotes({}); }
+    setLoading(false);
+  },[session]);
+
+  useEffect(()=>{ load(); },[load]);
+
+  const castVote=async(pollId,idx)=>{
+    if(!session){ onRequestSignIn(); return; }
+    setMyVotes(m=>({...m,[pollId]:idx}));
+    setPolls(prev=>prev.map(p=>{
+      if(p.id!==pollId) return p;
+      const counts=[...p.counts];
+      const prior=myVotes[pollId];
+      if(prior!==undefined&&prior!==idx) counts[prior]=Math.max(0,counts[prior]-1);
+      if(prior!==idx) counts[idx]++;
+      return {...p,counts,total:prior===undefined?p.total+1:p.total};
+    }));
+    await sb.from('poll_votes').upsert({poll_id:pollId,user_id:session.user.id,option_index:idx,updated_at:new Date().toISOString()});
+  };
+
+  const createPoll=async()=>{
+    setErr('');
+    const opts=newOpts.map(o=>o.trim()).filter(Boolean);
+    if(opts.length<2){ setErr('Need at least 2 options.'); return; }
+    const settings={ teams:Number(newSettings.teams)||null, format:newSettings.format, ppr:Number(newSettings.ppr), tep:Number(newSettings.tep), passTd:Number(newSettings.passTd)||null, ppc:Number(newSettings.ppc)||0, status:newSettings.status||null };
+    const { data, error } = await sb.from('polls').insert({created_by:session.user.id,title:'',options:opts,settings}).select().single();
+    if(error){ setErr(error.message); return; }
+    setNewOpts(['','']); setShowCreate(false);
+    setPolls(prev=>[{...data,counts:Array(opts.length).fill(0),total:0,poll_votes:[]},...prev]);
+  };
+
+  const addOpt=()=>setNewOpts(o=>o.length>=10?o:[...o,'']);
+  const setOpt=(i,v)=>setNewOpts(o=>o.map((x,j)=>j===i?v:x));
+  const rmOpt=(i)=>setNewOpts(o=>o.length<=2?o:o.filter((_,j)=>j!==i));
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,gap:10,flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1}}>TRADE POLLS</div>
+          <div style={{fontSize:11,color:'#777',marginTop:2}}>Post a trade, vote anonymously. You can change your vote anytime.</div>
+        </div>
+        {session?(
+          <button onClick={()=>setShowCreate(s=>!s)} style={{padding:'10px 18px',background:'#FFD700',color:'#000',border:'none',borderRadius:8,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>{showCreate?'✕ CANCEL':'+ NEW POLL'}</button>
+        ):(
+          <button onClick={onRequestSignIn} style={{padding:'10px 18px',background:'transparent',color:'#FFD700',border:'1px solid #FFD700',borderRadius:8,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>SIGN IN TO POST</button>
+        )}
+      </div>
+
+      {showCreate&&(
+        <div style={{background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:16,marginBottom:18}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:12}}>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TEAMS</label>
+              <input value={newSettings.teams} onChange={e=>setNewSettings({...newSettings,teams:e.target.value})} placeholder="12" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>FORMAT</label>
+              <select value={newSettings.format} onChange={e=>setNewSettings({...newSettings,format:e.target.value})} style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}>
+                <option>Superflex</option><option>1QB</option>
+              </select>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PPR</label>
+              <input value={newSettings.ppr} onChange={e=>setNewSettings({...newSettings,ppr:e.target.value})} placeholder="1.0" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TE PREMIUM</label>
+              <input value={newSettings.tep} onChange={e=>setNewSettings({...newSettings,tep:e.target.value})} placeholder="1.0" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PASS TD</label>
+              <input value={newSettings.passTd} onChange={e=>setNewSettings({...newSettings,passTd:e.target.value})} placeholder="6" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PPC</label>
+              <input value={newSettings.ppc} onChange={e=>setNewSettings({...newSettings,ppc:e.target.value})} placeholder="0" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TEAM STATUS (optional)</label>
+              <select value={newSettings.status} onChange={e=>setNewSettings({...newSettings,status:e.target.value})} style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}>
+                <option value="">—</option>
+                <option>Contender</option>
+                <option>Rebuilding</option>
+              </select>
+            </div>
+          </div>
+          {newOpts.map((o,i)=>(
+            <div key={i} style={{display:'flex',gap:6,marginBottom:6}}>
+              <input value={o} onChange={e=>setOpt(i,e.target.value)} placeholder={`Option ${i+1} (e.g., 'Accept', 'Decline', 'Counter')`} style={{flex:1,padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+              {newOpts.length>2&&<button onClick={()=>rmOpt(i)} style={{padding:'0 10px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#666',cursor:'pointer'}}>✕</button>}
+            </div>
+          ))}
+          <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+            {newOpts.length<10&&<button onClick={addOpt} style={{padding:'7px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#aaa',cursor:'pointer',fontSize:12}}>+ Option</button>}
+            <button onClick={createPoll} style={{padding:'7px 18px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1,marginLeft:'auto'}}>POST POLL</button>
+          </div>
+          {err&&<div style={{color:'#ef4444',fontSize:12,marginTop:8}}>{err}</div>}
+        </div>
+      )}
+
+      {loading?(
+        <div style={{padding:40,color:'#555',textAlign:'center',fontSize:13}}>Loading polls...</div>
+      ):polls.length===0?(
+        <div style={{padding:40,color:'#555',textAlign:'center',fontSize:13,background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:10}}>No polls yet. Be the first to post one!</div>
+      ):(
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {polls.map(p=>{
+            const myIdx=myVotes[p.id];
+            const voted=myIdx!==undefined;
+            return (
+              <div key={p.id} style={{background:'#0f0f0f',border:'1px solid #222',borderRadius:10,padding:16}}>
+                {p.title&&<div style={{fontWeight:700,fontSize:14,marginBottom:8,color:'#eee'}}>{p.title}</div>}
+                {p.settings&&(
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+                    {p.settings.teams&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.teams}-team</span>}
+                    {p.settings.format&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.format}</span>}
+                    {(p.settings.ppr||p.settings.ppr===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.ppr} PPR</span>}
+                    {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.tep} TEP</span>}
+                    {p.settings.passTd&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
+                    {p.settings.ppc>0&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#FFD700',fontWeight:700}}>{p.settings.ppc} PPC</span>}
+                    {p.settings.status&&<span style={{padding:'4px 10px',background:'#FFD700',border:'1px solid #FFD700',borderRadius:12,fontSize:11,color:'#000',fontWeight:800}}>{p.settings.status}</span>}
+                  </div>
+                )}
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {p.options.map((opt,i)=>{
+                    const pct=p.total>0?Math.round((p.counts[i]/p.total)*100):0;
+                    const isMine=myIdx===i;
+                    return (
+                      <button key={i} onClick={()=>castVote(p.id,i)} style={{position:'relative',textAlign:'left',padding:'10px 14px',background:'#0a0a0a',border:isMine?'2px solid #FFD700':'1px solid #2a2a2a',borderRadius:8,color:'#eee',cursor:'pointer',overflow:'hidden',fontSize:13,fontWeight:isMine?700:500}}>
+                        <div style={{position:'absolute',left:0,top:0,bottom:0,width:pct+'%',background:isMine?'rgba(255,215,0,0.18)':'rgba(255,255,255,0.06)',transition:'width 0.25s'}}/>
+                        <div style={{position:'relative',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+                          <span>{isMine&&'✓ '}{opt}</span>
+                          <span style={{fontSize:11,color:'#999',fontWeight:700,flexShrink:0}}>{p.counts[i]} · {pct}%</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:10,display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:11,color:'#555'}}>
+                  <span>{p.total} vote{p.total===1?'':'s'} · anonymous</span>
+                  <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                </div>
+                {!session&&<div style={{marginTop:6,fontSize:10,color:'#666'}}>Sign in to vote</div>}
+                {voted&&<div style={{marginTop:6,fontSize:10,color:'#666'}}>You can change your vote by tapping another option.</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OutlookTab() {
   const ranked      = loadStorage('pfk_ranked', []);
   const leagueName  = loadStorage('pfk_league_name', '');
@@ -1057,9 +1237,12 @@ function App(){
 
   useEffect(()=>{
     if(!session||!sb){ setUserRow(null); return; }
-    sb.from('users').select('*').eq('id',session.user.id).maybeSingle().then(({data})=>{
-      if(data) setUserRow(data);
-    });
+    (async()=>{
+      const { data } = await sb.from('users').select('*').eq('id',session.user.id).maybeSingle();
+      if(data){ setUserRow(data); return; }
+      const { data:inserted } = await sb.from('users').insert({id:session.user.id,email:session.user.email}).select().maybeSingle();
+      if(inserted) setUserRow(inserted);
+    })();
   },[session]);
 
   const doAuth=async()=>{
@@ -1211,7 +1394,7 @@ function App(){
           </div>
           {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:11,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
           <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
-            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ My 2026 Rookies"],["team","📊 Power Rankings"]].map(([t,l])=>(
+            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ My 2026 Rookies"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
           </div>
@@ -1309,6 +1492,7 @@ function App(){
           </div>
         )}
         {tab==="team"&&<TeamTab/>}
+        {tab==="polls"&&<TradePollsTab session={session} onRequestSignIn={()=>{setAuthMode('signin');setAuthOpen(true);}}/>}
       </div>
     </div>
   );
