@@ -435,6 +435,28 @@ function TeamTab() {
 
   const myTeam = ranked.find(r=>r.owner_id===sleeperUser?.user_id);
 
+  const posRanks = useMemo(()=>{
+    if(!ranked.length) return {};
+    const totals = {};
+    ranked.forEach(t=>{
+      const row={}; POS_ORDER.forEach(p=>row[p]={d:0,r:0});
+      t.allPlayers.forEach(pid=>{
+        const fc=fcMap[pid]; const pos=fc?.player?.position;
+        if(pos&&row[pos]){ row[pos].d+=fc.value||0; row[pos].r+=fc.redraftValue||0; }
+      });
+      totals[t.roster_id]=row;
+    });
+    const rankMap={};
+    ranked.forEach(t=>{ rankMap[t.roster_id]={}; POS_ORDER.forEach(p=>rankMap[t.roster_id][p]={}); });
+    POS_ORDER.forEach(p=>{
+      const byD=[...ranked].sort((a,b)=>totals[b.roster_id][p].d-totals[a.roster_id][p].d);
+      const byR=[...ranked].sort((a,b)=>totals[b.roster_id][p].r-totals[a.roster_id][p].r);
+      byD.forEach((t,i)=>{ rankMap[t.roster_id][p].dRank=i+1; });
+      byR.forEach((t,i)=>{ rankMap[t.roster_id][p].rRank=i+1; });
+    });
+    return rankMap;
+  },[ranked,fcMap]);
+
   const myPicks = useMemo(()=>{
     if(!myTeam||!rosters.length) return [];
     const now2=new Date(); const startYr=now2.getFullYear()+(now2.getMonth()>=8?1:0);
@@ -524,12 +546,16 @@ function TeamTab() {
               <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 10px',background:'#111',borderLeft:'3px solid '+col,borderRadius:'5px 5px 0 0',marginBottom:3}}>
                 <span style={{fontWeight:900,color:col,fontSize:11,letterSpacing:1}}>{pos}</span>
                 <span style={{fontSize:10,color:col}}>({group.length})</span>
-                {hasFc&&posTotalD>0&&(
-                  <span style={{marginLeft:'auto',display:'flex',gap:10}}>
-                    <span style={{fontSize:10,color:'#FFD700',fontWeight:700}}>DYN {(posTotalD/1000).toFixed(1)}k</span>
-                    <span style={{fontSize:10,color:'#3b82f6',fontWeight:700}}>RDFT {(posTotalR/1000).toFixed(1)}k</span>
-                  </span>
-                )}
+                {hasFc&&posTotalD>0&&(()=>{
+                  const pr=posRanks[team.roster_id]?.[pos];
+                  const n=ranked.length;
+                  return (
+                    <span style={{marginLeft:'auto',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                      <span style={{fontSize:10,color:'#FFD700',fontWeight:700}}>DYN {(posTotalD/1000).toFixed(1)}k{pr?.dRank?` · #${pr.dRank}/${n}`:''}</span>
+                      <span style={{fontSize:10,color:'#3b82f6',fontWeight:700}}>RDFT {(posTotalR/1000).toFixed(1)}k{pr?.rRank?` · #${pr.rRank}/${n}`:''}</span>
+                    </span>
+                  );
+                })()}
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:2}}>
                 {group.map(({pid,fc})=>{
