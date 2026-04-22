@@ -1138,7 +1138,7 @@ function App(){
   const createList=()=>{
     const id='list_'+Date.now();
     const n=savedLists.length+1;
-    setSavedLists(prev=>[...prev,{id,name:`List ${n}`,items:buildInitialList()}]);
+    setSavedLists(prev=>[...prev,{id,name:`List ${n}`,items:officialList||buildInitialList()}]);
     setActiveListId(id);
     setHistory([]);
   };
