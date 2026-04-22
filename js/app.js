@@ -533,7 +533,7 @@ function TeamTab() {
                       <span style={{flex:1,fontSize:11,color:'#666'}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
                       {p.round===1
                         ? <span style={{fontSize:11,fontWeight:700,color:'#FFD700',flexShrink:0}}>{fcVal>0?(fcVal/1000).toFixed(1)+'k':'—'}</span>
-                        : <span style={{fontSize:10,color:'#444',flexShrink:0}}>no FC value</span>
+                        : null
                       }
                     </div>
                   );
