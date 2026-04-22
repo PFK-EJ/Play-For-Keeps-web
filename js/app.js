@@ -225,6 +225,7 @@ function TeamTab() {
   const [fcError, setFcError]             = useState(false);
   const [lastFetched, setLastFetched]     = useState(null);
   const [viewMode, setViewMode]           = useState('dynasty');
+  const [selectedOtherRid, setSelectedOtherRid] = useState(null);
   const inp2 = ex=>({padding:'7px 10px',background:'#0d0d0d',border:'1px solid #333',borderRadius:7,color:'#fff',fontSize:13,fontFamily:'inherit',...ex});
 
   const connectUser = async () => {
@@ -251,6 +252,19 @@ function TeamTab() {
       setLoading('');
     } catch(e){ setError(e.message); setLoading(''); }
   };
+
+  useEffect(()=>{
+    if(username) localStorage.setItem('pfk_sleeper_user', username);
+  },[username]);
+
+  const autoTriedRef = useRef(false);
+  useEffect(()=>{
+    if(autoTriedRef.current) return;
+    if(username && !sleeperUser && !loading){
+      autoTriedRef.current = true;
+      connectUser();
+    }
+  },[username,sleeperUser,loading]);
 
   const NO_CACHE = {cache:'no-store'};
 
@@ -465,12 +479,12 @@ function TeamTab() {
   },[ranked]);
 
   // ── Grouped roster renderer ──
-  const RosterSection = () => {
-    if (!myTeam) return null;
+  const RosterSection = ({ team, showPicks }) => {
+    if (!team) return null;
     const hasFc = fcValues.length > 0;
     const byPos = {};
     POS_ORDER.forEach(p=>{ byPos[p]=[]; });
-    myTeam.allPlayers.forEach(pid=>{
+    team.allPlayers.forEach(pid=>{
       const fc=fcMap[pid];
       const pos=fc?.player?.position;
       if(pos&&byPos[pos]) byPos[pos].push({pid,fc});
@@ -480,16 +494,16 @@ function TeamTab() {
     const valKey = viewMode==='redraft' ? 'redraftValue' : 'value';
     POS_ORDER.forEach(p=>{ byPos[p].sort((a,b)=>(b.fc?.[valKey]||0)-(a.fc?.[valKey]||0)); });
 
-    const myChamps = champCounts[sleeperUser?.user_id]||0;
+    const teamChamps = champCounts[team.owner_id]||0;
 
     return (
       <div>
         {/* Roster header */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-          <span style={{fontSize:11,fontWeight:700,color:'#555',letterSpacing:1}}>ROSTER · {myTeam.allPlayers.length} PLAYERS</span>
-          {myChamps>0&&(
+          <span style={{fontSize:11,fontWeight:700,color:'#555',letterSpacing:1}}>ROSTER · {team.allPlayers.length} PLAYERS</span>
+          {teamChamps>0&&(
             <span style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',background:'#111',border:'1px solid #FFD700',borderRadius:20,fontSize:11,fontWeight:800,color:'#FFD700'}}>
-              {'🏆'.repeat(Math.min(myChamps,5))} {myChamps} LEAGUE TITLE{myChamps>1?'S':''}
+              {'🏆'.repeat(Math.min(teamChamps,5))} {teamChamps} LEAGUE TITLE{teamChamps>1?'S':''}
             </span>
           )}
           {hasFc&&(
@@ -511,9 +525,9 @@ function TeamTab() {
                 <span style={{fontWeight:900,color:col,fontSize:11,letterSpacing:1}}>{pos}</span>
                 <span style={{fontSize:10,color:col}}>({group.length})</span>
                 {hasFc&&posTotalD>0&&(
-                  <span style={{marginLeft:'auto',display:'flex',gap:8}}>
-                    <span style={{fontSize:10,color:'#FFD700',fontWeight:700}}>{(posTotalD/1000).toFixed(1)}k</span>
-                    <span style={{fontSize:10,color:'#3b82f6',fontWeight:700}}>{(posTotalR/1000).toFixed(1)}k</span>
+                  <span style={{marginLeft:'auto',display:'flex',gap:10}}>
+                    <span style={{fontSize:10,color:'#FFD700',fontWeight:700}}>DYN {(posTotalD/1000).toFixed(1)}k</span>
+                    <span style={{fontSize:10,color:'#3b82f6',fontWeight:700}}>RDFT {(posTotalR/1000).toFixed(1)}k</span>
                   </span>
                 )}
               </div>
@@ -541,7 +555,7 @@ function TeamTab() {
         })}
 
         {/* Draft Capital */}
-        {myPicks.length>0&&(
+        {showPicks&&myPicks.length>0&&(
           <div style={{marginTop:4}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 10px',background:'#111',borderLeft:'3px solid #FFD700',borderRadius:'5px 5px 0 0',marginBottom:3}}>
               <span style={{fontWeight:900,color:'#FFD700',fontSize:11,letterSpacing:1}}>DRAFT CAPITAL</span>
@@ -675,9 +689,36 @@ function TeamTab() {
             </div>
           )}
           {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:11,color:'#f59e0b',marginBottom:14}}>⚠️ FantasyCalc values unavailable — showing Sleeper roster only.</div>}
-          <RosterSection/>
+          <RosterSection team={myTeam} showPicks={true}/>
         </div>
       )}
+
+      {/* Other team roster (click-to-view) */}
+      {(()=>{
+        const other = ranked.find(t=>t.roster_id===selectedOtherRid);
+        if(!other || other.owner_id===sleeperUser?.user_id) return null;
+        return (
+          <div style={{background:'#0f0f0f',border:`2px solid ${other.arc.color}`,borderRadius:14,padding:24}}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap',marginBottom:18}}>
+              <div style={{flex:1,minWidth:180}}>
+                <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:2,marginBottom:4}}>VIEWING</div>
+                <div style={{fontSize:20,fontWeight:900,color:'#f0f0f0'}}>{other.teamName}</div>
+                <div style={{display:'flex',gap:10,marginTop:4,flexWrap:'wrap'}}>
+                  <span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>Dyn #{other.dRank} · {(other.dVal/1000).toFixed(1)}k</span>
+                  <span style={{fontSize:11,color:'#3b82f6',fontWeight:700}}>Rdft #{other.rRank} · {(other.rVal/1000).toFixed(1)}k</span>
+                </div>
+              </div>
+              <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${other.arc.color}`,borderRadius:10,flexShrink:0}}>
+                <div style={{fontSize:26}}>{other.arc.emoji}</div>
+                <div style={{fontSize:15,fontWeight:900,color:other.arc.color,marginTop:2,letterSpacing:1}}>{other.arc.label.toUpperCase()}</div>
+                <div style={{fontSize:10,color:'#888',marginTop:3,maxWidth:160}}>{other.arc.desc}</div>
+              </div>
+              <button onClick={()=>setSelectedOtherRid(null)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:11,fontWeight:700}}>✕ Close</button>
+            </div>
+            <RosterSection team={other} showPicks={false}/>
+          </div>
+        );
+      })()}
 
       {/* League Standings + Championship History — side-by-side on desktop */}
       <div className="pfk-pr-grid">
@@ -697,8 +738,10 @@ function TeamTab() {
             {[...ranked].sort((a,b)=>viewMode==='redraft'?a.rRank-b.rRank:a.dRank-b.dRank).map((t,i)=>{
               const isMe=t.owner_id===sleeperUser?.user_id;
               const rings=champCounts[t.owner_id]||0;
+              const isSelected=selectedOtherRid===t.roster_id;
+              const clickable=!isMe;
               return (
-                <div key={t.roster_id} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:isMe?'#141414':'#0a0a0a',border:'1px solid '+(isMe?t.arc.color:'#1e1e1e'),borderRadius:9,flexWrap:'wrap'}}>
+                <div key={t.roster_id} onClick={clickable?()=>setSelectedOtherRid(isSelected?null:t.roster_id):undefined} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:isSelected?'#1a1a0a':isMe?'#141414':'#0a0a0a',border:'1px solid '+(isSelected?'#FFD700':isMe?t.arc.color:'#1e1e1e'),borderRadius:9,flexWrap:'wrap',cursor:clickable?'pointer':'default'}}>
                   <span style={{fontSize:13,fontWeight:900,color:i<3?'#FFD700':'#555',width:24,flexShrink:0,textAlign:'center'}}>#{i+1}</span>
                   <span style={{padding:'2px 8px',fontSize:10,fontWeight:800,borderRadius:4,background:'#111',color:t.arc.color,border:'1px solid '+t.arc.color,flexShrink:0,whiteSpace:'nowrap'}}>{t.arc.emoji} {t.arc.label}</span>
                   <span style={{flex:1,fontSize:13,fontWeight:isMe?900:600,color:isMe?'#FFD700':'#f0f0f0',minWidth:100}}>{t.teamName}{isMe?' ★':''}</span>
@@ -1543,7 +1586,7 @@ function App(){
             </div>
           </div>
         )}
-        {tab==="team"&&<TeamTab/>}
+        <div style={{display:tab==="team"?"block":"none"}}><TeamTab/></div>
         {tab==="polls"&&<TradePollsTab session={session} onRequestSignIn={()=>{setAuthMode('signin');setAuthOpen(true);}}/>}
       </div>
     </div>
