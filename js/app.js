@@ -1547,19 +1547,26 @@ function AdminApp(){
   const [password,setPassword]=useState('');
   const [loginErr,setLoginErr]=useState('');
   const [loading,setLoading]=useState(true);
-  const [list,setList]=useState(()=>buildInitialList());
-  const [history,setHistory]=useState([]);
+  const [sets,setSets]=useState({});
   const [editingPlayer,setEditingPlayer]=useState(null);
   const [playerDraft,setPlayerDraft]=useState({});
   const [renamingTier,setRenamingTier]=useState(null);
   const [tierNameDraft,setTierNameDraft]=useState("");
   const [posFilter,setPosFilter]=useState(()=>new Set(["WR","RB","TE","QB"]));
   const [publishMsg,setPublishMsg]=useState('');
-  const [lastUpdated,setLastUpdated]=useState(null);
   const [adminSettings,setAdminSettings]=useState(DEFAULT_SETTINGS);
-  const [adminMissing,setAdminMissing]=useState(false);
   const [showAddPlayer,setShowAddPlayer]=useState(false);
   const [newP,setNewP]=useState({name:'',pos:'WR',college:''});
+
+  const sigOf=s=>`${s.tep}|${s.ppr}|${s.passTd}|${s.ppc}`;
+  const currentSig=sigOf(adminSettings);
+  const bucket=sets[currentSig];
+  const list=bucket?.items||[];
+  const history=bucket?.history||[];
+  const lastUpdated=bucket?.updatedAt||null;
+  const adminMissing=bucket?.missing||false;
+  const isDirty=s=>JSON.stringify(s.items)!==(s.saved||'');
+  const dirtyCount=Object.values(sets).filter(isDirty).length;
 
   useEffect(()=>{
     if(!sb){ setLoading(false); return; }
@@ -1570,17 +1577,18 @@ function AdminApp(){
 
   useEffect(()=>{
     if(!session) return;
-    fetchOfficialRankings(adminSettings).then(row=>{
-      if(row?.data && Array.isArray(row.data)){
-        setList(row.data);
-        setLastUpdated(row.updated_at);
-        setAdminMissing(!sameSettings(row.settings,adminSettings));
-      } else {
-        setLastUpdated(null);
-        setAdminMissing(true);
-      }
+    if(sets[currentSig]) return;
+    const snapshotSettings={...adminSettings};
+    fetchOfficialRankings(snapshotSettings).then(row=>{
+      const hasMatch=row&&row.data&&Array.isArray(row.data)&&sameSettings(row.settings,snapshotSettings);
+      const items=(row?.data&&Array.isArray(row.data))?row.data:buildInitialList();
+      setSets(prev=>prev[currentSig]?prev:{...prev,[currentSig]:{
+        items, saved: hasMatch?JSON.stringify(items):null,
+        updatedAt: hasMatch?row.updated_at:null,
+        missing: !hasMatch, history:[], settings:snapshotSettings
+      }});
     });
-  },[session,adminSettings]);
+  },[session,currentSig]);
 
   const login=async()=>{
     setLoginErr('');
@@ -1591,30 +1599,46 @@ function AdminApp(){
   const logout=async()=>{ await sb.auth.signOut(); };
 
   const publish=async()=>{
-    setPublishMsg('Publishing...');
-    const { error } = await publishOfficialRankings(list, adminSettings);
-    if(error){ setPublishMsg('Error: '+(error.message||error)); return; }
-    setPublishMsg('Published! Live on the site.');
-    setLastUpdated(new Date().toISOString());
-    setAdminMissing(false);
-    setTimeout(()=>setPublishMsg(''),3000);
+    const dirty=Object.entries(sets).filter(([,s])=>isDirty(s));
+    if(!dirty.length){ setPublishMsg('Nothing to publish.'); setTimeout(()=>setPublishMsg(''),2500); return; }
+    setPublishMsg(`Publishing ${dirty.length} combo${dirty.length>1?'s':''}...`);
+    const errors=[];
+    const nowIso=new Date().toISOString();
+    for(const [sig,s] of dirty){
+      const { error } = await publishOfficialRankings(s.items, s.settings);
+      if(error) errors.push(error.message||String(error));
+      else {
+        const snap=JSON.stringify(s.items);
+        setSets(prev=>prev[sig]?{...prev,[sig]:{...prev[sig],saved:snap,updatedAt:nowIso,missing:false}}:prev);
+      }
+    }
+    if(errors.length) setPublishMsg('Error: '+errors.join('; '));
+    else setPublishMsg(`Published ${dirty.length} combo${dirty.length>1?'s':''}! Live on the site.`);
+    setTimeout(()=>setPublishMsg(''),3500);
   };
 
-  const pushHist=()=>setHistory(h=>[...h.slice(-20),list]);
-  const undo=()=>{ if(!history.length) return; setList(history[history.length-1]); setHistory(h=>h.slice(0,-1)); };
+  const mutate=(fn)=>setSets(prev=>{
+    const cur=prev[currentSig]; if(!cur) return prev;
+    const next=fn(cur.items);
+    return {...prev,[currentSig]:{...cur,items:next,history:[...cur.history.slice(-20),cur.items]}};
+  });
+  const undo=()=>setSets(prev=>{
+    const cur=prev[currentSig]; if(!cur||!cur.history.length) return prev;
+    return {...prev,[currentSig]:{...cur,items:cur.history[cur.history.length-1],history:cur.history.slice(0,-1)}};
+  });
 
-  const onReorder=(fromId,beforeId)=>{ pushHist(); setList(prev=>{ const l=[...prev], fi=l.findIndex(x=>x.id===fromId); if(fi<0) return prev; const [item]=l.splice(fi,1); if(beforeId===null){ l.push(item); }else{ const ti=l.findIndex(x=>x.id===beforeId); l.splice(ti!==-1?ti:l.length,0,item); } return l; }); };
-  const onMove=(id,dir)=>{ pushHist(); setList(prev=>{ const l=[...prev], i=l.findIndex(x=>x.id===id), sw=i+dir; if(sw<0||sw>=l.length) return l; [l[i],l[sw]]=[l[sw],l[i]]; return l; }); };
+  const onReorder=(fromId,beforeId)=>mutate(prev=>{ const l=[...prev], fi=l.findIndex(x=>x.id===fromId); if(fi<0) return prev; const [item]=l.splice(fi,1); if(beforeId===null){ l.push(item); }else{ const ti=l.findIndex(x=>x.id===beforeId); l.splice(ti!==-1?ti:l.length,0,item); } return l; });
+  const onMove=(id,dir)=>mutate(prev=>{ const l=[...prev], i=l.findIndex(x=>x.id===id), sw=i+dir; if(sw<0||sw>=l.length) return l; [l[i],l[sw]]=[l[sw],l[i]]; return l; });
   const onEdit=(p)=>{ setEditingPlayer(p.id); setPlayerDraft({...p}); };
-  const onRemove=(id)=>{ pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
-  const onSavePlayer=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===editingPlayer?{...x,...playerDraft}:x)); setEditingPlayer(null); };
+  const onRemove=(id)=>mutate(prev=>prev.filter(x=>x.id!==id));
+  const onSavePlayer=()=>{ mutate(prev=>prev.map(x=>x.id===editingPlayer?{...x,...playerDraft}:x)); setEditingPlayer(null); };
   const onCancelEdit=()=>setEditingPlayer(null);
   const onRenameStart=(id,name)=>{ setRenamingTier(id); setTierNameDraft(name); };
   const onRenameCancel=()=>setRenamingTier(null);
-  const onRenameSave=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
-  const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
-  const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; pushHist(); setList(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
-  const addPlayer=()=>{ if(!newP.name.trim()) return; pushHist(); setList(prev=>[...prev,{type:'player',id:'p_'+Date.now(),name:newP.name.trim(),pos:newP.pos,college:newP.college.trim()}]); setNewP({name:'',pos:'WR',college:''}); setShowAddPlayer(false); };
+  const onRenameSave=()=>{ mutate(prev=>prev.map(x=>x.id===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
+  const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; mutate(prev=>prev.filter(x=>x.id!==id)); };
+  const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; mutate(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
+  const addPlayer=()=>{ if(!newP.name.trim()) return; mutate(prev=>[...prev,{type:'player',id:'p_'+Date.now(),name:newP.name.trim(),pos:newP.pos,college:newP.college.trim()}]); setNewP({name:'',pos:'WR',college:''}); setShowAddPlayer(false); };
 
   if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
 
@@ -1649,7 +1673,7 @@ function AdminApp(){
           <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:12,fontWeight:700}}>+ Player</button>
           <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:12,fontWeight:700}}>+ Tier</button>
           <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:12}}>↶ Undo</button>
-          <button onClick={publish} style={{padding:'8px 16px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>PUBLISH</button>
+          <button onClick={publish} disabled={!dirtyCount} style={{padding:'8px 16px',background:dirtyCount?'#FFD700':'#333',color:dirtyCount?'#000':'#888',border:'none',borderRadius:6,fontWeight:900,cursor:dirtyCount?'pointer':'not-allowed',fontSize:12,letterSpacing:1}}>{`PUBLISH${dirtyCount?` (${dirtyCount})`:''}`}</button>
           <button onClick={logout} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:12}}>Sign out</button>
         </div>
       </div>
