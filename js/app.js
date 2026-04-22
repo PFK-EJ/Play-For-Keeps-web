@@ -916,12 +916,13 @@ function TradePollsTab({session,onRequestSignIn}){
   const [showCreate,setShowCreate]=useState(false);
   const [newTitle,setNewTitle]=useState('');
   const [newOpts,setNewOpts]=useState(['','']);
+  const [newSettings,setNewSettings]=useState({teams:'12',format:'Superflex',tep:'1.0',passTd:'6'});
   const [err,setErr]=useState('');
 
   const load=useCallback(async()=>{
     if(!sb){ setLoading(false); return; }
     setLoading(true);
-    const { data:polls } = await sb.from('polls').select('id,title,options,created_at,poll_votes(option_index,user_id)').order('created_at',{ascending:false}).limit(100);
+    const { data:polls } = await sb.from('polls').select('id,title,options,settings,created_at,poll_votes(option_index,user_id)').order('created_at',{ascending:false}).limit(100);
     const list=(polls||[]).map(p=>{
       const counts=Array(p.options.length).fill(0);
       (p.poll_votes||[]).forEach(v=>{ if(counts[v.option_index]!==undefined) counts[v.option_index]++; });
@@ -960,7 +961,8 @@ function TradePollsTab({session,onRequestSignIn}){
     const title=newTitle.trim();
     const opts=newOpts.map(o=>o.trim()).filter(Boolean);
     if(!title||opts.length<2){ setErr('Need a title and at least 2 options.'); return; }
-    const { data, error } = await sb.from('polls').insert({created_by:session.user.id,title,options:opts}).select().single();
+    const settings={ teams:Number(newSettings.teams)||null, format:newSettings.format, tep:Number(newSettings.tep), passTd:Number(newSettings.passTd)||null };
+    const { data, error } = await sb.from('polls').insert({created_by:session.user.id,title,options:opts,settings}).select().single();
     if(error){ setErr(error.message); return; }
     setNewTitle(''); setNewOpts(['','']); setShowCreate(false);
     setPolls(prev=>[{...data,counts:Array(opts.length).fill(0),total:0,poll_votes:[]},...prev]);
@@ -987,6 +989,26 @@ function TradePollsTab({session,onRequestSignIn}){
       {showCreate&&(
         <div style={{background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:16,marginBottom:18}}>
           <input autoFocus value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="Trade details (e.g., 'I give Bijan for CMC + 2026 1st')" style={{width:'100%',padding:10,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,marginBottom:10}}/>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:12}}>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TEAMS</label>
+              <input value={newSettings.teams} onChange={e=>setNewSettings({...newSettings,teams:e.target.value})} placeholder="12" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>FORMAT</label>
+              <select value={newSettings.format} onChange={e=>setNewSettings({...newSettings,format:e.target.value})} style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}>
+                <option>Superflex</option><option>1QB</option>
+              </select>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>TE PREMIUM</label>
+              <input value={newSettings.tep} onChange={e=>setNewSettings({...newSettings,tep:e.target.value})} placeholder="1.0" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3}}>
+              <label style={{fontSize:10,color:'#888',letterSpacing:1}}>PASS TD</label>
+              <input value={newSettings.passTd} onChange={e=>setNewSettings({...newSettings,passTd:e.target.value})} placeholder="6" style={{padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+            </div>
+          </div>
           {newOpts.map((o,i)=>(
             <div key={i} style={{display:'flex',gap:6,marginBottom:6}}>
               <input value={o} onChange={e=>setOpt(i,e.target.value)} placeholder={`Option ${i+1} (e.g., 'Accept', 'Decline', 'Counter')`} style={{flex:1,padding:9,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
@@ -1012,7 +1034,15 @@ function TradePollsTab({session,onRequestSignIn}){
             const voted=myIdx!==undefined;
             return (
               <div key={p.id} style={{background:'#0f0f0f',border:'1px solid #222',borderRadius:10,padding:16}}>
-                <div style={{fontWeight:700,fontSize:14,marginBottom:12,color:'#eee'}}>{p.title}</div>
+                <div style={{fontWeight:700,fontSize:14,marginBottom:8,color:'#eee'}}>{p.title}</div>
+                {p.settings&&(
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+                    {p.settings.teams&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.teams}-team</span>}
+                    {p.settings.format&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.format}</span>}
+                    {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.tep} TEP</span>}
+                    {p.settings.passTd&&<span style={{padding:'3px 9px',background:'#1a1a1a',border:'1px solid #333',borderRadius:12,fontSize:10,color:'#FFD700',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
+                  </div>
+                )}
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
                   {p.options.map((opt,i)=>{
                     const pct=p.total>0?Math.round((p.counts[i]/p.total)*100):0;
@@ -1191,9 +1221,12 @@ function App(){
 
   useEffect(()=>{
     if(!session||!sb){ setUserRow(null); return; }
-    sb.from('users').select('*').eq('id',session.user.id).maybeSingle().then(({data})=>{
-      if(data) setUserRow(data);
-    });
+    (async()=>{
+      const { data } = await sb.from('users').select('*').eq('id',session.user.id).maybeSingle();
+      if(data){ setUserRow(data); return; }
+      const { data:inserted } = await sb.from('users').insert({id:session.user.id,email:session.user.email}).select().maybeSingle();
+      if(inserted) setUserRow(inserted);
+    })();
   },[session]);
 
   const doAuth=async()=>{
