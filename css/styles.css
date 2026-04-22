@@ -1,0 +1,20 @@
+* { box-sizing: border-box; margin:0; padding:0; }
+body { background:#080808; color:#f0f0f0; font-family:'Inter','Segoe UI',sans-serif; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
+button { font-family:inherit; }
+input, select { font-family:inherit; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:#111; }
+::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
+@media (min-width:601px){
+  .pfk-filter-bar { position:sticky; top:82px; z-index:50; background:#080808; padding:8px 0; margin-bottom:8px !important; }
+  .pfk-pr-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:20px; align-items:start; }
+}
+@media (max-width:600px){
+  .pfk-sticky-header { padding:8px 12px !important; }
+  .pfk-logo-img { width:34px !important; height:34px !important; }
+  .pfk-header-subtitle { display:none !important; }
+  .pfk-header-title { font-size:16px !important; letter-spacing:2px !important; }
+  .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
+  .pfk-top-tabs button { flex:1 !important; padding:6px 2px !important; font-size:9px !important; letter-spacing:0 !important; }
+  .pfk-content { padding:10px 10px 16px !important; }
+}
