@@ -863,7 +863,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                     {["WR","RB","TE","QB"].map(o=><option key={o}>{o}</option>)}
                   </select>
                 </div>
-                {[["age","AGE"],["college","COLLEGE"],["nflTeam","NFL"]].map(([k,l])=>(
+                {[["college","COLLEGE"]].map(([k,l])=>(
                   <div key={k} style={{display:"flex",flexDirection:"column",gap:3}}>
                     <label style={{fontSize:10,color:"#888"}}>{l}</label>
                     <input value={playerDraft[k]||""} onChange={e=>setPlayerDraft({...playerDraft,[k]:e.target.value})} style={{padding:"7px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:12,width:k==="college"?90:58}}/>
@@ -883,15 +883,14 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
             <div ref={el=>rowRefs.current[item.id]=el}
               onPointerDown={allowEdit?e=>onPD(e,item.id):undefined}
               onPointerMove={allowEdit?onPM:undefined} onPointerUp={allowEdit?onPU:undefined} onPointerCancel={allowEdit?onPU:undefined}
-              style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowEdit?"grab":"default",opacity:isDrag?0.25:1,transition:"none",minWidth:580}}>
+              style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowEdit?"grab":"default",opacity:isDrag?0.25:1,transition:"none"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 {allowEdit&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
                 <span style={{width:44,textAlign:"center",fontSize:11,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
-                <span style={{fontWeight:700,fontSize:14,flex:1,minWidth:80}}>{item.name}</span>
-                {item.age&&<span style={{fontSize:10,color:"#aaa",flexShrink:0,minWidth:28,textAlign:"center"}}>{Number(item.age).toFixed(1)}</span>}
-                <span style={{fontSize:11,color:"#aaa",flexShrink:0,minWidth:36,textAlign:"center"}}>{item.college}</span>
-                {item.nflTeam&&item.nflTeam!=="TBD"&&<span style={{fontSize:10,fontWeight:700,color:"#FFD700",flexShrink:0,minWidth:34,textAlign:"center"}}>{item.nflTeam}</span>}
+                <span style={{fontWeight:700,fontSize:14,flexShrink:0}}>{item.name}</span>
+                <span style={{fontSize:11,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
+                <span style={{flex:1}}/>
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:10,padding:"1px 6px"}}>▲</button>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:10,padding:"1px 6px"}}>▼</button>
@@ -1025,7 +1024,7 @@ function App(){
   const [editingPlayer,setEditingPlayer]=useState(null);
   const [playerDraft,setPlayerDraft]=useState({});
   const [showAdd,setShowAdd]=useState(false);
-  const [newPlayer,setNewPlayer]=useState({name:"",pos:"WR",age:"",college:"",nflTeam:""});
+  const [newPlayer,setNewPlayer]=useState({name:"",pos:"WR",college:""});
   const [renamingTier,setRenamingTier]=useState(null);
   const [tierNameDraft,setTierNameDraft]=useState("");
   const [renamingListId,setRenamingListId]=useState(null);
@@ -1166,7 +1165,7 @@ function App(){
   const addTier=()=>{if(!newTierName.trim())return;const id="t_"+newTierName+"_"+Date.now();push(list);setList(prev=>[{type:"tier",id,name:newTierName.trim()},...prev]);setNewTierName("");setShowAddTier(false);};
   const savePlayer=()=>{push(list);setList(prev=>prev.map(x=>x.type==="player"&&x.id===editingPlayer?{...x,...playerDraft,id:x.id,type:"player"}:x));setEditingPlayer(null);flash();};
   const removePlayer=id=>{push(list);setList(prev=>prev.filter(x=>x.id!==id));};
-  const addNew=()=>{if(!newPlayer.name)return;push(list);const id="p_"+Date.now();setList(prev=>[...prev,{type:"player",id,...newPlayer,age:Number(newPlayer.age)||null}]);setNewPlayer({name:"",pos:"WR",age:"",college:"",nflTeam:""});setShowAdd(false);};
+  const addNew=()=>{if(!newPlayer.name)return;push(list);const id="p_"+Date.now();setList(prev=>[...prev,{type:"player",id,...newPlayer}]);setNewPlayer({name:"",pos:"WR",college:""});setShowAdd(false);};
 
   const inp=ex=>({padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:12,...ex});
   const avgAge=teamRoster.length?(teamRoster.reduce((s,p)=>s+Number(p.age||25),0)/teamRoster.length).toFixed(1):"—";
@@ -1299,7 +1298,7 @@ function App(){
             {showAdd&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
               <div style={{display:"flex",flexDirection:"column",gap:3,flex:2,minWidth:110}}><label style={{fontSize:10,color:"#666"}}>NAME</label><input value={newPlayer.name} onChange={e=>setNewPlayer({...newPlayer,name:e.target.value})} placeholder="Player name" style={inp({width:"100%"})}/></div>
               <div style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:10,color:"#666"}}>POS</label><select value={newPlayer.pos} onChange={e=>setNewPlayer({...newPlayer,pos:e.target.value})} style={inp({})}>{["WR","RB","TE","QB"].map(o=><option key={o}>{o}</option>)}</select></div>
-              {[["age","AGE","22"],["college","SCHOOL","School"],["nflTeam","NFL","TBD"]].map(([k,l,ph])=>(<div key={k} style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:10,color:"#666"}}>{l}</label><input value={newPlayer[k]||""} onChange={e=>setNewPlayer({...newPlayer,[k]:e.target.value})} placeholder={ph} style={inp({width:k==="college"?90:58})}/></div>))}
+              {[["college","SCHOOL","School"]].map(([k,l,ph])=>(<div key={k} style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:10,color:"#666"}}>{l}</label><input value={newPlayer[k]||""} onChange={e=>setNewPlayer({...newPlayer,[k]:e.target.value})} placeholder={ph} style={inp({width:120})}/></div>))}
               <button onClick={addNew} style={{padding:"7px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Add</button>
               <button onClick={()=>setShowAdd(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:12}}>✕</button>
             </div>)}
@@ -1330,6 +1329,8 @@ function AdminApp(){
   const [posFilter,setPosFilter]=useState(()=>new Set(["WR","RB","TE","QB"]));
   const [publishMsg,setPublishMsg]=useState('');
   const [lastUpdated,setLastUpdated]=useState(null);
+  const [showAddPlayer,setShowAddPlayer]=useState(false);
+  const [newP,setNewP]=useState({name:'',pos:'WR',college:''});
 
   useEffect(()=>{
     if(!sb){ setLoading(false); return; }
@@ -1376,6 +1377,7 @@ function AdminApp(){
   const onRenameSave=()=>{ pushHist(); setList(prev=>prev.map(x=>x.id===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
   const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; pushHist(); setList(prev=>prev.filter(x=>x.id!==id)); };
   const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; pushHist(); setList(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
+  const addPlayer=()=>{ if(!newP.name.trim()) return; pushHist(); setList(prev=>[...prev,{type:'player',id:'p_'+Date.now(),name:newP.name.trim(),pos:newP.pos,college:newP.college.trim()}]); setNewP({name:'',pos:'WR',college:''}); setShowAddPlayer(false); };
 
   if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
 
@@ -1407,6 +1409,7 @@ function AdminApp(){
           <div style={{fontSize:10,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:12,fontWeight:700}}>+ Player</button>
           <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:12,fontWeight:700}}>+ Tier</button>
           <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:12}}>↶ Undo</button>
           <button onClick={publish} style={{padding:'8px 16px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>PUBLISH</button>
@@ -1414,6 +1417,24 @@ function AdminApp(){
         </div>
       </div>
       {publishMsg&&<div style={{padding:'8px 16px',background:publishMsg.startsWith('Error')?'#3a1010':'#103a10',color:publishMsg.startsWith('Error')?'#ef4444':'#10b981',fontSize:12,fontWeight:700}}>{publishMsg}</div>}
+      {showAddPlayer&&(
+        <div style={{padding:'12px 16px',background:'#0f0f0f',borderBottom:'1px solid #222',display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:3,flex:'1 1 200px',minWidth:140}}>
+            <label style={{fontSize:10,color:'#888'}}>NAME</label>
+            <input autoFocus value={newP.name} onChange={e=>setNewP({...newP,name:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addPlayer()} placeholder="Player name" style={{padding:'8px 10px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:3}}>
+            <label style={{fontSize:10,color:'#888'}}>POS</label>
+            <select value={newP.pos} onChange={e=>setNewP({...newP,pos:e.target.value})} style={{padding:'8px 10px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}>{['WR','RB','TE','QB'].map(o=><option key={o}>{o}</option>)}</select>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:3,flex:'1 1 160px',minWidth:120}}>
+            <label style={{fontSize:10,color:'#888'}}>SCHOOL</label>
+            <input value={newP.college} onChange={e=>setNewP({...newP,college:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addPlayer()} placeholder="School" style={{padding:'8px 10px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+          </div>
+          <button onClick={addPlayer} style={{padding:'9px 16px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:12}}>Add</button>
+          <button onClick={()=>setShowAddPlayer(false)} style={{padding:'9px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:12}}>Cancel</button>
+        </div>
+      )}
       <div style={{padding:'16px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <RenderList src={list} allowEdit={true} {...commonProps}/>
       </div>
