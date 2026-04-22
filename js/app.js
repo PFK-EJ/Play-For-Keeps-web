@@ -720,33 +720,6 @@ function TeamTab() {
         </div>
       )}
 
-      {/* Other team roster (click-to-view) */}
-      {(()=>{
-        const other = ranked.find(t=>t.roster_id===selectedOtherRid);
-        if(!other || other.owner_id===sleeperUser?.user_id) return null;
-        return (
-          <div style={{background:'#0f0f0f',border:`2px solid ${other.arc.color}`,borderRadius:14,padding:24}}>
-            <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap',marginBottom:18}}>
-              <div style={{flex:1,minWidth:180}}>
-                <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:2,marginBottom:4}}>VIEWING</div>
-                <div style={{fontSize:20,fontWeight:900,color:'#f0f0f0'}}>{other.teamName}</div>
-                <div style={{display:'flex',gap:10,marginTop:4,flexWrap:'wrap'}}>
-                  <span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>Dyn #{other.dRank} · {(other.dVal/1000).toFixed(1)}k</span>
-                  <span style={{fontSize:11,color:'#3b82f6',fontWeight:700}}>Rdft #{other.rRank} · {(other.rVal/1000).toFixed(1)}k</span>
-                </div>
-              </div>
-              <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${other.arc.color}`,borderRadius:10,flexShrink:0}}>
-                <div style={{fontSize:26}}>{other.arc.emoji}</div>
-                <div style={{fontSize:15,fontWeight:900,color:other.arc.color,marginTop:2,letterSpacing:1}}>{other.arc.label.toUpperCase()}</div>
-                <div style={{fontSize:10,color:'#888',marginTop:3,maxWidth:160}}>{other.arc.desc}</div>
-              </div>
-              <button onClick={()=>setSelectedOtherRid(null)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:11,fontWeight:700}}>✕ Close</button>
-            </div>
-            <RosterSection team={other} showPicks={false}/>
-          </div>
-        );
-      })()}
-
       {/* League Standings + Championship History — side-by-side on desktop */}
       <div className="pfk-pr-grid">
       {ranked.length>0&&(
@@ -830,6 +803,33 @@ function TeamTab() {
       )}
 
       </div>{/* end pfk-pr-grid */}
+
+      {/* Other team roster (click-to-view — toggles off on second click) */}
+      {(()=>{
+        const other = ranked.find(t=>t.roster_id===selectedOtherRid);
+        if(!other || other.owner_id===sleeperUser?.user_id) return null;
+        return (
+          <div style={{background:'#0f0f0f',border:`2px solid ${other.arc.color}`,borderRadius:14,padding:24}}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap',marginBottom:18}}>
+              <div style={{flex:1,minWidth:180}}>
+                <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:2,marginBottom:4}}>VIEWING</div>
+                <div style={{fontSize:20,fontWeight:900,color:'#f0f0f0'}}>{other.teamName}</div>
+                <div style={{display:'flex',gap:10,marginTop:4,flexWrap:'wrap'}}>
+                  <span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>Dyn #{other.dRank} · {(other.dVal/1000).toFixed(1)}k</span>
+                  <span style={{fontSize:11,color:'#3b82f6',fontWeight:700}}>Rdft #{other.rRank} · {(other.rVal/1000).toFixed(1)}k</span>
+                </div>
+              </div>
+              <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${other.arc.color}`,borderRadius:10,flexShrink:0}}>
+                <div style={{fontSize:26}}>{other.arc.emoji}</div>
+                <div style={{fontSize:15,fontWeight:900,color:other.arc.color,marginTop:2,letterSpacing:1}}>{other.arc.label.toUpperCase()}</div>
+                <div style={{fontSize:10,color:'#888',marginTop:3,maxWidth:160}}>{other.arc.desc}</div>
+              </div>
+              <button onClick={()=>setSelectedOtherRid(null)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:11,fontWeight:700}}>✕ Close</button>
+            </div>
+            <RosterSection team={other} showPicks={false}/>
+          </div>
+        );
+      })()}
 
       {sleeperUser&&!league&&!loading&&leagues.length>0&&(
         <div style={{padding:'30px',textAlign:'center',color:'#555',fontSize:13}}>← Select a league above to see your team analysis</div>
