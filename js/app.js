@@ -349,18 +349,23 @@ function TeamTab() {
   },[fcValues]);
 
   const fcPickMap = useMemo(()=>{
-    // slotValues: {1→6665, 2→4118, ...} for 2026 specific pick slots (DP_0_N → slot N+1)
+    // slotValues[round][slot] = value. Rounds and slots are 1-indexed.
+    //   Source sleeperId: "DP_<roundIdx>_<slotIdx>" (both 0-based) for current-year rookie picks.
     const slotValues={};
-    // futureValues: {"2027_1"→2938, "2028_1"→2108} for generic future 1st round picks
+    // futureValues["YYYY_R"] = generic pick value for future year YYYY, round R.
+    //   Source sleeperId: "FP_YYYY_R".
     const futureValues={};
     fcValues.forEach(v=>{
       if(v.player?.position!=='PICK') return;
       const sid = v.player?.sleeperId||'';
       const val = v.value||0;
-      // 2026 specific slots: sleeperId = "DP_0_N" where N is 0-based slot index
-      const dpM = sid.match(/^DP_0_(\d+)$/);
-      if(dpM){ slotValues[Number(dpM[1])+1]=val; return; }
-      // Future generic 1st round: sleeperId = "FP_YYYY_R"
+      const dpM = sid.match(/^DP_(\d+)_(\d+)$/);
+      if(dpM){
+        const round=Number(dpM[1])+1, slot=Number(dpM[2])+1;
+        slotValues[round]=slotValues[round]||{};
+        slotValues[round][slot]=val;
+        return;
+      }
       const fpM = sid.match(/^FP_(\d{4})_(\d+)$/);
       if(fpM){ futureValues[`${fpM[1]}_${fpM[2]}`]=val; }
     });
@@ -395,20 +400,23 @@ function TeamTab() {
       const own={};
       rosters.forEach(r=>{ yrs.forEach(y=>{ [1,2,3,4].forEach(rd=>{ own[`${y}_${rd}_${r.roster_id}`]=r.roster_id; }); }); });
       tradedPicks.forEach(tp=>{ const y=Number(tp.season); if(yrs.includes(y)) own[`${y}_${tp.round}_${tp.roster_id}`]=tp.owner_id; });
-      // Avg slot value for 2026 fallback when draftSlots unknown
-      const avgSlot2026=Object.keys(slotValues).length?Math.round(Object.values(slotValues).reduce((s,v)=>s+v,0)/Object.keys(slotValues).length):0;
+      const standingsOrder=[...rosters]
+        .sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0)||(b.settings?.losses||0)-(a.settings?.losses||0)||a.roster_id-b.roster_id)
+        .map(r=>r.roster_id);
+      const avgRoundVal = rd => {
+        const vals=Object.values(slotValues[rd]||{});
+        return vals.length?Math.round(vals.reduce((s,v)=>s+v,0)/vals.length):0;
+      };
       Object.entries(own).forEach(([key,ownRid])=>{
         const [yr,rd,origRid]=key.split('_').map(Number);
-        if(rd>2) return; // value 1st and 2nd round picks
-        let baseFirst=0;
+        if(rd>4) return;
+        let val=0;
         if(yr===startYr){
-          const slot=draftSlots[origRid];
-          baseFirst=slot?(slotValues[slot]||0):avgSlot2026;
+          const slot = draftSlots[origRid] || (standingsOrder.indexOf(origRid)+1) || null;
+          val = (slot && slotValues[rd]?.[slot]) || avgRoundVal(rd);
         } else {
-          baseFirst=futureValues[`${yr}_1`]||0;
+          val = futureValues[`${yr}_${rd}`] || 0;
         }
-        // FC doesn't value 2nds explicitly; estimate at 30% of a 1st for that year
-        const val = rd===1 ? baseFirst : Math.round(baseFirst*0.30);
         pickDVal[ownRid]=(pickDVal[ownRid]||0)+val;
       });
     }
@@ -594,26 +602,20 @@ function TeamTab() {
                 {picks.map((p,i)=>{
                   const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
                   const ord = ORDINALS[p.round-1]||`${p.round}th`;
-                  const labelColor = p.round===1?'#FFD700':p.round===2?'#bbb':'#888';
+                  const labelColor = p.round===1?'#FFD700':p.round===2?'#bbb':p.round===3?'#8B6914':'#555';
                   const {slotValues={},futureValues={}}=fcPickMap;
                   let fcVal=0;
-                  if(p.isCurrent && p.round===1){
-                    // 2026: exact slot value from FC (DP_0_N)
-                    fcVal = p.slotNum ? (slotValues[p.slotNum]||0) : 0;
-                  } else if(!p.isCurrent && p.round===1){
-                    // 2027/2028: generic 1st round value from FC (FP_YYYY_1)
-                    fcVal = futureValues[`${p.year}_1`]||0;
+                  if(p.isCurrent){
+                    fcVal = (p.slotNum && slotValues[p.round]?.[p.slotNum]) || 0;
+                  } else {
+                    fcVal = futureValues[`${p.year}_${p.round}`] || 0;
                   }
-                  // FC only values 1st round picks; 2nd/3rd/4th show no value
                   const label = p.slotStr ? `${p.round}.${p.slotStr}` : ord;
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'#0a0a0a',border:'1px solid #181818',borderTop:'none',borderRadius:i===picks.length-1?'0 0 6px 6px':'0'}}>
                       <span style={{fontSize:12,fontWeight:900,color:labelColor,minWidth:36,flexShrink:0}}>{label}</span>
                       <span style={{flex:1,fontSize:11,color:'#666'}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
-                      {p.round===1
-                        ? <span style={{fontSize:11,fontWeight:700,color:'#FFD700',flexShrink:0}}>{fcVal>0?(fcVal/1000).toFixed(1)+'k':'—'}</span>
-                        : null
-                      }
+                      <span style={{fontSize:11,fontWeight:700,color:labelColor,flexShrink:0}}>{fcVal>0?(fcVal/1000).toFixed(1)+'k':'—'}</span>
                     </div>
                   );
                 })}
