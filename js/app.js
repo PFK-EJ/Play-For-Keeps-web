@@ -5,7 +5,7 @@ const SUPABASE_KEY = 'sb_publishable_8z6jTCr6BPKmltRnNvEVzA_do7BmXKe';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const DEFAULT_SETTINGS = { tep:0.5, ppr:1.0, passTd:6, ppc:0 };
-const TEP_CHOICES=[0,0.5,1.0], PPR_CHOICES=[0,0.5,1.0], PTD_CHOICES=[4,6], PPC_CHOICES=[0,0.25,0.5];
+const TEP_CHOICES=[0,0.5,0.75,1.0], PPR_CHOICES=[0,0.5,1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0,0.25,0.5];
 
 const sameSettings = (a,b)=> a && b && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
 
