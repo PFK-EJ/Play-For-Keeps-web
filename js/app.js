@@ -930,43 +930,13 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects}){
+function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter}){
   const rowRefs = useRef({});
   const [draggingId,setDraggingId] = useState(null);
   const [insertBefore,setInsertBefore] = useState(null);
   const [ghostPos,setGhostPos] = useState({x:0,y:0});
   const [ghostOff,setGhostOff] = useState({x:0,y:0});
   const fl = posFilter.size>=4?src:src.filter(x=>x.type==="tier"||posFilter.has(x.pos));
-
-  const normName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
-  const hoverCapable = useMemo(()=>typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(hover:hover)').matches,[]);
-  const [popover,setPopover] = useState(null);
-  const showProspect = (e,id,prospect)=>{
-    if(!prospect) return;
-    const r=e.currentTarget.getBoundingClientRect();
-    const vw=window.innerWidth, vh=window.innerHeight;
-    const W=240;
-    const x=Math.max(8,Math.min(r.left, vw-W-8));
-    let y=r.bottom+6;
-    if(y+300>vh) y=Math.max(8,r.top-306);
-    setPopover({id, prospect, x, y});
-  };
-  const hideProspect = ()=>setPopover(null);
-
-  useEffect(()=>{
-    if(!popover) return;
-    const close=()=>setPopover(null);
-    window.addEventListener('scroll',close,true);
-    let onDoc;
-    if(!hoverCapable){
-      onDoc=()=>setPopover(null);
-      setTimeout(()=>document.addEventListener('click',onDoc),0);
-    }
-    return ()=>{
-      window.removeEventListener('scroll',close,true);
-      if(onDoc) document.removeEventListener('click',onDoc);
-    };
-  },[popover,hoverCapable]);
 
   useEffect(()=>{
     if(draggingId) document.body.classList.add('pfk-dragging');
@@ -1125,18 +1095,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                 {allowEdit&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
                 <span style={{width:44,textAlign:"center",fontSize:11,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
-                {(()=>{
-                  const p=prospects&&prospects[normName(item.name)];
-                  const und=p?{textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#FFD70088',cursor:'help'}:{};
-                  const handlers=p?(hoverCapable?{
-                    onMouseEnter:e=>showProspect(e,item.id,p),
-                    onMouseLeave:hideProspect
-                  }:{
-                    onClick:e=>{e.stopPropagation();if(popover&&popover.id===item.id)setPopover(null);else showProspect(e,item.id,p);},
-                    onPointerDown:e=>e.stopPropagation()
-                  }):{};
-                  return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
-                })()}
+                <span style={{fontWeight:700,fontSize:14,flexShrink:0}}>{item.name}</span>
                 <span style={{fontSize:11,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
                 <span style={{flex:1}}/>
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
@@ -1153,22 +1112,6 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
         );
       })}
       {draggingId&&insertBefore===null&&<DropLine/>}
-      {popover&&(
-        <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
-          onClick={e=>e.stopPropagation()}>
-          <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
-          <div style={{fontWeight:900,fontSize:14,marginTop:8,color:'#FFD700'}}>{popover.prospect.name}</div>
-          <div style={{fontSize:11,color:'#888',marginTop:2}}>{popover.prospect.position} · {popover.prospect.college}</div>
-          <div style={{display:'flex',gap:14,marginTop:8,fontSize:12}}>
-            <div><span style={{color:'#555'}}>HT </span><span style={{fontWeight:700}}>{popover.prospect.height||'—'}</span></div>
-            <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
-          </div>
-          <div style={{fontSize:11,marginTop:8,paddingTop:8,borderTop:'1px solid #1e1e1e'}}>
-            <span style={{color:'#555',letterSpacing:1,fontWeight:700}}>DRAFT PICK — </span>
-            <span style={{color:popover.prospect.draftPick?'#FFD700':'#444',fontWeight:800}}>{popover.prospect.draftPick||'TBD'}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1485,14 +1428,6 @@ function App(){
   const [officialList,setOfficialList]=useState(null);
   const [pfkSettings,setPfkSettings]=useState(DEFAULT_SETTINGS);
   const [pfkMissing,setPfkMissing]=useState(false);
-  const [prospects,setProspects]=useState({});
-
-  useEffect(()=>{
-    fetch('js/prospects-2026.json').then(r=>r.json()).then(arr=>{
-      const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
-      const m={}; arr.forEach(p=>{m[norm(p.name)]=p;}); setProspects(m);
-    }).catch(()=>{});
-  },[]);
   const [session,setSession]=useState(null);
   const [userRow,setUserRow]=useState(null);
   const [authOpen,setAuthOpen]=useState(false);
@@ -1701,7 +1636,7 @@ function App(){
             </div>
             <FilterBar/>
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',margin:'0 -2px'}}>
-              <RenderList src={officialList||PFK_LIST} allowEdit={false} prospects={prospects} {...commonProps}/>
+              <RenderList src={officialList||PFK_LIST} allowEdit={false} {...commonProps}/>
             </div>
           </div>
         )}
