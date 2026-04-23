@@ -510,15 +510,41 @@ function TeamTab() {
         pickDVal[ownRid]=(pickDVal[ownRid]||0)+val;
       });
     }
+    const rp=league?.roster_positions||[];
+    const tepBonus=league?.scoring_settings?.bonus_rec_te||0;
+    const teMult=1+tepBonus*0.30;
+    const BENCH_MULT=0.3;
+    const slots=[];
+    rp.forEach(s=>{
+      if(s==='QB'||s==='RB'||s==='WR'||s==='TE') slots.push({strict:true,elig:[s]});
+      else if(s==='SUPER_FLEX') slots.push({strict:false,elig:['QB','RB','WR','TE']});
+      else if(s==='FLEX') slots.push({strict:false,elig:['RB','WR','TE']});
+      else if(s==='REC_FLEX') slots.push({strict:false,elig:['WR','TE']});
+      else if(s==='WRRB_FLEX'||s==='RB_WR_FLEX') slots.push({strict:false,elig:['RB','WR']});
+    });
+    slots.sort((a,b)=>(a.strict?0:1)-(b.strict?0:1));
+    const lineupValue=(playerIds,valKey)=>{
+      const pool=playerIds.map(pid=>{
+        const fc=fcMap[pid]; if(!fc) return null;
+        const pos=fc.player?.position; const base=fc[valKey]||0;
+        const adj=pos==='TE'?base*teMult:base;
+        return {pid,pos,val:adj};
+      }).filter(x=>x&&x.val>0).sort((a,b)=>b.val-a.val);
+      const used=new Set(); let starter=0;
+      slots.forEach(slot=>{
+        const pick=pool.find(p=>!used.has(p.pid)&&slot.elig.includes(p.pos));
+        if(pick){ used.add(pick.pid); starter+=pick.val; }
+      });
+      let bench=0; pool.forEach(p=>{ if(!used.has(p.pid)) bench+=p.val; });
+      return Math.round(starter+bench*BENCH_MULT);
+    };
     const stats=rosters.map(r=>{
       const active=r.players||[];
       const allP=[...active,...(r.taxi||[])];
-      let dVal=0,rVal=0;
-      // Dynasty: active + taxi players + picks
-      allP.forEach(pid=>{ const v=fcMap[pid]; if(v) dVal+=v.value||0; });
-      dVal+=(pickDVal[r.roster_id]||0);
-      // Redraft: active players only (no taxi, no picks — matches FC methodology)
-      active.forEach(pid=>{ const v=fcMap[pid]; if(v) rVal+=v.redraftValue||0; });
+      // Dynasty: starter-usable lineup + discounted bench from full roster, plus picks (full)
+      const dVal=lineupValue(allP,'value')+(pickDVal[r.roster_id]||0);
+      // Redraft: starter-usable lineup + discounted bench from active only
+      const rVal=lineupValue(active,'redraftValue');
       const owner=userMap[r.owner_id];
       return {...r,dVal,rVal,teamName:owner?.metadata?.team_name||owner?.display_name||`Team ${r.roster_id}`,allPlayers:allP};
     });
