@@ -557,6 +557,59 @@ function TeamTab() {
     return rankMap;
   },[ranked,fcMap]);
 
+  const teamNeeds = useMemo(()=>{
+    if(!ranked.length||!fcValues.length) return {};
+    const rp = league?.roster_positions||[];
+    const starters = {QB:0,RB:0,WR:0,TE:0};
+    rp.forEach(s=>{
+      if(s==='QB') starters.QB++;
+      else if(s==='RB') starters.RB++;
+      else if(s==='WR') starters.WR++;
+      else if(s==='TE') starters.TE++;
+      else if(s==='SUPER_FLEX') starters.QB++;
+      else if(s==='FLEX') { starters.RB+=1/3; starters.WR+=1/3; starters.TE+=1/3; }
+      else if(s==='REC_FLEX') { starters.WR+=0.5; starters.TE+=0.5; }
+      else if(s==='WRRB_FLEX'||s==='RB_WR_FLEX') { starters.RB+=0.5; starters.WR+=0.5; }
+    });
+    const ranksByMode = {};
+    ['d','r'].forEach(m=>{
+      const valKey = m==='r' ? 'redraftValue' : 'value';
+      const perTeam = ranked.map(t=>{
+        const groups={QB:[],RB:[],WR:[],TE:[]};
+        t.allPlayers.forEach(pid=>{
+          const fc=fcMap[pid]; const pos=fc?.player?.position;
+          if(pos&&groups[pos]) groups[pos].push(fc[valKey]||0);
+        });
+        const depth={};
+        POS_ORDER.forEach(p=>{
+          const s=groups[p].sort((a,b)=>b-a);
+          const N=Math.max(1,Math.ceil((starters[p]||0.5)+1));
+          depth[p]=s.slice(0,N).reduce((a,b)=>a+b,0);
+        });
+        return {rid:t.roster_id,depth};
+      });
+      const rank={}; POS_ORDER.forEach(p=>{ rank[p]={}; });
+      POS_ORDER.forEach(p=>{
+        const sorted=[...perTeam].sort((a,b)=>b.depth[p]-a.depth[p]);
+        sorted.forEach((x,i)=>{ rank[p][x.rid]=i+1; });
+      });
+      ranksByMode[m]=rank;
+    });
+    const needs={};
+    ranked.forEach(t=>{
+      const lab=t.arc.label;
+      const mode=(lab==='Aging Contender'||lab==='Win-Now')?'r':'d';
+      const r=ranksByMode[mode];
+      const rows=POS_ORDER.map(p=>{
+        const imp=Math.max(0.5,starters[p]||0.5);
+        return {pos:p,rank:r[p][t.roster_id],importance:imp,score:(r[p][t.roster_id]||ranked.length)*imp};
+      });
+      rows.sort((a,b)=>b.score-a.score);
+      needs[t.roster_id]={mode,rows,teams:ranked.length};
+    });
+    return needs;
+  },[ranked,fcMap,league,fcValues]);
+
   const picksByRoster = useMemo(()=>{
     if(!rosters.length) return {};
     const now2=new Date(); const startYr=now2.getFullYear()+(now2.getMonth()>=8?1:0);
@@ -630,6 +683,22 @@ function TeamTab() {
             </span>
           )}
         </div>
+        {teamNeeds[team.roster_id]&&(
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,flexWrap:'wrap',padding:'8px 10px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8}}>
+            <span style={{fontSize:10,fontWeight:800,color:'#777',letterSpacing:1.5}}>TEAM NEEDS</span>
+            <span style={{fontSize:9,color:'#444',fontStyle:'italic'}}>ranked by {teamNeeds[team.roster_id].mode==='r'?'redraft value':'dynasty value'}</span>
+            <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
+              {teamNeeds[team.roster_id].rows.map((n,i)=>(
+                <React.Fragment key={n.pos}>
+                  {i>0&&<span style={{color:'#333',fontSize:11,fontWeight:700}}>›</span>}
+                  <span style={{padding:'3px 9px',borderRadius:5,fontSize:11,fontWeight:800,background:i===0?POS_COLORS[n.pos]+'22':'#0f0f0f',color:POS_COLORS[n.pos],border:'1px solid '+POS_COLORS[n.pos]+(i===0?'':'55')}}>
+                    {n.pos} <span style={{color:'#888',fontSize:10}}>#{n.rank}/{teamNeeds[team.roster_id].teams}</span>
+                  </span>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Positions */}
         {POS_ORDER.filter(p=>byPos[p].length>0).map(pos=>{
@@ -843,6 +912,15 @@ function TeamTab() {
                       <span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>D {(t.dVal/1000).toFixed(1)}k</span>
                       <span style={{fontSize:11,color:'#3b82f6',fontWeight:700}}>R {(t.rVal/1000).toFixed(1)}k</span>
                       <span style={{fontSize:10,color:'#555'}}>{viewMode==='redraft'?`Dyn #${t.dRank}`:`Rdft #${t.rRank}`}</span>
+                    </div>
+                  )}
+                  {teamNeeds[t.roster_id]&&(
+                    <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,width:'100%',marginTop:2,paddingTop:6,borderTop:'1px solid #1a1a1a'}}>
+                      <span style={{fontSize:9,fontWeight:800,color:'#555',letterSpacing:1.2}}>NEEDS</span>
+                      <span style={{fontSize:8,color:'#333'}}>({teamNeeds[t.roster_id].mode==='r'?'RDFT':'DYN'})</span>
+                      {teamNeeds[t.roster_id].rows.slice(0,2).map((n,ni)=>(
+                        <span key={n.pos} style={{padding:'1px 7px',borderRadius:4,fontSize:10,fontWeight:800,background:ni===0?POS_COLORS[n.pos]+'33':'#0f0f0f',color:POS_COLORS[n.pos],border:'1px solid '+POS_COLORS[n.pos]+(ni===0?'':'44')}}>{n.pos} #{n.rank}</span>
+                      ))}
                     </div>
                   )}
                 </div>
