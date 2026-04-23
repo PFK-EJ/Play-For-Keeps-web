@@ -1159,9 +1159,10 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
           <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
           <div style={{fontWeight:900,fontSize:14,marginTop:8,color:'#FFD700'}}>{popover.prospect.name}</div>
           <div style={{fontSize:11,color:'#888',marginTop:2}}>{popover.prospect.position} · {popover.prospect.college}</div>
-          <div style={{display:'flex',gap:14,marginTop:8,fontSize:12}}>
+          <div style={{display:'flex',gap:14,marginTop:8,fontSize:12,flexWrap:'wrap'}}>
             <div><span style={{color:'#555'}}>HT </span><span style={{fontWeight:700}}>{popover.prospect.height||'—'}</span></div>
             <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
+            <div><span style={{color:'#555'}}>AGE </span><span style={{fontWeight:700}}>{popover.prospect.age!=null?popover.prospect.age:'—'}</span></div>
           </div>
           <div style={{fontSize:11,marginTop:8,paddingTop:8,borderTop:'1px solid #1e1e1e'}}>
             <span style={{color:'#555',letterSpacing:1,fontWeight:700}}>DRAFT PICK — </span>
