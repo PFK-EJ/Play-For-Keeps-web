@@ -149,6 +149,60 @@ const classifyTeam = (dPct, rPct) => {
   return                          {label:'Full Rebuild',           emoji:'🏗️', color:'#94a3b8', desc:'Tearing it down to build it right'};
 };
 
+// Team Analyzer thresholds — see project_team_analyzer_spec memory for derivation
+const AGE_RISK_AGE = { RB: 29, WR: 29, TE: 27, QB: 31 };
+const AGE_TIERS = [
+  {max:25.0, label:'Young',  desc:'Dynasty upside',   color:'#3b82f6'},
+  {max:26.5, label:'Prime',  desc:'Prime window',     color:'#10b981'},
+  {max:27.5, label:'Mature', desc:'Contender window', color:'#FFD700'},
+  {max:28.5, label:'Aging',  desc:'Window closing',   color:'#f59e0b'},
+  {max:999,  label:'Old',    desc:'Rebuild risk',     color:'#ef4444'},
+];
+const ageTier = a => AGE_TIERS.find(t=>a<=t.max) || AGE_TIERS[AGE_TIERS.length-1];
+const POS_TIER_BANDS = [
+  {max:5,   key:'Elite', color:'#FFD700'},
+  {max:12,  key:'T1',    color:'#c084fc'},
+  {max:24,  key:'T2',    color:'#3b82f6'},
+  {max:36,  key:'Flex',  color:'#10b981'},
+  {max:999, key:'Depth', color:'#666'},
+];
+const posTier = rank => rank ? (POS_TIER_BANDS.find(b=>rank<=b.max) || POS_TIER_BANDS[POS_TIER_BANDS.length-1]) : null;
+const healthGrade = (pos, b) => {
+  const e=b.Elite||0, t1=b.T1||0, t2=b.T2||0, fx=b.Flex||0;
+  if (pos==='QB'){
+    if ((e>=1 && (e+t1+t2)>=2) || t1>=2) return 'Strong';
+    if (t1>=1 && t2>=1)                  return 'Adequate';
+    if ((e+t1+t2)>=1 && fx>=1)           return 'Thin';
+    return 'Critical';
+  }
+  if (pos==='RB'){
+    if ((e+t1)>=2 || (e>=1 && t2>=2))    return 'Strong';
+    if (t1>=1 && t2>=1 && fx>=1)         return 'Adequate';
+    if ((e+t1+t2)>=1)                    return 'Thin';
+    return 'Critical';
+  }
+  if (pos==='WR'){
+    if ((e>=1 && (t1+t2)>=2) || t1>=3)   return 'Strong';
+    if (t1>=2 || (t1>=1 && t2>=2))       return 'Adequate';
+    if ((e+t1+t2)>=1)                    return 'Thin';
+    return 'Critical';
+  }
+  if (pos==='TE'){
+    if (e>=1 || t1>=2)                   return 'Strong';
+    if (t1>=1)                           return 'Adequate';
+    if (t2>=1)                           return 'Thin';
+    return 'Critical';
+  }
+  return 'Critical';
+};
+const GRADE_COLOR = {Strong:'#10b981', Adequate:'#FFD700', Thin:'#f59e0b', Critical:'#ef4444'};
+const pickTierFromStand = (standPos) => {
+  if (standPos<=3)  return {key:'Very Early', color:'#FFD700'};
+  if (standPos<=7)  return {key:'Early-Mid',  color:'#c084fc'};
+  if (standPos<=10) return {key:'Mid-Late',   color:'#3b82f6'};
+  return              {key:'Late',       color:'#666'};
+};
+
 const SLEEPER = 'https://api.sleeper.app/v1';
 const FC      = 'https://api.fantasycalc.com';
 const POS_ORDER = ['QB','RB','WR','TE'];
@@ -302,6 +356,8 @@ function TeamTab() {
   useEffect(()=>{ localStorage.setItem('pfk_value_mode', valueMode); },[valueMode]);
   const [selectedOtherRid, setSelectedOtherRid] = useState(null);
   const [leagueArcs, setLeagueArcs] = useState({});
+  const [subView, setSubView] = useState('standings'); // 'standings' | 'analyzer'
+  const [analyzerRid, setAnalyzerRid] = useState(null);
   const inp2 = ex=>({padding:'7px 10px',background:'#0d0d0d',border:'1px solid #333',borderRadius:7,color:'#fff',fontSize:13,fontFamily:'inherit',...ex});
 
   const connectUser = async () => {
@@ -563,6 +619,10 @@ function TeamTab() {
 
   const myTeam = ranked.find(r=>r.owner_id===sleeperUser?.user_id);
 
+  useEffect(()=>{
+    if(!analyzerRid && myTeam) setAnalyzerRid(myTeam.roster_id);
+  },[myTeam,analyzerRid]);
+
   const posRanks = useMemo(()=>{
     if(!ranked.length) return {};
     const totals = {};
@@ -622,6 +682,117 @@ function TeamTab() {
       localStorage.setItem('pfk_league_name',league?.name||'');
     }
   },[ranked]);
+
+  // ── Team Analyzer data builder ──
+  const analyzeTeam = (team) => {
+    if(!team) return null;
+    const hasFc = fcValues.length>0;
+    // Build per-position lists with tier info
+    const byPos = {QB:[],RB:[],WR:[],TE:[]};
+    team.allPlayers.forEach(pid=>{
+      const fc=fcMap[pid]; if(!fc) return;
+      const pos=fc.player?.position; if(!byPos[pos]) return;
+      byPos[pos].push({
+        pid, name:fc.player?.name||pid,
+        age:fc.player?.maybeAge??null,
+        value:fc.value||0,
+        tier:posTier(fc.positionRank)
+      });
+    });
+    POS_ORDER.forEach(p=>byPos[p].sort((a,b)=>b.value-a.value));
+    // Tier buckets per position for health grade
+    const buckets = {};
+    const grades = {};
+    POS_ORDER.forEach(p=>{
+      const b={Elite:0,T1:0,T2:0,Flex:0,Depth:0};
+      byPos[p].forEach(x=>{ if(x.tier) b[x.tier.key]++; });
+      buckets[p]=b;
+      grades[p]=healthGrade(p,b);
+    });
+    // Starter lineup (re-run slot fill to get the starting ~9 players and their avg age)
+    const rp=league?.roster_positions||[];
+    const tepBonus=league?.scoring_settings?.bonus_rec_te||0;
+    const teMult=1+tepBonus*0.30;
+    const slots=[];
+    rp.forEach(s=>{
+      if(s==='QB'||s==='RB'||s==='WR'||s==='TE') slots.push({strict:true,elig:[s]});
+      else if(s==='SUPER_FLEX') slots.push({strict:false,elig:['QB','RB','WR','TE']});
+      else if(s==='FLEX') slots.push({strict:false,elig:['RB','WR','TE']});
+      else if(s==='REC_FLEX') slots.push({strict:false,elig:['WR','TE']});
+      else if(s==='WRRB_FLEX'||s==='RB_WR_FLEX') slots.push({strict:false,elig:['RB','WR']});
+    });
+    slots.sort((a,b)=>(a.strict?0:1)-(b.strict?0:1));
+    const pool=team.allPlayers.map(pid=>{
+      const fc=fcMap[pid]; if(!fc) return null;
+      const pos=fc.player?.position;
+      const base=fc.value||0;
+      const adj=pos==='TE'?base*teMult:base;
+      return {pid,pos,val:adj,age:fc.player?.maybeAge??null};
+    }).filter(x=>x&&x.val>0).sort((a,b)=>b.val-a.val);
+    const usedIds=new Set(); const starters=[];
+    slots.forEach(slot=>{
+      const pick=pool.find(p=>!usedIds.has(p.pid)&&slot.elig.includes(p.pos));
+      if(pick){ usedIds.add(pick.pid); starters.push(pick); }
+    });
+    const agesWithValues=starters.filter(s=>s.age!=null);
+    const avgAge = agesWithValues.length
+      ? +(agesWithValues.reduce((s,x)=>s+x.age,0)/agesWithValues.length).toFixed(1)
+      : null;
+    const ageTierInfo = avgAge!=null ? ageTier(avgAge) : null;
+    // Age-risk flags across ALL rostered players
+    const flags=[];
+    POS_ORDER.forEach(p=>{
+      byPos[p].forEach(x=>{
+        if(x.age==null) return;
+        const thr=AGE_RISK_AGE[p];
+        if(thr && x.age>=thr) flags.push({...x, pos:p});
+      });
+    });
+    flags.sort((a,b)=>b.age-a.age);
+    // Pick capital
+    const picks = picksByRoster[team.roster_id]||[];
+    const now=new Date(); const startYr=now.getFullYear()+(now.getMonth()>=8?1:0);
+    const futureFirsts = picks.filter(p=>p.round===1 && p.year>startYr).length;
+    // Window assessment
+    let windowText='';
+    if(avgAge!=null){
+      if(team.arc.label==='Dynasty') windowText='Built for sustained contention';
+      else if(team.arc.label==='Aging Contender') windowText='Window closing fast — push now';
+      else if(team.arc.label==='Future Dynasty') windowText='Young core still cooking';
+      else if(team.arc.label==='Contender') windowText=avgAge>=27.5?'Contender window open but closing':'Contender with runway';
+      else if(team.arc.label==='Win-Now') windowText='Win now, figure out tomorrow later';
+      else if(team.arc.label==='Rebuilding') windowText='Stockpiling for the next push';
+      else windowText='Full rebuild mode';
+    }
+    // Suggestions
+    const sugs=[];
+    // Position-based
+    POS_ORDER.forEach(p=>{
+      const g=grades[p], b=buckets[p];
+      if(g==='Critical') sugs.push({type:'critical', text:`Your ${p} room is critical — 0 players inside the top 24. Prioritize a ${p} upgrade above all else.`});
+      else if(g==='Thin') sugs.push({type:'thin', text:`${p} is thin — only ${b.Elite+b.T1+b.T2} ${p} inside the top 24. Consider consolidating depth into a ${p} upgrade.`});
+      else if(b.Elite===0 && b.T1>=3 && (p==='WR'||p==='RB')){
+        sugs.push({type:'consolidate', text:`You have ${b.T1}+ tier-1 ${p}s but no Elite — consider consolidating into a top-5 ${p}.`});
+      }
+    });
+    // Age-based starter flags
+    const oldRBStarters = starters.filter(s=>s.pos==='RB' && s.age!=null && s.age>=AGE_RISK_AGE.RB).length;
+    const rbStarters = starters.filter(s=>s.pos==='RB').length;
+    if(oldRBStarters>=2 && rbStarters>0) sugs.push({type:'age',text:`${oldRBStarters} of your starting RBs are 29+ — target a young RB in the next rookie draft.`});
+    const oldTEStarters = starters.filter(s=>s.pos==='TE' && s.age!=null && s.age>=AGE_RISK_AGE.TE).length;
+    if(oldTEStarters>=1 && starters.filter(s=>s.pos==='TE').length>0) sugs.push({type:'age',text:`Your starting TE is 27+ — TE decline starts here. Look at young TEs if you're not already elite.`});
+    // Window guidance
+    if(avgAge!=null){
+      if(avgAge>=28.5 && (team.arc.label==='Contender'||team.arc.label==='Win-Now'||team.arc.label==='Aging Contender'))
+        sugs.push({type:'window',text:`Roster trends old (${avgAge} avg) and you're competing — push now, don't hoard picks.`});
+      if(avgAge<=25.5 && (team.arc.label==='Rebuilding'||team.arc.label==='Full Rebuild'||team.arc.label==='Future Dynasty'))
+        sugs.push({type:'window',text:`Young core (${avgAge} avg) — keep accumulating picks and young assets.`});
+    }
+    // Pick capital red flag
+    if(futureFirsts===0 && team.arc.label!=='Dynasty')
+      sugs.push({type:'critical',text:`🚩 Zero future 1st-round picks. This is a red flag unless you're in true Dynasty status.`});
+    return {byPos, buckets, grades, starters, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugs, hasFc};
+  };
 
   // ── Grouped roster renderer ──
   const RosterSection = ({ team }) => {
@@ -797,6 +968,18 @@ function TeamTab() {
         </div>
       )}
 
+      {/* Sub-view toggle */}
+      {league && ranked.length>0 && (
+        <div style={{display:'flex',gap:6,background:'#0a0a0a',border:'1px solid #222',borderRadius:10,padding:4,alignSelf:'flex-start'}}>
+          {[['standings','📊 Standings'],['analyzer','🔍 Team Analyzer']].map(([k,l])=>(
+            <button key={k} onClick={()=>setSubView(k)} style={{padding:'8px 16px',background:subView===k?'#FFD700':'transparent',color:subView===k?'#000':'#888',border:'none',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:800,letterSpacing:1}}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {/* STANDINGS VIEW — existing content */}
+      {subView==='standings' && (<>
+
       {/* My Team Card */}
       {myTeam&&(
         <div style={{background:'#0f0f0f',border:`2px solid ${myTeam.arc.color}`,borderRadius:14,padding:24}}>
@@ -961,6 +1144,158 @@ function TeamTab() {
       {sleeperUser&&!league&&!loading&&leagues.length>0&&(
         <div style={{padding:'30px',textAlign:'center',color:'#555',fontSize:13}}>← Select a league above to see your team analysis</div>
       )}
+
+      </>)}{/* end STANDINGS VIEW */}
+
+      {/* ANALYZER VIEW */}
+      {subView==='analyzer' && league && ranked.length>0 && (()=>{
+        const team = ranked.find(t=>t.roster_id===analyzerRid) || myTeam || ranked[0];
+        if(!team) return null;
+        const a = analyzeTeam(team);
+        if(!a) return null;
+        const {byPos, buckets, grades, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugs, hasFc} = a;
+        return (
+          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            {/* Team selector */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'14px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:1}}>ANALYZE TEAM</span>
+              <select value={analyzerRid||''} onChange={e=>setAnalyzerRid(Number(e.target.value))} style={inp2({flex:1,minWidth:180,maxWidth:360})}>
+                {[...ranked].sort((a,b)=>a.dRank-b.dRank).map(t=>(
+                  <option key={t.roster_id} value={t.roster_id}>
+                    #{t.dRank} · {t.teamName}{t.owner_id===sleeperUser?.user_id?' ★':''}
+                  </option>
+                ))}
+              </select>
+              <span style={{fontSize:10,color:'#555',letterSpacing:0.5}}>Pick projections assume max-PF scoring</span>
+            </div>
+
+            {/* Header */}
+            <div style={{background:'#0f0f0f',border:`2px solid ${team.arc.color}`,borderRadius:14,padding:20}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:2,marginBottom:4}}>TEAM ANALYZER</div>
+                  <div style={{fontSize:22,fontWeight:900,color:'#f0f0f0'}}>{team.teamName}</div>
+                  <div style={{fontSize:11,color:'#666',marginTop:2}}>{league?.name} · Dyn #{team.dRank}/{ranked.length} · Rdft #{team.rRank}/{ranked.length}</div>
+                  {windowText && <div style={{marginTop:10,fontSize:13,color:team.arc.color,fontWeight:700}}>{windowText}</div>}
+                </div>
+                <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${team.arc.color}`,borderRadius:10,flexShrink:0}}>
+                  <div style={{fontSize:24}}>{team.arc.emoji}</div>
+                  <div style={{fontSize:14,fontWeight:900,color:team.arc.color,marginTop:2,letterSpacing:1}}>{team.arc.label.toUpperCase()}</div>
+                </div>
+                {avgAge!=null && ageTierInfo && (
+                  <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${ageTierInfo.color}`,borderRadius:10,flexShrink:0}}>
+                    <div style={{fontSize:20,fontWeight:900,color:ageTierInfo.color}}>{avgAge}</div>
+                    <div style={{fontSize:10,fontWeight:900,color:ageTierInfo.color,marginTop:2,letterSpacing:1}}>{ageTierInfo.label.toUpperCase()}</div>
+                    <div style={{fontSize:9,color:'#888',marginTop:2}}>avg starter age</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Positional Breakdown */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
+              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:12,textTransform:'uppercase'}}>Positional Breakdown</div>
+              {POS_ORDER.map(p=>{
+                const list=byPos[p], b=buckets[p], g=grades[p];
+                return (
+                  <div key={p} style={{marginBottom:14}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'6px 10px',background:'#0a0a0a',borderLeft:`3px solid ${GRADE_COLOR[g]}`,borderRadius:6,marginBottom:6}}>
+                      <span style={{fontWeight:900,color:'#f0f0f0',fontSize:13,letterSpacing:1,minWidth:24}}>{p}</span>
+                      <span style={{padding:'3px 10px',borderRadius:6,fontSize:10,fontWeight:900,letterSpacing:1,background:'#111',color:GRADE_COLOR[g],border:`1px solid ${GRADE_COLOR[g]}`}}>{g.toUpperCase()}</span>
+                      <span style={{fontSize:10,color:'#666',letterSpacing:0.5}}>
+                        {POS_TIER_BANDS.slice(0,4).map(band=>`${band.key}:${b[band.key]||0}`).join(' · ')} · Depth:{b.Depth||0}
+                      </span>
+                      <span style={{marginLeft:'auto',fontSize:10,color:'#444'}}>{list.length} rostered</span>
+                    </div>
+                    {list.length===0 && <div style={{fontSize:11,color:'#555',padding:'4px 10px'}}>No rostered {p}s</div>}
+                    {list.length>0 && (
+                      <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                        {list.map(pl=>(
+                          <span key={pl.pid} style={{padding:'4px 9px',background:'#0a0a0a',border:`1px solid ${pl.tier?pl.tier.color:'#222'}`,borderRadius:6,fontSize:11,color:'#f0f0f0',display:'inline-flex',gap:6,alignItems:'center'}}>
+                            <span style={{fontSize:9,fontWeight:900,color:pl.tier?pl.tier.color:'#555',letterSpacing:0.5}}>{pl.tier?pl.tier.key:'—'}</span>
+                            <span>{pl.name}</span>
+                            {pl.age!=null&&<span style={{fontSize:9,color:'#555'}}>{pl.age.toFixed(1)}</span>}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Age-Risk Flags */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
+              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:12,textTransform:'uppercase'}}>Age-Risk Flags</div>
+              {flags.length===0 && <div style={{fontSize:12,color:'#10b981'}}>✓ No rostered players past their cliff threshold.</div>}
+              {flags.length>0 && (
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  {flags.map(f=>(
+                    <div key={f.pid} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',background:'#0a0a0a',border:'1px solid #2a1a00',borderRadius:7}}>
+                      <span style={{fontSize:14}}>⚠</span>
+                      <span style={{fontSize:12,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
+                      <span style={{fontSize:10,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}</span>
+                      <span style={{fontSize:10,color:'#888'}}>decline risk</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{fontSize:9,color:'#555',marginTop:10}}>Thresholds: RB ≥29 · WR ≥29 · TE ≥27 · QB ≥31</div>
+            </div>
+
+            {/* Pick Capital */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
+                <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Pick Capital</span>
+                {futureFirsts===0 && team.arc.label!=='Dynasty' && (
+                  <span style={{padding:'3px 10px',borderRadius:6,fontSize:10,fontWeight:900,letterSpacing:1,background:'#2a0000',color:'#ef4444',border:'1px solid #ef4444'}}>🚩 NO FUTURE 1sts</span>
+                )}
+              </div>
+              {picks.length===0 && <div style={{fontSize:12,color:'#666'}}>No tracked picks.</div>}
+              {picks.length>0 && (
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  {picks.map((p,i)=>{
+                    const n = rosters.length || 12;
+                    const tier = p.isCurrent && p.slotNum ? pickTierFromStand(p.slotNum) : null;
+                    const ord = ORDINALS[p.round-1]||`${p.round}th`;
+                    const label = p.slotStr ? `${p.round}.${p.slotStr}` : `${p.year} ${ord}`;
+                    const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
+                    return (
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',background:'#0a0a0a',border:'1px solid #181818',borderRadius:7}}>
+                        <span style={{fontSize:12,fontWeight:900,color:p.round===1?'#FFD700':p.round===2?'#bbb':'#8B6914',minWidth:56,flexShrink:0}}>{p.year} · {label}</span>
+                        <span style={{fontSize:11,color:'#666',flex:1}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
+                        {tier && <span style={{padding:'2px 8px',borderRadius:5,fontSize:9,fontWeight:900,letterSpacing:0.5,background:'#111',color:tier.color,border:`1px solid ${tier.color}`}}>{tier.key.toUpperCase()}</span>}
+                        {!tier && !p.isCurrent && <span style={{fontSize:10,color:'#555'}}>future</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{fontSize:9,color:'#555',marginTop:10}}>Slot tiers: Very Early 1–3 · Early-Mid 4–7 · Mid-Late 8–10 · Late 11+. When close, predict later.</div>
+            </div>
+
+            {/* Suggestions */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
+              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:12,textTransform:'uppercase'}}>Team-Building Suggestions</div>
+              {sugs.length===0 && <div style={{fontSize:12,color:'#10b981'}}>✓ No major issues flagged — roster looks balanced for your arc.</div>}
+              {sugs.length>0 && (
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {sugs.map((s,i)=>{
+                    const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : '#FFD700';
+                    return (
+                      <div key={i} style={{display:'flex',gap:10,padding:'9px 12px',background:'#0a0a0a',borderLeft:`3px solid ${col}`,borderRadius:'0 7px 7px 0'}}>
+                        <span style={{fontSize:12,color:'#f0f0f0',lineHeight:1.4}}>{s.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{fontSize:9,color:'#555',marginTop:10}}>Broad guidance only — no specific trade offers. Never suggests trading future picks away.</div>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
