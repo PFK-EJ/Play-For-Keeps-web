@@ -298,6 +298,8 @@ function TeamTab() {
   const [fcError, setFcError]             = useState(false);
   const [lastFetched, setLastFetched]     = useState(null);
   const [viewMode, setViewMode]           = useState('dynasty');
+  const [valueMode, setValueMode]         = useState(()=>localStorage.getItem('pfk_value_mode')||'starter');
+  useEffect(()=>{ localStorage.setItem('pfk_value_mode', valueMode); },[valueMode]);
   const [selectedOtherRid, setSelectedOtherRid] = useState(null);
   const [leagueArcs, setLeagueArcs] = useState({});
   const inp2 = ex=>({padding:'7px 10px',background:'#0d0d0d',border:'1px solid #333',borderRadius:7,color:'#fff',fontSize:13,fontFamily:'inherit',...ex});
@@ -513,7 +515,7 @@ function TeamTab() {
     const rp=league?.roster_positions||[];
     const tepBonus=league?.scoring_settings?.bonus_rec_te||0;
     const teMult=1+tepBonus*0.30;
-    const BENCH_MULT=0.3;
+    const BENCH_MULT=valueMode==='starter'?0:1;
     const slots=[];
     rp.forEach(s=>{
       if(s==='QB'||s==='RB'||s==='WR'||s==='TE') slots.push({strict:true,elig:[s]});
@@ -557,7 +559,7 @@ function TeamTab() {
       const rPct=Math.round((1-ri/(n-1||1))*100);
       return {...t,dRank:di+1,rRank:ri+1,dPct,rPct,arc:classifyTeam(dPct,rPct)};
     });
-  },[rosters,fcMap,userMap,tradedPicks,fcPickMap,draftSlots,league]);
+  },[rosters,fcMap,userMap,tradedPicks,fcPickMap,draftSlots,league,valueMode]);
 
   const myTeam = ranked.find(r=>r.owner_id===sleeperUser?.user_id);
 
@@ -844,10 +846,17 @@ function TeamTab() {
         <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
             <span style={{fontSize:13,fontWeight:900,color:'#FFD700',textTransform:'uppercase',letterSpacing:1}}>📊 League Standings</span>
-            <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2,marginLeft:'auto'}}>
-              {['dynasty','redraft'].map(m=>(
-                <button key={m} onClick={()=>setViewMode(m)} style={{padding:'4px 10px',background:viewMode===m?(m==='dynasty'?'#FFD700':'#3b82f6'):'transparent',color:viewMode===m?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:1,textTransform:'uppercase'}}>{m}</button>
-              ))}
+            <div style={{display:'flex',gap:6,marginLeft:'auto',alignItems:'center',flexWrap:'wrap'}}>
+              <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}} title="Starter = only usable lineup slots count · Total = all roster players count">
+                {['starter','total'].map(m=>(
+                  <button key={m} onClick={()=>setValueMode(m)} style={{padding:'4px 8px',background:valueMode===m?'#22c55e':'transparent',color:valueMode===m?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:1,textTransform:'uppercase'}}>{m}</button>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}}>
+                {['dynasty','redraft'].map(m=>(
+                  <button key={m} onClick={()=>setViewMode(m)} style={{padding:'4px 10px',background:viewMode===m?(m==='dynasty'?'#FFD700':'#3b82f6'):'transparent',color:viewMode===m?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:1,textTransform:'uppercase'}}>{m}</button>
+                ))}
+              </div>
             </div>
             {championships.length>0&&<span style={{fontSize:10,color:'#555',width:'100%'}}>🏆 = league titles</span>}
           </div>
