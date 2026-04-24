@@ -2348,6 +2348,36 @@ function AdminApp(){
   const onRenameSave=()=>{ mutate(prev=>prev.map(x=>x.id===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
   const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; mutate(prev=>prev.filter(x=>x.id!==id)); };
   const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; mutate(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
+  const copyToAllCombos=()=>{
+    if(!list.length){ alert('Current list is empty — nothing to copy.'); return; }
+    const total=FORMAT_CHOICES.length*TEP_CHOICES.length*PPR_CHOICES.length*PTD_CHOICES.length*PPC_CHOICES.length;
+    if(!confirm(`Overwrite this list into all ${total} settings combos? You can still tweak individual combos after. Hit PUBLISH to commit.`)) return;
+    const itemsJson=JSON.stringify(list);
+    const items=JSON.parse(itemsJson);
+    setSets(prev=>{
+      const next={...prev};
+      for(const format of FORMAT_CHOICES)
+      for(const tep of TEP_CHOICES)
+      for(const ppr of PPR_CHOICES)
+      for(const passTd of PTD_CHOICES)
+      for(const ppc of PPC_CHOICES){
+        const settings={format,tep,ppr,passTd,ppc};
+        const sig=sigOf(settings);
+        const cur=next[sig];
+        next[sig]={
+          items: JSON.parse(itemsJson),
+          saved: cur?.saved ?? null,
+          updatedAt: cur?.updatedAt ?? null,
+          missing: cur?.missing ?? true,
+          history: cur?(cur.history||[]).concat([cur.items]).slice(-20):[],
+          settings
+        };
+      }
+      return next;
+    });
+    setPublishMsg(`Staged list into ${total} combos — hit PUBLISH to commit.`);
+    setTimeout(()=>setPublishMsg(''),4000);
+  };
   const addPlayer=()=>{ if(!newP.name.trim()) return; mutate(prev=>[...prev,{type:'player',id:'p_'+Date.now(),name:newP.name.trim(),pos:newP.pos,college:newP.college.trim()}]); setNewP({name:'',pos:'WR',college:''}); setShowAddPlayer(false); };
 
   if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
@@ -2382,6 +2412,7 @@ function AdminApp(){
         <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
           <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
+          <button onClick={copyToAllCombos} style={{padding:'8px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:14,fontWeight:700}} title="Overwrite this list into every settings combo">⇢ Copy to all combos</button>
           <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
           <button onClick={publish} disabled={!dirtyCount} style={{padding:'8px 16px',background:dirtyCount?'#FFD700':'#333',color:dirtyCount?'#000':'#888',border:'none',borderRadius:6,fontWeight:900,cursor:dirtyCount?'pointer':'not-allowed',fontSize:14,letterSpacing:1}}>{`PUBLISH${dirtyCount?` (${dirtyCount})`:''}`}</button>
           <button onClick={logout} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:14}}>Sign out</button>
