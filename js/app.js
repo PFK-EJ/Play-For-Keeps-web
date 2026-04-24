@@ -6,7 +6,7 @@ const sb = (window.supabase && window.supabase.createClient) ? window.supabase.c
 
 const DEFAULT_SETTINGS = { format:'Superflex', tep:0.5, ppr:1.0, passTd:6, ppc:0 };
 const FORMAT_CHOICES=['1QB','Superflex'];
-const TEP_CHOICES=[0.5,0.75,1.0], PPR_CHOICES=[0.5,1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0,0.25];
+const TEP_CHOICES=[0.5,0.75,1.0], PPR_CHOICES=[1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0];
 
 const sameSettings = (a,b)=> a && b && (a.format||'Superflex')===(b.format||'Superflex') && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
 
@@ -52,9 +52,7 @@ function SettingsToggleBar({value,onChange,compact}){
     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
       <Group label="FORMAT" choices={FORMAT_CHOICES} suffix="" current={value.format||'Superflex'} field="format"/>
       <Group label="TEP" choices={TEP_CHOICES} suffix="" current={value.tep} field="tep"/>
-      <Group label="PPR" choices={PPR_CHOICES} suffix="" current={value.ppr} field="ppr"/>
       <Group label="PASS TD" choices={PTD_CHOICES} suffix="pt" current={value.passTd} field="passTd"/>
-      <Group label="PPC" choices={PPC_CHOICES} suffix="" current={value.ppc} field="ppc"/>
     </div>
   );
 }
