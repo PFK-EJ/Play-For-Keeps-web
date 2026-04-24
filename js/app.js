@@ -943,7 +943,7 @@ function TeamTab() {
                   const n=ranked.length;
                   if(!pr?.dRank) return null;
                   return (
-                    <span style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                    <span style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                       <span style={{fontSize:13,color:'#FFD700',fontWeight:900,letterSpacing:0.5}}>DYN #{pr.dRank}/{n}</span>
                       <span style={{fontSize:13,color:'#3b82f6',fontWeight:900,letterSpacing:0.5}}>RDFT #{pr.rRank}/{n}</span>
                     </span>
@@ -978,12 +978,12 @@ function TeamTab() {
                   const nflTeam = fc?.player?.team || null;
                   return (
                     <div key={pid} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 4px',minWidth:0}}>
-                      <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 10px',background:bgCol,border:`1px solid ${borderCol}`,borderRadius:7,minWidth:0,flex:'0 1 auto',maxWidth:'100%'}}>
+                      <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 10px',background:bgCol,border:`1px solid ${borderCol}`,borderRadius:7,minWidth:0,flex:'0 1 auto'}}>
                         {tierBadge && <span style={{fontSize:12,fontWeight:900,color:tierBadge.color,letterSpacing:1,flexShrink:0}}>{tierBadge.icon} {tierBadge.label}</span>}
                         <span style={{fontSize:13,fontWeight:700,color:fc?'#f0f0f0':'#444',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{fc?.player?.name||pid}</span>
-                        {age && <span style={{fontSize:12,color:ageCliff?'#ef4444':'#888',fontWeight:ageCliff?900:400,flexShrink:0,whiteSpace:'nowrap'}}>{ageCliff?'🚩 ':''}{age}y</span>}
                         {nflTeam && <span style={{fontSize:12,color:'#666',flexShrink:0,fontWeight:700}}>{nflTeam}</span>}
                       </div>
+                      {age && <span style={{fontSize:12,color:ageCliff?'#ef4444':'#888',fontWeight:ageCliff?900:600,flexShrink:0,whiteSpace:'nowrap'}}>{ageCliff?'🚩 ':''}Age: {age}</span>}
                       {hasFc&&(
                         <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
                           <span style={{fontSize:12,color:'#FFD700',fontWeight:700}}>Dyn {pos}#{dyn||'NR'}</span>
