@@ -1642,10 +1642,6 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
             <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
             <div><span style={{color:'#555'}}>AGE </span><span style={{fontWeight:700}}>{popover.prospect.age!=null?popover.prospect.age:'—'}</span></div>
           </div>
-          <div style={{fontSize:13,marginTop:8,paddingTop:8,borderTop:'1px solid #1e1e1e'}}>
-            <span style={{color:'#555',letterSpacing:1,fontWeight:700}}>DRAFT PICK — </span>
-            <span style={{color:popover.prospect.draftPick?'#FFD700':'#444',fontWeight:800}}>{popover.prospect.draftPick||'TBD'}</span>
-          </div>
         </div>
       )}
     </div>
@@ -2148,7 +2144,7 @@ function App(){
           </div>
           {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
           <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
-            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ My 2026 Rookies"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].map(([t,l])=>(
+            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ My 2026 Rookies"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
           </div>
