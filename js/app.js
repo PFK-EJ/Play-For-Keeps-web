@@ -1093,15 +1093,22 @@ function TeamTab() {
         const pTD  = ss.pass_td ?? 4;
         const recFD= ss.bonus_rec_fd ?? 0;
         const rushFD = ss.bonus_rush_fd ?? 0;
+        const ppc  = ss.rush_att ?? 0;
         const pprLabel = ppr>=1?'Full PPR':ppr>=0.5?'Half PPR':ppr>0?`${ppr} PPR`:'Standard';
         const pills = [
           {l:'Format', v:isSF?'Superflex':'1-QB'},
           {l:'Starters', v:String(starters)},
           {l:'Pass TD', v:`${pTD} pts`},
           {l:'PPR', v:pprLabel},
-          {l:'TE Premium', v:tep>0?`+${tep}`:'—'},
-          {l:'PPFD', v:recFD>0?`+${recFD} rec`+(rushFD>0?`/+${rushFD} rush`:''):(rushFD>0?`+${rushFD} rush`:'—')},
         ];
+        if(tep>0)           pills.push({l:'TE Premium', v:`+${tep}`});
+        if(ppc>0)           pills.push({l:'PPC',        v:`+${ppc}`});
+        if(recFD>0||rushFD>0){
+          const parts=[];
+          if(recFD>0)  parts.push(`+${recFD} rec`);
+          if(rushFD>0) parts.push(`+${rushFD} rush`);
+          pills.push({l:'PPFD', v:parts.join(' / ')});
+        }
         return (
           <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'10px 14px'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
@@ -1369,11 +1376,17 @@ function TeamTab() {
                           const dyn = pl.dynPosRank;
                           const rdft = pl.rdftPosRank;
                           const elite = pl.isElite;
+                          // Per-position tier cutoffs matching Age Cliff section:
+                          // WR/RB cap at top 50, QB/TE cap at top 28. Outside the cap = grey.
+                          const bands = (p==='QB'||p==='TE')
+                            ? {purple:15, blue:21, green:28}
+                            : {purple:20, blue:35, green:50};
                           let borderCol = '#2a2a2a';
                           if (elite) borderCol = '#FFD700';
-                          else if (dyn && dyn<=20) borderCol = '#c084fc';
-                          else if (dyn && dyn<=35) borderCol = '#3b82f6';
-                          else if (dyn && dyn<=49) borderCol = '#10b981';
+                          else if (dyn && dyn<=10) borderCol = '#c084fc';
+                          else if (dyn && dyn<=bands.purple) borderCol = '#c084fc';
+                          else if (dyn && dyn<=bands.blue) borderCol = '#3b82f6';
+                          else if (dyn && dyn<=bands.green) borderCol = '#10b981';
                           return (
                             <span key={pl.pid} style={{padding:'6px 10px',background:elite?'#1a1400':'#0a0a0a',border:`1px solid ${borderCol}`,borderRadius:7,fontSize:13,color:'#f0f0f0',display:'inline-flex',gap:8,alignItems:'center'}}>
                               {elite && <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1}}>⭐ ELITE</span>}
@@ -1389,7 +1402,7 @@ function TeamTab() {
                   </div>
                 );
               })}
-              <div style={{fontSize:13,color:'#555',marginTop:6}}>⭐ Elite (gold) = top 10 dynasty AND redraft · Purple = top 20 · Blue = top 35 · Green = top 49 · Grey = deeper/unranked.</div>
+              <div style={{fontSize:13,color:'#555',marginTop:6}}>⭐ Gold = Elite (top 10 both) · Purple/Blue/Green = tiers within position cap (WR/RB top 50 · QB/TE top 28) · Grey = outside cap / unranked.</div>
             </div>
 
             {/* Age Cliff Red Flags */}
