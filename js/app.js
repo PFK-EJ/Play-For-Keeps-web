@@ -967,16 +967,20 @@ function TeamTab() {
                   else if (dyn && dyn<=bands.purple) borderCol = '#c084fc';
                   else if (dyn && dyn<=bands.blue) borderCol = '#3b82f6';
                   else if (dyn && dyn<=bands.green) borderCol = '#10b981';
+                  const age = fc?.player?.age ? Number(fc.player.age).toFixed(1) : null;
+                  const nflTeam = fc?.player?.team || null;
                   return (
-                    <div key={pid} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:bgCol,border:`1px solid ${borderCol}`,borderRadius:6}}>
-                      {elite && <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,flexShrink:0}}>⭐ ELITE</span>}
-                      <span style={{flex:1,fontSize:13,fontWeight:600,color:fc?'#f0f0f0':'#444',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{fc?.player?.name||pid}</span>
-                      {fc?.player?.age&&<span style={{fontSize:12,color:'#555',flexShrink:0,whiteSpace:'nowrap'}}>Age {Number(fc.player.age).toFixed(1)}</span>}
-                      {fc?.player?.team&&<span style={{fontSize:12,color:'#444',flexShrink:0,minWidth:30,textAlign:'center'}}>{fc.player.team}</span>}
+                    <div key={pid} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 4px',minWidth:0}}>
+                      <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 10px',background:bgCol,border:`1px solid ${borderCol}`,borderRadius:7,minWidth:0,flex:'0 1 auto',maxWidth:'100%'}}>
+                        {elite && <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,flexShrink:0}}>⭐ ELITE</span>}
+                        <span style={{fontSize:13,fontWeight:700,color:fc?'#f0f0f0':'#444',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{fc?.player?.name||pid}</span>
+                        {age && <span style={{fontSize:12,color:'#888',flexShrink:0,whiteSpace:'nowrap'}}>{age}y</span>}
+                        {nflTeam && <span style={{fontSize:12,color:'#666',flexShrink:0,fontWeight:700}}>{nflTeam}</span>}
+                      </div>
                       {hasFc&&(
-                        <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
-                          <span style={{fontSize:12,color:'#FFD700',fontWeight:700,minWidth:48,textAlign:'right'}}>Dyn {pos}#{dyn||'NR'}</span>
-                          <span style={{fontSize:12,color:'#3b82f6',fontWeight:700,minWidth:48,textAlign:'right'}}>Rdft {pos}#{rdft||'NR'}</span>
+                        <div style={{marginLeft:'auto',display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
+                          <span style={{fontSize:12,color:'#FFD700',fontWeight:700,minWidth:52,textAlign:'right'}}>Dyn {pos}#{dyn||'NR'}</span>
+                          <span style={{fontSize:12,color:'#3b82f6',fontWeight:700,minWidth:52,textAlign:'right'}}>Rdft {pos}#{rdft||'NR'}</span>
                           <span style={{fontSize:13,fontWeight:700,color:'#FFD700',minWidth:34,textAlign:'right'}}>{dv>0?(dv/1000).toFixed(1)+'k':'—'}</span>
                           <span style={{fontSize:13,fontWeight:600,color:'#3b82f6',minWidth:34,textAlign:'right'}}>{rv>0?(rv/1000).toFixed(1)+'k':'—'}</span>
                         </div>
