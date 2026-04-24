@@ -356,7 +356,6 @@ function TeamTab() {
   useEffect(()=>{ localStorage.setItem('pfk_value_mode', valueMode); },[valueMode]);
   const [selectedOtherRid, setSelectedOtherRid] = useState(null);
   const [leagueArcs, setLeagueArcs] = useState({});
-  const [subView, setSubView] = useState('standings'); // 'standings' | 'analyzer'
   const [analyzerRid, setAnalyzerRid] = useState(null);
   const [suggestionMode, setSuggestionMode] = useState(null); // null = auto by arc
   const [pendingTrades, setPendingTrades] = useState(0);
@@ -663,7 +662,6 @@ function TeamTab() {
 
   useEffect(()=>{
     if(myTeam) setAnalyzerRid(myTeam.roster_id);
-    setSubView('standings');
     setSuggestionMode(null);
   },[league?.league_id, myTeam?.roster_id]);
 
@@ -1066,20 +1064,11 @@ function TeamTab() {
         </div>
       )}
 
-      {/* Sub-view toggle + pending-trade indicator */}
-      {league && ranked.length>0 && (
-        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-          <div style={{display:'flex',gap:6,background:'#0a0a0a',border:'1px solid #222',borderRadius:10,padding:4}}>
-            {[['standings','📊 Standings'],['analyzer','🔍 Team Analyzer']].map(([k,l])=>(
-              <button key={k} onClick={()=>setSubView(k)} style={{padding:'8px 16px',background:subView===k?'#FFD700':'transparent',color:subView===k?'#000':'#888',border:'none',borderRadius:7,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:1}}>{l}</button>
-            ))}
-          </div>
-          {pendingTrades>0 && (
-            <a href={`https://sleeper.com/leagues/${league.league_id}/trade`} target="_blank" rel="noopener" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:8,fontSize:14,fontWeight:800,color:'#FFD700',textDecoration:'none',letterSpacing:0.5,animation:'pfk-pulse 1.8s ease-in-out infinite'}}>
-              🔔 {pendingTrades} pending trade{pendingTrades>1?'s':''}
-            </a>
-          )}
-        </div>
+      {/* Pending-trade indicator */}
+      {league && ranked.length>0 && pendingTrades>0 && (
+        <a href={`https://sleeper.com/leagues/${league.league_id}/trade`} target="_blank" rel="noopener" style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:8,fontSize:14,fontWeight:800,color:'#FFD700',textDecoration:'none',letterSpacing:0.5,animation:'pfk-pulse 1.8s ease-in-out infinite'}}>
+          🔔 {pendingTrades} pending trade{pendingTrades>1?'s':''}
+        </a>
       )}
 
       {/* League Settings bar */}
@@ -1127,56 +1116,69 @@ function TeamTab() {
         );
       })()}
 
-      {/* STANDINGS VIEW — existing content */}
-      {subView==='standings' && (<>
-
-      {/* My Team Card */}
-      {myTeam&&(
-        <div style={{background:'#0f0f0f',border:`2px solid ${myTeam.arc.color}`,borderRadius:14,padding:24}}>
-          {/* Header */}
-          <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap',marginBottom:18}}>
-            <div style={{flex:1,minWidth:180}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                <div style={{fontSize:13,color:'#666',fontWeight:700,letterSpacing:2}}>YOUR TEAM</div>
-                <button onClick={refreshLeague} disabled={!!loading} style={{marginLeft:'auto',padding:'3px 10px',background:'#111',border:'1px solid #333',borderRadius:6,color:loading?'#444':'#aaa',cursor:loading?'default':'pointer',fontSize:12,fontWeight:700,letterSpacing:0.5}}>{loading?'LOADING…':'↻ REFRESH'}</button>
+      {/* Selected Team Card — analyze any team in the league */}
+      {(()=>{
+        const selTeam = ranked.find(t=>t.roster_id===analyzerRid) || myTeam;
+        if(!selTeam) return null;
+        const aSel = analyzeTeam(selTeam);
+        const avgAge = aSel?.avgAge;
+        const ageTierInfo = aSel?.ageTierInfo;
+        const isMine = selTeam.owner_id===sleeperUser?.user_id;
+        return (
+          <div style={{background:'#0f0f0f',border:`2px solid ${selTeam.arc.color}`,borderRadius:14,padding:24}}>
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap',marginBottom:18}}>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                  <div style={{fontSize:13,color:'#666',fontWeight:700,letterSpacing:2}}>{isMine?'YOUR TEAM':'ANALYZING'}</div>
+                  <button onClick={refreshLeague} disabled={!!loading} style={{marginLeft:'auto',padding:'3px 10px',background:'#111',border:'1px solid #333',borderRadius:6,color:loading?'#444':'#aaa',cursor:loading?'default':'pointer',fontSize:12,fontWeight:700,letterSpacing:0.5}}>{loading?'LOADING…':'↻ REFRESH'}</button>
+                </div>
+                <select value={selTeam.roster_id} onChange={e=>{setAnalyzerRid(Number(e.target.value));setSuggestionMode(null);}} style={{background:'#111',border:`1px solid ${selTeam.arc.color}`,borderRadius:7,color:'#f0f0f0',padding:'8px 12px',fontSize:17,fontWeight:900,minWidth:220,maxWidth:'100%'}}>
+                  {[...ranked].sort((a,b)=>a.dRank-b.dRank).map(t=>(
+                    <option key={t.roster_id} value={t.roster_id}>
+                      #{t.dRank} · {t.teamName}{t.owner_id===sleeperUser?.user_id?' ★':''}
+                    </option>
+                  ))}
+                </select>
+                <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6,flexWrap:'wrap'}}>
+                  <div style={{fontSize:13,color:'#666'}}>{league?.name}</div>
+                  {lastFetched&&<div style={{fontSize:12,color:'#444'}}>· Updated {lastFetched.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>}
+                </div>
               </div>
-              <div style={{fontSize:20,fontWeight:900,color:'#f0f0f0'}}>{myTeam.teamName}</div>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2,flexWrap:'wrap'}}>
-                <div style={{fontSize:13,color:'#666'}}>{league?.name}</div>
-                {lastFetched&&<div style={{fontSize:12,color:'#444'}}>· Updated {lastFetched.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>}
+              <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${selTeam.arc.color}`,borderRadius:10,flexShrink:0}}>
+                <div style={{fontSize:26}}>{selTeam.arc.emoji}</div>
+                <div style={{fontSize:15,fontWeight:900,color:selTeam.arc.color,marginTop:2,letterSpacing:1}}>{selTeam.arc.label.toUpperCase()}</div>
+                <div style={{fontSize:12,color:'#888',marginTop:3,maxWidth:160}}>{selTeam.arc.desc}</div>
               </div>
-              {pendingTrades>0 && (
-                <div style={{marginTop:8,display:'inline-flex',alignItems:'center',gap:8,padding:'5px 11px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:7,fontSize:14,fontWeight:700,color:'#FFD700'}}>
-                  🔔 {pendingTrades} incoming trade request{pendingTrades>1?'s':''} on Sleeper
+              {avgAge!=null && ageTierInfo && (
+                <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${ageTierInfo.color}`,borderRadius:10,flexShrink:0}}>
+                  <div style={{fontSize:22,fontWeight:900,color:ageTierInfo.color}}>{avgAge}</div>
+                  <div style={{fontSize:14,fontWeight:900,color:ageTierInfo.color,marginTop:3,letterSpacing:1}}>{ageTierInfo.label.toUpperCase()}</div>
+                  <div style={{fontSize:12,color:'#888',marginTop:3}}>team avg age</div>
                 </div>
               )}
             </div>
-            <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${myTeam.arc.color}`,borderRadius:10,flexShrink:0}}>
-              <div style={{fontSize:26}}>{myTeam.arc.emoji}</div>
-              <div style={{fontSize:15,fontWeight:900,color:myTeam.arc.color,marginTop:2,letterSpacing:1}}>{myTeam.arc.label.toUpperCase()}</div>
-              <div style={{fontSize:12,color:'#888',marginTop:3,maxWidth:160}}>{myTeam.arc.desc}</div>
-            </div>
+            {/* Stat pills */}
+            {fcValues.length>0&&(
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:20}}>
+                {[
+                  {l:'Dynasty Rank', v:`#${selTeam.dRank} / ${ranked.length}`, c:selTeam.arc.color},
+                  {l:'Redraft Rank',  v:`#${selTeam.rRank} / ${ranked.length}`, c:selTeam.rRank<=ranked.length/3?'#10b981':selTeam.rRank<=ranked.length*2/3?'#FFD700':'#ef4444'},
+                  {l:'Dynasty Value', v:(selTeam.dVal/1000).toFixed(1)+'k',     c:'#FFD700'},
+                  {l:'Redraft Value', v:(selTeam.rVal/1000).toFixed(1)+'k',     c:'#3b82f6'},
+                ].map(({l,v,c})=>(
+                  <div key={l} style={{background:'#0a0a0a',borderRadius:8,padding:'10px 12px',border:'1px solid #1e1e1e',textAlign:'center'}}>
+                    <div style={{fontSize:18,fontWeight:900,color:c}}>{v}</div>
+                    <div style={{fontSize:12,fontWeight:600,color:'#666',marginTop:2}}>{l}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:14}}>⚠️ Player values unavailable — showing Sleeper roster only.</div>}
+            <RosterSection team={selTeam}/>
           </div>
-          {/* Stat pills */}
-          {fcValues.length>0&&(
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:20}}>
-              {[
-                {l:'Dynasty Rank', v:`#${myTeam.dRank} / ${ranked.length}`, c:myTeam.arc.color},
-                {l:'Redraft Rank',  v:`#${myTeam.rRank} / ${ranked.length}`, c:myTeam.rRank<=ranked.length/3?'#10b981':myTeam.rRank<=ranked.length*2/3?'#FFD700':'#ef4444'},
-                {l:'Dynasty Value', v:(myTeam.dVal/1000).toFixed(1)+'k',     c:'#FFD700'},
-                {l:'Redraft Value', v:(myTeam.rVal/1000).toFixed(1)+'k',     c:'#3b82f6'},
-              ].map(({l,v,c})=>(
-                <div key={l} style={{background:'#0a0a0a',borderRadius:8,padding:'10px 12px',border:'1px solid #1e1e1e',textAlign:'center'}}>
-                  <div style={{fontSize:18,fontWeight:900,color:c}}>{v}</div>
-                  <div style={{fontSize:12,fontWeight:600,color:'#666',marginTop:2}}>{l}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:14}}>⚠️ Player values unavailable — showing Sleeper roster only.</div>}
-          <RosterSection team={myTeam}/>
-        </div>
-      )}
+        );
+      })()}
 
       {/* League Standings + Championship History — side-by-side on desktop */}
       <div className="pfk-pr-grid">
@@ -1300,15 +1302,13 @@ function TeamTab() {
         <div style={{padding:'30px',textAlign:'center',color:'#555',fontSize:13}}>← Select a league above to see your team analysis</div>
       )}
 
-      </>)}{/* end STANDINGS VIEW */}
-
-      {/* ANALYZER VIEW */}
-      {subView==='analyzer' && league && ranked.length>0 && (()=>{
+      {/* Team Analyzer deep-dive — appears below Championship History */}
+      {league && ranked.length>0 && (()=>{
         const team = ranked.find(t=>t.roster_id===analyzerRid) || myTeam || ranked[0];
         if(!team) return null;
         const a = analyzeTeam(team);
         if(!a) return null;
-        const {byPos, buckets, grades, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugsContending, sugsTanking, hasFc} = a;
+        const {flags, picks, futureFirsts, windowText, sugsContending, sugsTanking} = a;
         const contenderArcs=['Dynasty','Contender','Win-Now','Aging Contender','Future Dynasty'];
         const defaultMode = contenderArcs.includes(team.arc.label) ? 'contending' : 'tanking';
         const mode = suggestionMode || defaultMode;
@@ -1316,93 +1316,11 @@ function TeamTab() {
         const n = rosters.length || 12;
         return (
           <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            {/* Team selector */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'14px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:1}}>ANALYZE TEAM</span>
-              <select value={analyzerRid||''} onChange={e=>{setAnalyzerRid(Number(e.target.value));setSuggestionMode(null);}} style={inp2({flex:1,minWidth:200,maxWidth:380,fontSize:14})}>
-                {[...ranked].sort((a,b)=>a.dRank-b.dRank).map(t=>(
-                  <option key={t.roster_id} value={t.roster_id}>
-                    #{t.dRank} · {t.teamName}{t.owner_id===sleeperUser?.user_id?' ★':''}
-                  </option>
-                ))}
-              </select>
-              <span style={{fontSize:14,color:'#666',letterSpacing:0.3}}>Pick projections assume max-PF scoring</span>
-            </div>
-
-            {/* Header */}
-            <div style={{background:'#0f0f0f',border:`2px solid ${team.arc.color}`,borderRadius:14,padding:22}}>
-              <div style={{display:'flex',alignItems:'flex-start',gap:18,flexWrap:'wrap'}}>
-                <div style={{flex:1,minWidth:200}}>
-                  <div style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:2,marginBottom:6}}>TEAM ANALYZER</div>
-                  <div style={{fontSize:24,fontWeight:900,color:'#f0f0f0'}}>{team.teamName}</div>
-                  <div style={{fontSize:13,color:'#888',marginTop:4}}>{league?.name} · Dyn #{team.dRank}/{ranked.length} · Rdft #{team.rRank}/{ranked.length}</div>
-                  {pendingTrades>0 && team.owner_id===sleeperUser?.user_id && (
-                    <div style={{marginTop:10,display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:8,fontSize:13,fontWeight:700,color:'#FFD700'}}>
-                      🔔 {pendingTrades} incoming trade request{pendingTrades>1?'s':''} on Sleeper
-                    </div>
-                  )}
-                  {windowText && <div style={{marginTop:12,fontSize:15,color:team.arc.color,fontWeight:700}}>{windowText}</div>}
-                </div>
-                <div style={{textAlign:'center',padding:'14px 20px',background:'#111',border:`2px solid ${team.arc.color}`,borderRadius:10,flexShrink:0}}>
-                  <div style={{fontSize:28}}>{team.arc.emoji}</div>
-                  <div style={{fontSize:15,fontWeight:900,color:team.arc.color,marginTop:3,letterSpacing:1}}>{team.arc.label.toUpperCase()}</div>
-                </div>
-                {avgAge!=null && ageTierInfo && (
-                  <div style={{textAlign:'center',padding:'14px 20px',background:'#111',border:`2px solid ${ageTierInfo.color}`,borderRadius:10,flexShrink:0}}>
-                    <div style={{fontSize:22,fontWeight:900,color:ageTierInfo.color}}>{avgAge}</div>
-                    <div style={{fontSize:14,fontWeight:900,color:ageTierInfo.color,marginTop:3,letterSpacing:1}}>{ageTierInfo.label.toUpperCase()}</div>
-                    <div style={{fontSize:13,color:'#888',marginTop:3}}>avg starter age</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Positional Breakdown */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Positional Breakdown</div>
-              {POS_ORDER.map(p=>{
-                const list=byPos[p], b=buckets[p], g=grades[p];
-                return (
-                  <div key={p} style={{marginBottom:16}}>
-                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'8px 12px',background:'#0a0a0a',borderLeft:`3px solid ${GRADE_COLOR[g]}`,borderRadius:6,marginBottom:8}}>
-                      <span style={{fontWeight:900,color:'#f0f0f0',fontSize:15,letterSpacing:1,minWidth:28}}>{p}</span>
-                      <span style={{padding:'4px 12px',borderRadius:6,fontSize:14,fontWeight:900,letterSpacing:1,background:'#111',color:GRADE_COLOR[g],border:`1px solid ${GRADE_COLOR[g]}`}}>{g.toUpperCase()}</span>
-                      <span style={{marginLeft:'auto',fontSize:14,color:'#666'}}>{list.length} rostered</span>
-                    </div>
-                    {list.length===0 && <div style={{fontSize:13,color:'#555',padding:'4px 12px'}}>No rostered {p}s</div>}
-                    {list.length>0 && (
-                      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                        {list.map(pl=>{
-                          const dyn = pl.dynPosRank;
-                          const rdft = pl.rdftPosRank;
-                          const elite = pl.isElite;
-                          // Per-position tier cutoffs matching Age Cliff section:
-                          // WR/RB cap at top 50, QB/TE cap at top 28. Outside the cap = grey.
-                          const bands = (p==='QB'||p==='TE')
-                            ? {purple:15, blue:21, green:28}
-                            : {purple:20, blue:35, green:50};
-                          let borderCol = '#2a2a2a';
-                          if (elite) borderCol = '#FFD700';
-                          else if (dyn && dyn<=10) borderCol = '#c084fc';
-                          else if (dyn && dyn<=bands.purple) borderCol = '#c084fc';
-                          else if (dyn && dyn<=bands.blue) borderCol = '#3b82f6';
-                          else if (dyn && dyn<=bands.green) borderCol = '#10b981';
-                          return (
-                            <span key={pl.pid} style={{padding:'6px 10px',background:elite?'#1a1400':'#0a0a0a',border:`1px solid ${borderCol}`,borderRadius:7,fontSize:13,color:'#f0f0f0',display:'inline-flex',gap:8,alignItems:'center'}}>
-                              {elite && <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1}}>⭐ ELITE</span>}
-                              <span style={{fontWeight:600}}>{pl.name}</span>
-                              <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>Dyn {p}#{dyn||'NR'}</span>
-                              <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>Rdft {p}#{rdft||'NR'}</span>
-                              {pl.age!=null&&<span style={{fontSize:13,color:'#666'}}>{pl.age.toFixed(1)}y</span>}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <div style={{fontSize:13,color:'#555',marginTop:6}}>⭐ Gold = Elite (top 10 both) · Purple/Blue/Green = tiers within position cap (WR/RB top 50 · QB/TE top 28) · Grey = outside cap / unranked.</div>
+            {/* Arc window banner */}
+            <div style={{background:'#0f0f0f',border:`1px solid ${team.arc.color}`,borderRadius:12,padding:'12px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:1}}>CONTENDER / REBUILD ANALYSIS</span>
+              <span style={{fontSize:13,color:'#666'}}>· {team.teamName}</span>
+              {windowText && <span style={{marginLeft:'auto',fontSize:14,color:team.arc.color,fontWeight:700}}>{windowText}</span>}
             </div>
 
             {/* Age Cliff Red Flags */}
