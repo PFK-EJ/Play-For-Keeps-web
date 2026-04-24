@@ -1938,6 +1938,9 @@ function App(){
     return 'list_1';
   });
   const [history,setHistory]=useState([]);
+  const [shareOpen,setShareOpen]=useState(false);
+  const [shareText,setShareText]=useState('');
+  const [shareCopied,setShareCopied]=useState(false);
   const [editingPlayer,setEditingPlayer]=useState(null);
   const [playerDraft,setPlayerDraft]=useState({});
   const [showAdd,setShowAdd]=useState(false);
@@ -2091,6 +2094,25 @@ function App(){
   const reorder=(fromId,beforeId)=>{push(list);setList(prev=>{const l=[...prev],fi=l.findIndex(x=>x.id===fromId);const[item]=l.splice(fi,1);if(beforeId===null){l.push(item);}else{const ti=l.findIndex(x=>x.id===beforeId);l.splice(ti!==-1?ti:l.length,0,item);}return l;});};
   const moveItem=(id,dir)=>{push(list);setList(prev=>{const l=[...prev],i=l.findIndex(x=>x.id===id),sw=i+dir;if(sw<0||sw>=l.length)return l;[l[i],l[sw]]=[l[sw],l[i]];return l;});};
   const undo=()=>{if(!history.length)return;setList(history[history.length-1]);setHistory(h=>h.slice(0,-1));};
+  const buildShareText=()=>{
+    const players=list.filter(x=>x.type==='player').slice(0,12);
+    const lines=players.map((p,i)=>`${i+1}. ${p.name} (${p.pos})`).join('\n');
+    return `My 2026 Dynasty Rookie 1st Round 🏆\n\n${lines}\n\nvia @PlayForKeepsFF\nplayforkeeps-web.pages.dev`;
+  };
+  const shareTop12=async()=>{
+    const players=list.filter(x=>x.type==='player');
+    if(players.length<12){ alert(`You only have ${players.length} players in this list — add at least 12 before sharing your 1st Round.`); return; }
+    const text=buildShareText();
+    setShareText(text);
+    setShareCopied(false);
+    if(navigator.share){
+      try{ await navigator.share({text,title:'My 2026 Dynasty Rookie 1st Round'}); return; }catch(e){ if(e?.name==='AbortError') return; }
+    }
+    setShareOpen(true);
+  };
+  const copyShareText=async()=>{
+    try{ await navigator.clipboard.writeText(shareText); setShareCopied(true); setTimeout(()=>setShareCopied(false),2200); }catch(e){ alert('Copy failed — select and copy manually.'); }
+  };
   const deleteTier=id=>{push(list);setList(prev=>prev.filter(x=>x.id!==id));};
   const saveRename=()=>{if(!renamingTier)return;const name=tierNameDraft.trim()||renamingTier;push(list);setList(prev=>prev.map(x=>x.type==="tier"&&x.id===renamingTier?{...x,name}:x));setRenamingTier(null);};
   const addTier=()=>{if(!newTierName.trim())return;const id="t_"+newTierName+"_"+Date.now();push(list);setList(prev=>[{type:"tier",id,name:newTierName.trim()},...prev]);setNewTierName("");setShowAddTier(false);};
@@ -2223,6 +2245,7 @@ function App(){
               <button onClick={()=>setShowAdd(v=>!v)} style={{padding:"6px 12px",background:"#222",border:"1px solid #444",borderRadius:7,color:"#ccc",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Player</button>
               <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#FFD700":"#333"),borderRadius:7,color:history.length?"#FFD700":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:14}}>↩ Undo</button>
               <button onClick={()=>{setHistory([]);setList(buildInitialList());}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:14}}>↺ Reset</button>
+              <button onClick={shareTop12} style={{padding:"6px 12px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14,letterSpacing:0.5}}>📤 Share 1st Round</button>
             </div>
             {showAddTier&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
               <input value={newTierName} onChange={e=>setNewTierName(e.target.value)} placeholder="Tier name" onKeyDown={e=>e.key==="Enter"&&addTier()} style={{flex:1,padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:13}}/>
@@ -2245,6 +2268,21 @@ function App(){
         <div style={{display:tab==="team"?"block":"none"}}><TeamTab/></div>
         {tab==="polls"&&<TradePollsTab session={session} onRequestSignIn={()=>{setAuthMode('signin');setAuthOpen(true);}}/>}
       </div>
+      {shareOpen&&(
+        <div onClick={()=>setShareOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:460,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:12,padding:20}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+              <div style={{fontWeight:900,fontSize:16,letterSpacing:1.5,color:'#FFD700'}}>SHARE YOUR 1ST ROUND</div>
+              <button onClick={()=>setShareOpen(false)} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
+            </div>
+            <textarea readOnly value={shareText} onFocus={e=>e.target.select()} style={{width:'100%',height:200,background:'#000',border:'1px solid #333',borderRadius:8,color:'#eee',padding:10,fontSize:13,fontFamily:'inherit',resize:'vertical',marginBottom:12}}/>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" style={{flex:'1 1 140px',padding:'10px 14px',background:'#FFD700',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:0.5,textAlign:'center',textDecoration:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:6}}><svg width="14" height="14" viewBox="0 0 24 24" fill="#000" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>Share to X</a>
+              <button onClick={copyShareText} style={{flex:'1 1 140px',padding:'10px 14px',background:shareCopied?'#10b981':'transparent',border:'1px solid '+(shareCopied?'#10b981':'#FFD700'),borderRadius:7,color:shareCopied?'#000':'#FFD700',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:0.5}}>{shareCopied?'✓ Copied!':'Copy text'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
