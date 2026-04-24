@@ -20,5 +20,13 @@ input, select { font-family:inherit; }
   .pfk-header-title { font-size:18px !important; letter-spacing:2px !important; }
   .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
   .pfk-top-tabs button { flex:1 !important; padding:7px 2px !important; font-size:11px !important; letter-spacing:0 !important; }
-  .pfk-content { padding:10px 10px 16px !important; }
+  .pfk-content { padding:10px 8px 16px !important; }
+  /* Horizontal scroll containers so mobile shows the full PC layout */
+  .pfk-wide-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -8px; padding:0 8px 2px; }
+  .pfk-wide-scroll > * { min-width:720px; }
+  /* Standings / championship history grid stacks vertically on mobile; each card scrolls its own rows */
+  .pfk-pr-grid { display:block !important; }
+  .pfk-pr-grid > div { margin-bottom:14px; }
+  /* Filter bar doesn't need to stretch full width on mobile */
+  .pfk-filter-bar { position:static !important; }
 }

@@ -1225,7 +1225,7 @@ function TeamTab() {
               </div>
             )}
             {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:14}}>⚠️ Player values unavailable — showing Sleeper roster only.</div>}
-            <RosterSection team={selTeam}/>
+            <div className="pfk-wide-scroll"><RosterSection team={selTeam}/></div>
           </div>
         );
       })()}
@@ -1343,7 +1343,7 @@ function TeamTab() {
               </div>
               <button onClick={()=>setSelectedOtherRid(null)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13,fontWeight:700}}>✕ Close</button>
             </div>
-            <RosterSection team={other}/>
+            <div className="pfk-wide-scroll"><RosterSection team={other}/></div>
           </div>
         );
       })()}
@@ -2230,7 +2230,7 @@ function App(){
               {pfkMissing&&<div style={{fontSize:12,color:'#d97706',marginTop:8}}>No ranking published yet for this combo — showing most recent.</div>}
             </div>
             <FilterBar/>
-            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',margin:'0 -2px'}}>
+            <div className="pfk-wide-scroll">
               <RenderList src={officialList||PFK_LIST} allowEdit={false} prospects={prospects} {...commonProps}/>
             </div>
           </div>
@@ -2295,7 +2295,7 @@ function App(){
               <button onClick={()=>setShowAdd(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:14}}>✕</button>
             </div>)}
             <FilterBar/>
-            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',margin:'0 -2px'}}>
+            <div className="pfk-wide-scroll">
               <RenderList src={list} allowEdit={true} {...commonProps}/>
             </div>
           </div>
