@@ -975,6 +975,9 @@ function TeamTab() {
                   const ageNum = fc?.player?.maybeAge ?? fc?.player?.age ?? null;
                   const age = ageNum!=null ? Number(ageNum).toFixed(1) : null;
                   const ageCliff = ageNum!=null && AGE_RISK_AGE[pos]!=null && ageNum >= AGE_RISK_AGE[pos];
+                  // Prime age tops (peak end) per position — at/below = prime or younger
+                  const PRIME_MAX = {RB:28, WR:26, TE:26, QB:30};
+                  const agePrime = !ageCliff && ageNum!=null && PRIME_MAX[pos]!=null && ageNum <= PRIME_MAX[pos];
                   const nflTeam = fc?.player?.team || null;
                   return (
                     <div key={pid} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 4px',minWidth:0}}>
@@ -983,7 +986,7 @@ function TeamTab() {
                         <span style={{fontSize:13,fontWeight:700,color:fc?'#f0f0f0':'#444',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{fc?.player?.name||pid}</span>
                         {nflTeam && <span style={{fontSize:12,color:'#666',flexShrink:0,fontWeight:700}}>{nflTeam}</span>}
                       </div>
-                      {age && <span style={{fontSize:12,color:ageCliff?'#ef4444':'#888',fontWeight:ageCliff?900:600,flexShrink:0,whiteSpace:'nowrap'}}>{ageCliff?'🚩 ':''}Age: {age}</span>}
+                      {age && <span style={{fontSize:12,color:ageCliff?'#ef4444':agePrime?'#10b981':'#888',fontWeight:ageCliff||agePrime?900:600,flexShrink:0,whiteSpace:'nowrap'}}>{ageCliff?'🚩 ':''}Age: {age}</span>}
                       {hasFc&&(
                         <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
                           <span style={{fontSize:12,color:'#FFD700',fontWeight:700}}>Dyn {pos}#{dyn||'NR'}</span>
