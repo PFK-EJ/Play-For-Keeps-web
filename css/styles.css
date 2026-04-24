@@ -26,6 +26,11 @@ input, select { font-family:inherit; }
   .pfk-wide-scroll > * { min-width:720px; }
   .pfk-wide-scroll > div > div[style*="padding: 24px"], .pfk-content > div > div[style*="padding: 24px"] { padding:12px 10px !important; }
   .pfk-content > div > div[style*="padding: 20px"] { padding:12px 10px !important; }
+  /* Rookie list: fit viewport so name + draft pill show without scrolling */
+  .pfk-rookie-list .pfk-rookie-row { padding:8px 10px !important; }
+  .pfk-rookie-list .pfk-rookie-row > div { flex-wrap:wrap !important; gap:6px !important; }
+  .pfk-rookie-list .pfk-rook-slot { width:30px !important; font-size:12px !important; }
+  .pfk-rookie-list .pfk-rook-college { display:none !important; }
   /* Standings / championship history grid stacks vertically on mobile; each card scrolls its own rows */
   .pfk-pr-grid { display:block !important; }
   .pfk-pr-grid > div { margin-bottom:14px; }

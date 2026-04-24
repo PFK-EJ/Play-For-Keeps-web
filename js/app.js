@@ -660,7 +660,7 @@ function TeamTab() {
       // Redraft: starter-usable lineup + discounted bench from active only
       const rVal=lineupValue(active,'redraftValue');
       const owner=userMap[r.owner_id];
-      return {...r,dVal,rVal,teamName:owner?.metadata?.team_name||owner?.display_name||`Team ${r.roster_id}`,allPlayers:allP};
+      return {...r,dVal,rVal,teamName:owner?.metadata?.team_name||owner?.display_name||`Team ${r.roster_id}`,username:owner?.display_name||`Team ${r.roster_id}`,allPlayers:allP};
     });
     const byD=[...stats].sort((a,b)=>b.dVal-a.dVal);
     const byR=[...stats].sort((a,b)=>b.rVal-a.rVal);
@@ -1086,13 +1086,11 @@ function TeamTab() {
           <div style={{fontSize:13,fontWeight:900,color:'#FFD700',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>🏈 Your Leagues · 2025</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {leagues.map(lg=>{
-              const type=lg.settings?.type===2?'Dynasty':lg.settings?.type===1?'Keeper':'Redraft';
               const active=league?.league_id===lg.league_id;
               const arc=leagueArcs[lg.league_id];
               return (
                 <button key={lg.league_id} onClick={()=>selectLeague(lg)}
                   style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:active?'#141414':'#080808',border:'1px solid '+(active?'#FFD700':'#222'),borderRadius:9,cursor:'pointer',textAlign:'left',width:'100%',flexWrap:'wrap'}}>
-                  <span style={{padding:'2px 8px',borderRadius:4,fontSize:12,fontWeight:800,background:'#111',color:type==='Dynasty'?'#FFD700':type==='Keeper'?'#3b82f6':'#aaa',border:'1px solid '+(type==='Dynasty'?'#FFD700':type==='Keeper'?'#3b82f6':'#555'),flexShrink:0}}>{type}</span>
                   {arc&&<span style={{padding:'2px 8px',borderRadius:4,fontSize:12,fontWeight:800,background:'#111',color:arc.color,border:'1px solid '+arc.color,flexShrink:0}}>{arc.emoji} {arc.label}</span>}
                   <span style={{fontWeight:700,fontSize:13,color:active?'#FFD700':'#f0f0f0',flex:1,minWidth:120}}>{lg.name}</span>
                   <span style={{fontSize:13,color:'#555'}}>{lg.total_rosters} teams</span>
@@ -1235,10 +1233,6 @@ function TeamTab() {
               const n = rosters.length || 12;
               return (
                 <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:20}}>
-                  <div style={{background:'#0a0a0a',border:`1px solid ${selTeam.arc.color}`,borderRadius:12,padding:'12px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                    <span style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:1}}>CONTENDER / REBUILD ANALYSIS</span>
-                    {windowText && <span style={{marginLeft:'auto',fontSize:14,color:selTeam.arc.color,fontWeight:700}}>{windowText}</span>}
-                  </div>
                   <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
                     <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age Cliff Red Flags</div>
                     {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No startable players past their cliff threshold.</div>}
@@ -1254,35 +1248,6 @@ function TeamTab() {
                         ))}
                       </div>
                     )}
-                    <div style={{fontSize:13,color:'#555',marginTop:12}}>Age cutoffs: RB/WR ≥29 · TE ≥27 · QB ≥31. Rank cutoffs: WR/RB top 50 · QB/TE top 28. Sorted by dynasty value.</div>
-                  </div>
-                  <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-                    <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
-                      <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Pick Capital</span>
-                      {futureFirsts===0 && selTeam.arc.label!=='Dynasty' && (
-                        <span style={{padding:'4px 12px',borderRadius:6,fontSize:14,fontWeight:900,letterSpacing:1,background:'#2a0000',color:'#ef4444',border:'1px solid #ef4444'}}>NO FUTURE 1sts</span>
-                      )}
-                    </div>
-                    {picks.length===0 && <div style={{fontSize:13,color:'#666'}}>No tracked picks.</div>}
-                    {picks.length>0 && (
-                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                        {picks.map((p,i)=>{
-                          const tier = p.isCurrent && p.slotNum ? pickTierFromStand(p.slotNum, n) : null;
-                          const ord = ORDINALS[p.round-1]||`${p.round}th`;
-                          const label = p.slotStr ? `${p.round}.${p.slotStr}` : `${p.year} ${ord}`;
-                          const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
-                          return (
-                            <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0f0f0f',border:'1px solid #181818',borderRadius:7}}>
-                              <span style={{fontSize:14,fontWeight:900,color:p.round===1?'#FFD700':p.round===2?'#bbb':'#8B6914',minWidth:72,flexShrink:0}}>{p.year} · {label}</span>
-                              <span style={{fontSize:13,color:'#888',flex:1}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
-                              {tier && <span style={{padding:'3px 10px',borderRadius:5,fontSize:13,fontWeight:900,letterSpacing:0.5,background:'#111',color:tier.color,border:`1px solid ${tier.color}`}}>{tier.key.toUpperCase()}</span>}
-                              {!tier && !p.isCurrent && <span style={{fontSize:14,color:'#666'}}>future</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <div style={{fontSize:13,color:'#555',marginTop:12}}>Slot tiers (split in thirds): Early 1–{Math.round(n/3)} · Mid {Math.round(n/3)+1}–{Math.round(2*n/3)} · Late {Math.round(2*n/3)+1}–{n}.</div>
                   </div>
                   <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
@@ -1330,7 +1295,6 @@ function TeamTab() {
                 ))}
               </div>
             </div>
-            {championships.length>0&&<span style={{fontSize:12,color:'#555',width:'100%'}}>🏆 = league titles</span>}
           </div>
           {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:12}}>⚠️ Player values unavailable — showing Sleeper rosters only.</div>}
           <div style={{display:'flex',flexDirection:'column',gap:5}}>
@@ -1340,28 +1304,25 @@ function TeamTab() {
               const isSelected=selectedOtherRid===t.roster_id;
               const clickable=!isMe;
               return (
-                <div key={t.roster_id} onClick={clickable?()=>setSelectedOtherRid(isSelected?null:t.roster_id):undefined} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:isSelected?'#1a1a0a':isMe?'#141414':'#0a0a0a',border:'1px solid '+(isSelected?'#FFD700':isMe?t.arc.color:'#1e1e1e'),borderRadius:9,flexWrap:'wrap',cursor:clickable?'pointer':'default'}}>
-                  <span style={{fontSize:13,fontWeight:900,color:i<3?'#FFD700':'#555',width:24,flexShrink:0,textAlign:'center'}}>#{i+1}</span>
-                  <span style={{padding:'2px 8px',fontSize:12,fontWeight:800,borderRadius:4,background:'#111',color:t.arc.color,border:'1px solid '+t.arc.color,flexShrink:0,whiteSpace:'nowrap'}}>{t.arc.emoji} {t.arc.label}</span>
-                  <span style={{flex:1,fontSize:13,fontWeight:isMe?900:600,color:isMe?'#FFD700':'#f0f0f0',minWidth:100}}>{t.teamName}{isMe?' ★':''}</span>
-                  {rings>0&&<span style={{fontSize:14,flexShrink:0,letterSpacing:1}} title={`${rings} league title${rings>1?'s':''}`}>{'🏆'.repeat(Math.min(rings,5))}</span>}
-                  {fcValues.length>0&&(
-                    <div style={{display:'flex',gap:10,flexShrink:0,alignItems:'center'}}>
-                      <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>D {(t.dVal/1000).toFixed(1)}k</span>
-                      <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>R {(t.rVal/1000).toFixed(1)}k</span>
-                      <span style={{fontSize:12,color:'#555'}}>{viewMode==='redraft'?`Dyn #${t.dRank}`:`Rdft #${t.rRank}`}</span>
-                    </div>
-                  )}
+                <div key={t.roster_id} className="pfk-standings-row" onClick={clickable?()=>setSelectedOtherRid(isSelected?null:t.roster_id):undefined} style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 14px',background:isSelected?'#1a1a0a':isMe?'#141414':'#0a0a0a',border:'1px solid '+(isSelected?'#FFD700':isMe?t.arc.color:'#1e1e1e'),borderRadius:9,cursor:clickable?'pointer':'default'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:13,fontWeight:900,color:i<3?'#FFD700':'#555',width:28,flexShrink:0,textAlign:'center'}}>#{i+1}</span>
+                    <span style={{flex:1,fontSize:14,fontWeight:isMe?900:700,color:isMe?'#FFD700':'#f0f0f0',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.username}{isMe?' ★':''}</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <span style={{padding:'2px 8px',fontSize:12,fontWeight:800,borderRadius:4,background:'#111',color:t.arc.color,border:'1px solid '+t.arc.color,flexShrink:0,whiteSpace:'nowrap'}}>{t.arc.emoji} {t.arc.label}</span>
+                    {rings>0&&<span style={{fontSize:14,flexShrink:0,letterSpacing:1}} title={`${rings} league title${rings>1?'s':''}`}>{'🏆'.repeat(Math.min(rings,5))}</span>}
+                    {fcValues.length>0&&(
+                      <>
+                        <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>D {(t.dVal/1000).toFixed(1)}k</span>
+                        <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>R {(t.rVal/1000).toFixed(1)}k</span>
+                      </>
+                    )}
+                    <span style={{marginLeft:'auto',fontSize:12,color:'#666',fontWeight:700,flexShrink:0}}>#{i+1} of {ranked.length}</span>
+                  </div>
                 </div>
               );
             })}
-          </div>
-          <div style={{marginTop:14,display:'flex',flexWrap:'wrap',gap:7}}>
-            {[classifyTeam(80,80),classifyTeam(20,80),classifyTeam(80,20),classifyTeam(60,60),classifyTeam(55,35),classifyTeam(45,30),classifyTeam(20,20)]
-              .filter((v,i,a)=>a.findIndex(x=>x.label===v.label)===i)
-              .map(a=>(
-                <span key={a.label} style={{padding:'3px 9px',borderRadius:12,fontSize:12,fontWeight:700,background:'#111',color:a.color,border:'1px solid '+a.color}}>{a.emoji} {a.label}</span>
-              ))}
           </div>
         </div>
       )}
@@ -1627,13 +1588,13 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
         return(
           <React.Fragment key={item.id}>
             {showLine&&<DropLine/>}
-            <div ref={el=>rowRefs.current[item.id]=el}
+            <div ref={el=>rowRefs.current[item.id]=el} className="pfk-rookie-row"
               onPointerDown={allowEdit?e=>onPD(e,item.id):undefined}
               onPointerMove={allowEdit?onPM:undefined} onPointerUp={allowEdit?onPU:undefined} onPointerCancel={allowEdit?onPU:undefined}
               style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowEdit?"grab":"default",opacity:isDrag?0.25:1,transition:"none"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 {allowEdit&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
-                <span style={{width:44,textAlign:"center",fontSize:13,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
+                <span className="pfk-rook-slot" style={{width:44,textAlign:"center",fontSize:13,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:12,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
                 {(()=>{
                   const p=prospects&&prospects[normName(item.name)];
@@ -1647,7 +1608,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                   }):{};
                   return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
                 })()}
-                <span style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
+                <span className="pfk-rook-college" style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
                 {draftInfo&&(
                   <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
                     <img src={`https://a.espncdn.com/i/teamlogos/nfl/500/${draftInfo.team.toLowerCase()}.png`} alt={draftInfo.team} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
@@ -2217,7 +2178,7 @@ function App(){
               {pfkMissing&&<div style={{fontSize:12,color:'#d97706',marginTop:8}}>No ranking published yet for this combo — showing most recent.</div>}
             </div>
             <FilterBar/>
-            <div className="pfk-wide-scroll">
+            <div className="pfk-rookie-list">
               <RenderList src={officialList||PFK_LIST} allowEdit={false} prospects={prospects} {...commonProps}/>
             </div>
           </div>
@@ -2282,7 +2243,7 @@ function App(){
               <button onClick={()=>setShowAdd(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:14}}>✕</button>
             </div>)}
             <FilterBar/>
-            <div className="pfk-wide-scroll">
+            <div className="pfk-rookie-list">
               <RenderList src={list} allowEdit={true} {...commonProps}/>
             </div>
           </div>
