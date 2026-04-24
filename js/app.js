@@ -655,6 +655,8 @@ function TeamTab() {
 
   useEffect(()=>{
     if(myTeam) setAnalyzerRid(myTeam.roster_id);
+    setSubView('standings');
+    setSuggestionMode(null);
   },[league?.league_id, myTeam?.roster_id]);
 
   const posRanks = useMemo(()=>{
@@ -776,13 +778,17 @@ function TeamTab() {
       ? +(agesWithValues.reduce((s,x)=>s+x.age,0)/agesWithValues.length).toFixed(1)
       : null;
     const ageTierInfo = avgAge!=null ? ageTier(avgAge) : null;
-    // Age-risk flags across ALL rostered players
+    // Age-risk flags across rostered players (exclude deep cloggers — dyn & rdft both NR or >50)
     const flags=[];
     POS_ORDER.forEach(p=>{
       byPos[p].forEach(x=>{
         if(x.age==null) return;
         const thr=AGE_RISK_AGE[p];
-        if(thr && x.age>=thr) flags.push({...x, pos:p});
+        if(!thr || x.age<thr) return;
+        const dynOk  = x.dynPosRank  && x.dynPosRank  <= 50;
+        const rdftOk = x.rdftPosRank && x.rdftPosRank <= 50;
+        if(!dynOk && !rdftOk) return; // clogger — skip
+        flags.push({...x, pos:p});
       });
     });
     flags.sort((a,b)=>b.age-a.age);
@@ -812,31 +818,42 @@ function TeamTab() {
     });
     // CONTENDING suggestions
     const sugsContending=[];
-    POS_ORDER.forEach(p=>{
-      const g=grades[p], b=buckets[p];
-      if(g==='Critical') sugsContending.push({type:'critical', text:`Your ${p} room is critical — 0 players inside the top 24. Prioritize a ${p} upgrade above all else.`});
-      else if(g==='Thin') sugsContending.push({type:'thin', text:`${p} is thin — only ${b.Elite+b.T1+b.T2} ${p} inside the top 24. Consider consolidating depth into a ${p} upgrade.`});
-      else if(b.Elite===0 && b.T1>=3 && (p==='WR'||p==='RB')){
-        sugsContending.push({type:'consolidate', text:`You have ${b.T1}+ tier-1 ${p}s but no Elite — consider consolidating into a top-5 ${p}.`});
-      }
-    });
-    const oldRBStarters = starters.filter(s=>s.pos==='RB' && s.age!=null && s.age>=AGE_RISK_AGE.RB).length;
-    if(oldRBStarters>=2) sugsContending.push({type:'age',text:`${oldRBStarters} of your starting RBs are 29+ — target a young RB in the next rookie draft.`});
-    const oldTEStarters = starters.filter(s=>s.pos==='TE' && s.age!=null && s.age>=AGE_RISK_AGE.TE).length;
-    if(oldTEStarters>=1 && starters.filter(s=>s.pos==='TE').length>0) sugsContending.push({type:'age',text:`Your starting TE is 27+ — TE decline starts here. Look at young TEs if you're not already elite.`});
-    if(avgAge!=null && avgAge>=28.5)
-      sugsContending.push({type:'window',text:`Roster trends old (${avgAge} avg) — push now. Don't hoard picks while your window is open.`});
-    if(futureFirsts===0 && team.arc.label!=='Dynasty')
+    const isAging = team.arc.label==='Aging Contender';
+    if(isAging){
+      // Aging Contender: window is closing — don't push youth, push vets.
+      // Identify likely-late future 1sts the team owns (their own picks where they're projected early in standings)
+      const myFutureFirsts = picks.filter(p=>p.round===1 && p.year>startYr);
+      sugsContending.push({type:'window',text:`Window is closing (avg age ${avgAge??'—'}). Don't chase youth — convert picks into proven win-now producers.`});
+      if(myFutureFirsts.length>0)
+        sugsContending.push({type:'trade',text:`Package future 1sts — especially any that project late in their year — for established starters at your weakest position.`});
+      POS_ORDER.forEach(p=>{
+        const g=grades[p];
+        if(g==='Critical'||g==='Thin') sugsContending.push({type:'thin',text:`${p} is ${g.toLowerCase()} — target a proven veteran starter at ${p} using picks as currency.`});
+      });
+    } else {
+      POS_ORDER.forEach(p=>{
+        const g=grades[p], b=buckets[p];
+        if(g==='Critical') sugsContending.push({type:'critical', text:`Your ${p} room is critical — 0 players inside the top 24. Prioritize a ${p} upgrade above all else.`});
+        else if(g==='Thin') sugsContending.push({type:'thin', text:`${p} is thin — only ${b.Elite+b.T1+b.T2} ${p} inside the top 24. Consider consolidating depth into a ${p} upgrade.`});
+        else if(b.Elite===0 && b.T1>=3 && (p==='WR'||p==='RB')){
+          sugsContending.push({type:'consolidate', text:`You have ${b.T1}+ tier-1 ${p}s but no Elite — consider consolidating into a top-5 ${p}.`});
+        }
+      });
+      const oldRBStarters = starters.filter(s=>s.pos==='RB' && s.age!=null && s.age>=AGE_RISK_AGE.RB).length;
+      if(oldRBStarters>=2) sugsContending.push({type:'age',text:`${oldRBStarters} of your starting RBs are 29+ — target a young RB in the next rookie draft.`});
+      const oldTEStarters = starters.filter(s=>s.pos==='TE' && s.age!=null && s.age>=AGE_RISK_AGE.TE).length;
+      if(oldTEStarters>=1 && starters.filter(s=>s.pos==='TE').length>0) sugsContending.push({type:'age',text:`Your starting TE is 27+ — TE decline starts here. Look at young TEs if you're not already elite.`});
+      if(avgAge!=null && avgAge>=28.5)
+        sugsContending.push({type:'window',text:`Roster trends old (${avgAge} avg) — push now. Don't hoard picks while your window is open.`});
+    }
+    if(futureFirsts===0 && team.arc.label!=='Dynasty' && !isAging)
       sugsContending.push({type:'critical',text:`Zero future 1st-round picks. Red flag unless you're in true Dynasty status.`});
     if(sugsContending.length===0)
       sugsContending.push({type:'good',text:`Roster looks balanced for your arc. Stay patient and attack trade markets opportunistically.`});
 
     // TANKING suggestions
     const sugsTanking=[];
-    sugsTanking.push({type:'tank',text:`Commit to the tank — the 1.01 is ~50% more valuable than the 1.02. A partial rebuild leaves major value on the table vs. bottoming out for the top pick.`});
-    if(futureFirsts<2)
-      sugsTanking.push({type:'tank',text:`You only have ${futureFirsts} future 1st${futureFirsts===1?'':'s'} — trade aging vets for additional 1sts before the deadline.`});
-    // Old vets to move
+    // Old vets to move (defined up top so we can gate the 1.01 tip on sellable assets)
     const oldVets=[];
     POS_ORDER.forEach(p=>{
       byPos[p].forEach(x=>{
@@ -845,6 +862,11 @@ function TeamTab() {
         }
       });
     });
+    // Only surface the 1.01 tidbit when moving a few vets would realistically flip the tank.
+    // Gate: at least 2 sellable aging vets AND team isn't already a Full Rebuild (no one to sell there).
+    const canFlipTank = oldVets.length>=2 && team.arc.label!=='Full Rebuild';
+    if(canFlipTank)
+      sugsTanking.push({type:'tank',text:`Selling a few vets could flip you into tank mode. The 1.01 is ~50% more valuable than the 1.02 — commit fully rather than land mid-draft.`});
     if(oldVets.length>0)
       sugsTanking.push({type:'tank',text:`Aging vets still holding value: ${oldVets.slice(0,4).map(v=>`${v.name} (${v.pos} ${v.age.toFixed(1)})`).join(', ')}${oldVets.length>4?'…':''}. Cash them in for picks while the market still pays.`});
     if(youngCore.length>0)
@@ -857,7 +879,7 @@ function TeamTab() {
       sugsTanking.push({type:'tank',text:`Roster is still old (${avgAge} avg). A true tank means turning these vets into youth + picks, not just losing.`});
     if(avgAge!=null && avgAge<=24.5 && youngCore.length>=3)
       sugsTanking.push({type:'build',text:`Young core is already strong (${avgAge} avg, ${youngCore.length} young studs). You may be closer to contending than you think — consider a 'soft tank' this year then push next.`});
-    sugsTanking.push({type:'rule',text:`Never trade future 1sts away while tanking. They're the whole point.`});
+    sugsTanking.push({type:'rule',text:`Do not trade future 1sts. Acquiring future 1sts is the best course of action.`});
 
     return {byPos, buckets, grades, starters, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugsContending, sugsTanking, youngCore, hasFc};
   };
@@ -1031,7 +1053,7 @@ function TeamTab() {
       {/* Loading */}
       {(loading==='data'||loading==='fc')&&(
         <div style={{padding:'24px',textAlign:'center',color:'#FFD700',fontSize:13,fontWeight:700,letterSpacing:1}}>
-          {loading==='data'?'Loading roster data…':'Fetching player values from FantasyCalc…'}
+          {loading==='data'?'Loading roster data…':'Fetching player values…'}
         </div>
       )}
 
@@ -1090,7 +1112,7 @@ function TeamTab() {
               ))}
             </div>
           )}
-          {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:14}}>⚠️ FantasyCalc values unavailable — showing Sleeper roster only.</div>}
+          {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:14}}>⚠️ Player values unavailable — showing Sleeper roster only.</div>}
           <RosterSection team={myTeam}/>
         </div>
       )}
@@ -1115,7 +1137,7 @@ function TeamTab() {
             </div>
             {championships.length>0&&<span style={{fontSize:12,color:'#555',width:'100%'}}>🏆 = league titles</span>}
           </div>
-          {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:12}}>⚠️ FantasyCalc unavailable — showing Sleeper rosters only.</div>}
+          {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:12}}>⚠️ Player values unavailable — showing Sleeper rosters only.</div>}
           <div style={{display:'flex',flexDirection:'column',gap:5}}>
             {[...ranked].sort((a,b)=>viewMode==='redraft'?a.rRank-b.rRank:a.dRank-b.dRank).map((t,i)=>{
               const isMe=t.owner_id===sleeperUser?.user_id;
@@ -1293,13 +1315,17 @@ function TeamTab() {
                           const dyn = pl.dynPosRank;
                           const rdft = pl.rdftPosRank;
                           const elite = pl.isElite;
-                          const borderCol = elite ? '#FFD700' : (dyn&&dyn<=24) ? '#3b82f6' : '#2a2a2a';
+                          let borderCol = '#2a2a2a';
+                          if (elite) borderCol = '#FFD700';
+                          else if (dyn && dyn<=20) borderCol = '#c084fc';
+                          else if (dyn && dyn<=35) borderCol = '#3b82f6';
+                          else if (dyn && dyn<=49) borderCol = '#10b981';
                           return (
                             <span key={pl.pid} style={{padding:'6px 10px',background:elite?'#1a1400':'#0a0a0a',border:`1px solid ${borderCol}`,borderRadius:7,fontSize:13,color:'#f0f0f0',display:'inline-flex',gap:8,alignItems:'center'}}>
                               {elite && <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1}}>⭐ ELITE</span>}
                               <span style={{fontWeight:600}}>{pl.name}</span>
-                              <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>Dyn {p}#{dyn||'—'}</span>
-                              <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>Rdft {p}#{rdft||'—'}</span>
+                              <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>Dyn {p}#{dyn||'NR'}</span>
+                              <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>Rdft {p}#{rdft||'NR'}</span>
                               {pl.age!=null&&<span style={{fontSize:13,color:'#666'}}>{pl.age.toFixed(1)}y</span>}
                             </span>
                           );
@@ -1309,7 +1335,7 @@ function TeamTab() {
                   </div>
                 );
               })}
-              <div style={{fontSize:13,color:'#555',marginTop:6}}>⭐ Elite = top 10 in BOTH dynasty and redraft at position (FantasyCalc).</div>
+              <div style={{fontSize:13,color:'#555',marginTop:6}}>⭐ Elite (gold) = top 10 dynasty AND redraft · Purple = top 20 · Blue = top 35 · Green = top 49 · Grey = deeper/unranked.</div>
             </div>
 
             {/* Age-Risk Flags */}
@@ -1320,7 +1346,7 @@ function TeamTab() {
                 <div style={{display:'flex',flexDirection:'column',gap:5}}>
                   {flags.map(f=>(
                     <div key={f.pid} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0a0a0a',border:'1px solid #2a1a00',borderRadius:7}}>
-                      <span style={{fontSize:16,color:'#ef4444',fontWeight:900,lineHeight:1}}>▲</span>
+                      <span style={{fontSize:16,lineHeight:1}}>🚩</span>
                       <span style={{fontSize:14,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
                       <span style={{fontSize:14,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}y</span>
                       <span style={{fontSize:14,color:'#888'}}>decline risk</span>
