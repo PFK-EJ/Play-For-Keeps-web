@@ -2374,12 +2374,12 @@ function AdminApp(){
 
   return (
     <div style={{minHeight:'100vh',paddingBottom:40}}>
-      <div style={{position:'sticky',top:0,zIndex:100,background:'#080808',borderBottom:'2px solid #FFD700',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+      <div className="pfk-admin-topbar" style={{position:'sticky',top:0,zIndex:100,background:'#080808',borderBottom:'2px solid #FFD700',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
         <div>
           <div style={{fontWeight:900,fontSize:16,letterSpacing:2,color:'#FFD700'}}>PFK ADMIN</div>
           <div style={{fontSize:12,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
         </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
           <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
           <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
@@ -2411,7 +2411,7 @@ function AdminApp(){
           <button onClick={()=>setShowAddPlayer(false)} style={{padding:'9px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:14}}>Cancel</button>
         </div>
       )}
-      <div style={{padding:'16px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+      <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
         <RenderList src={list} allowEdit={true} {...commonProps}/>
       </div>
     </div>

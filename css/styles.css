@@ -36,4 +36,10 @@ input, select { font-family:inherit; }
   .pfk-pr-grid > div { margin-bottom:14px; }
   /* Filter bar doesn't need to stretch full width on mobile */
   .pfk-filter-bar { position:static !important; }
+  /* Admin page — match main rookie list layout on mobile */
+  .pfk-admin-topbar { padding:8px 10px !important; gap:6px !important; }
+  .pfk-admin-topbar > div:first-child { flex:1 1 100%; }
+  .pfk-admin-actions { width:100%; justify-content:flex-start !important; }
+  .pfk-admin-actions button { flex:1 1 auto; padding:7px 8px !important; font-size:12px !important; }
+  .pfk-admin-list { padding:10px 4px !important; }
 }
