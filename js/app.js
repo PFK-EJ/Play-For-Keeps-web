@@ -196,11 +196,11 @@ const healthGrade = (pos, b) => {
   return 'Critical';
 };
 const GRADE_COLOR = {Strong:'#10b981', Adequate:'#FFD700', Thin:'#f59e0b', Critical:'#ef4444'};
-const pickTierFromStand = (standPos) => {
-  if (standPos<=3)  return {key:'Very Early', color:'#FFD700'};
-  if (standPos<=7)  return {key:'Early-Mid',  color:'#c084fc'};
-  if (standPos<=10) return {key:'Mid-Late',   color:'#3b82f6'};
-  return              {key:'Late',       color:'#666'};
+const pickTierFromStand = (standPos, n=12) => {
+  const third = Math.max(1, Math.round(n/3));
+  if (standPos <= third)   return {key:'Early', color:'#FFD700'};
+  if (standPos <= third*2) return {key:'Mid',   color:'#3b82f6'};
+  return                        {key:'Late',  color:'#666'};
 };
 
 const SLEEPER = 'https://api.sleeper.app/v1';
@@ -358,6 +358,8 @@ function TeamTab() {
   const [leagueArcs, setLeagueArcs] = useState({});
   const [subView, setSubView] = useState('standings'); // 'standings' | 'analyzer'
   const [analyzerRid, setAnalyzerRid] = useState(null);
+  const [suggestionMode, setSuggestionMode] = useState(null); // null = auto by arc
+  const [pendingTrades, setPendingTrades] = useState(0);
   const inp2 = ex=>({padding:'7px 10px',background:'#0d0d0d',border:'1px solid #333',borderRadius:7,color:'#fff',fontSize:13,fontFamily:'inherit',...ex});
 
   const connectUser = async () => {
@@ -418,7 +420,7 @@ function TeamTab() {
 
   const selectLeague = async (lg) => {
     setLeague(lg); setLoading('data'); setError('');
-    setRosters([]); setUsers([]); setFcValues([]); setTradedPicks([]); setChampionships([]); setDraftSlots({}); setFcError(false); setLastFetched(null);
+    setRosters([]); setUsers([]); setFcValues([]); setTradedPicks([]); setChampionships([]); setDraftSlots({}); setFcError(false); setLastFetched(null); setPendingTrades(0);
     try {
       const [rs, us, tp, drafts] = await Promise.all([
         fetch(`${SLEEPER}/league/${lg.league_id}/rosters`, NO_CACHE).then(r=>r.json()).catch(()=>[]),
@@ -429,30 +431,54 @@ function TeamTab() {
       setRosters(Array.isArray(rs)?rs:[]);
       setUsers(Array.isArray(us)?us:[]);
       setTradedPicks(Array.isArray(tp)?tp:[]);
-      // Build draft slot order: use Sleeper draft's slot_to_roster_id (most accurate)
+      // Rookie-draft slot order:
+      // Dynasty leagues set the upcoming draft order by the PRIOR season's final standings
+      // (worst team gets 1.01). We prefer previous_league_id rosters for this because
+      // a stale slot_to_roster_id from last year's completed draft can otherwise leak in.
+      // Only override with slot_to_roster_id if the current draft is actively drafting/complete
+      // (meaning commissioner has locked the order for real).
       const allDrafts = Array.isArray(drafts)?drafts:[];
-      // Find the upcoming rookie draft: not auction, prefer pre_draft status, latest season
-      const rookieDraft = allDrafts
-        .filter(d=>d.type!=='auction')
-        .sort((a,b)=>Number(b.season||0)-Number(a.season||0)||(a.status==='pre_draft'?-1:1))[0];
-      const slotMap = rookieDraft?.slot_to_roster_id||{};
+      const nowDt=new Date(); const startYr=nowDt.getFullYear()+(nowDt.getMonth()>=8?1:0);
+      const lockedDraft = allDrafts.find(d=>
+        d.type!=='auction' &&
+        Number(d.season||0) === startYr &&
+        (d.status==='drafting' || d.status==='complete') &&
+        d.slot_to_roster_id && Object.keys(d.slot_to_roster_id).length
+      );
       const rosterToSlot = {};
-      if(Object.keys(slotMap).length){
-        Object.entries(slotMap).forEach(([slot,rid])=>{ rosterToSlot[Number(rid)]=Number(slot); });
+      if(lockedDraft){
+        Object.entries(lockedDraft.slot_to_roster_id).forEach(([slot,rid])=>{
+          rosterToSlot[Number(rid)]=Number(slot);
+        });
       } else {
-        // Fallback: fetch previous season's final standings since current season hasn't played yet
         const prevId = lg.previous_league_id;
         const prevRosters = prevId
           ? await fetch(`${SLEEPER}/league/${prevId}/rosters`,NO_CACHE).then(r=>r.json()).catch(()=>[])
           : (Array.isArray(rs)?rs:[]);
-        [...(Array.isArray(prevRosters)?prevRosters:[])].sort((a,b)=>
+        const source = Array.isArray(prevRosters)&&prevRosters.length ? prevRosters : (Array.isArray(rs)?rs:[]);
+        [...source].sort((a,b)=>
           (a.settings?.wins||0)-(b.settings?.wins||0)||
-          (b.settings?.losses||0)-(a.settings?.losses||0)||
+          (a.settings?.fpts||0)-(b.settings?.fpts||0)||
           a.roster_id-b.roster_id
         ).forEach((r,i)=>{ rosterToSlot[r.roster_id]=i+1; });
       }
       setDraftSlots(rosterToSlot);
       fetchLeagueChampionships(lg).then(c=>setChampionships(c)).catch(()=>{});
+      // Incoming trade request count — fetch transactions across recent NFL weeks and
+      // count pending trades that involve the user's roster_id.
+      (async()=>{
+        try {
+          const myRoster = (Array.isArray(rs)?rs:[]).find(r=>r.owner_id===sleeperUser?.user_id);
+          if(!myRoster) return;
+          const weeks=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+          const results = await Promise.all(weeks.map(w=>
+            fetch(`${SLEEPER}/league/${lg.league_id}/transactions/${w}`,NO_CACHE).then(r=>r.ok?r.json():[]).catch(()=>[])
+          ));
+          const txns = results.flat().filter(t=>t&&t.type==='trade'&&t.status==='pending');
+          const mine = txns.filter(t=>Array.isArray(t.roster_ids)&&t.roster_ids.includes(myRoster.roster_id));
+          setPendingTrades(mine.length);
+        } catch {}
+      })();
       setLoading('fc');
       const isSF  = lg.roster_positions?.includes('SUPER_FLEX')||false;
       const ppr   = (lg.scoring_settings?.rec??1)>=1?1:(lg.scoring_settings?.rec??1)>=0.5?0.5:0;
@@ -466,17 +492,21 @@ function TeamTab() {
           fetch(fcUrl('true'),  NO_CACHE).then(r=>{ if(!r.ok) throw new Error(); return r.json(); }),
           fetch(fcUrl('false'), NO_CACHE).then(r=>{ if(!r.ok) throw new Error(); return r.json(); }),
         ]);
-        // Build redraft lookup by sleeperId
+        // Build redraft lookup by sleeperId (value + positionRank)
         const rdftById = {};
         (Array.isArray(fcRdft)?fcRdft:[]).forEach(v=>{
           const sid = v.player?.sleeperId||v.player?.maybeSleeperId;
-          if(sid) rdftById[String(sid)] = v.value||0;
+          if(sid) rdftById[String(sid)] = {val:v.value||0, posRank:v.positionRank||null};
         });
-        // Merge: use dynasty entries but override redraftValue from pure-redraft fetch
+        // Merge: use dynasty entries but override redraftValue + store redraft position rank
         const merged = (Array.isArray(fcDyn)?fcDyn:[]).map(v=>{
           const sid = v.player?.sleeperId||v.player?.maybeSleeperId;
-          const rv  = sid ? (rdftById[String(sid)] ?? v.redraftValue ?? 0) : (v.redraftValue||0);
-          return {...v, redraftValue: rv};
+          const rm  = sid ? rdftById[String(sid)] : null;
+          return {
+            ...v,
+            redraftValue: rm ? rm.val : (v.redraftValue||0),
+            redraftPositionRank: rm ? rm.posRank : null,
+          };
         });
         setFcValues(merged);
         setLastFetched(new Date());
@@ -696,6 +726,9 @@ function TeamTab() {
         pid, name:fc.player?.name||pid,
         age:fc.player?.maybeAge??null,
         value:fc.value||0,
+        dynPosRank: fc.positionRank||null,
+        rdftPosRank: fc.redraftPositionRank||null,
+        isElite: (fc.positionRank&&fc.positionRank<=10)&&(fc.redraftPositionRank&&fc.redraftPositionRank<=10),
         tier:posTier(fc.positionRank)
       });
     });
@@ -764,34 +797,65 @@ function TeamTab() {
       else if(team.arc.label==='Rebuilding') windowText='Stockpiling for the next push';
       else windowText='Full rebuild mode';
     }
-    // Suggestions
-    const sugs=[];
-    // Position-based
+    // Young talent detection for tanking advice
+    const youngCore=[];
+    POS_ORDER.forEach(p=>{
+      byPos[p].forEach(x=>{
+        if(x.age!=null && x.age<=24.5 && (x.tier?.key==='Elite'||x.tier?.key==='T1')){
+          youngCore.push({...x, pos:p});
+        }
+      });
+    });
+    // CONTENDING suggestions
+    const sugsContending=[];
     POS_ORDER.forEach(p=>{
       const g=grades[p], b=buckets[p];
-      if(g==='Critical') sugs.push({type:'critical', text:`Your ${p} room is critical — 0 players inside the top 24. Prioritize a ${p} upgrade above all else.`});
-      else if(g==='Thin') sugs.push({type:'thin', text:`${p} is thin — only ${b.Elite+b.T1+b.T2} ${p} inside the top 24. Consider consolidating depth into a ${p} upgrade.`});
+      if(g==='Critical') sugsContending.push({type:'critical', text:`Your ${p} room is critical — 0 players inside the top 24. Prioritize a ${p} upgrade above all else.`});
+      else if(g==='Thin') sugsContending.push({type:'thin', text:`${p} is thin — only ${b.Elite+b.T1+b.T2} ${p} inside the top 24. Consider consolidating depth into a ${p} upgrade.`});
       else if(b.Elite===0 && b.T1>=3 && (p==='WR'||p==='RB')){
-        sugs.push({type:'consolidate', text:`You have ${b.T1}+ tier-1 ${p}s but no Elite — consider consolidating into a top-5 ${p}.`});
+        sugsContending.push({type:'consolidate', text:`You have ${b.T1}+ tier-1 ${p}s but no Elite — consider consolidating into a top-5 ${p}.`});
       }
     });
-    // Age-based starter flags
     const oldRBStarters = starters.filter(s=>s.pos==='RB' && s.age!=null && s.age>=AGE_RISK_AGE.RB).length;
-    const rbStarters = starters.filter(s=>s.pos==='RB').length;
-    if(oldRBStarters>=2 && rbStarters>0) sugs.push({type:'age',text:`${oldRBStarters} of your starting RBs are 29+ — target a young RB in the next rookie draft.`});
+    if(oldRBStarters>=2) sugsContending.push({type:'age',text:`${oldRBStarters} of your starting RBs are 29+ — target a young RB in the next rookie draft.`});
     const oldTEStarters = starters.filter(s=>s.pos==='TE' && s.age!=null && s.age>=AGE_RISK_AGE.TE).length;
-    if(oldTEStarters>=1 && starters.filter(s=>s.pos==='TE').length>0) sugs.push({type:'age',text:`Your starting TE is 27+ — TE decline starts here. Look at young TEs if you're not already elite.`});
-    // Window guidance
-    if(avgAge!=null){
-      if(avgAge>=28.5 && (team.arc.label==='Contender'||team.arc.label==='Win-Now'||team.arc.label==='Aging Contender'))
-        sugs.push({type:'window',text:`Roster trends old (${avgAge} avg) and you're competing — push now, don't hoard picks.`});
-      if(avgAge<=25.5 && (team.arc.label==='Rebuilding'||team.arc.label==='Full Rebuild'||team.arc.label==='Future Dynasty'))
-        sugs.push({type:'window',text:`Young core (${avgAge} avg) — keep accumulating picks and young assets.`});
-    }
-    // Pick capital red flag
+    if(oldTEStarters>=1 && starters.filter(s=>s.pos==='TE').length>0) sugsContending.push({type:'age',text:`Your starting TE is 27+ — TE decline starts here. Look at young TEs if you're not already elite.`});
+    if(avgAge!=null && avgAge>=28.5)
+      sugsContending.push({type:'window',text:`Roster trends old (${avgAge} avg) — push now. Don't hoard picks while your window is open.`});
     if(futureFirsts===0 && team.arc.label!=='Dynasty')
-      sugs.push({type:'critical',text:`🚩 Zero future 1st-round picks. This is a red flag unless you're in true Dynasty status.`});
-    return {byPos, buckets, grades, starters, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugs, hasFc};
+      sugsContending.push({type:'critical',text:`Zero future 1st-round picks. Red flag unless you're in true Dynasty status.`});
+    if(sugsContending.length===0)
+      sugsContending.push({type:'good',text:`Roster looks balanced for your arc. Stay patient and attack trade markets opportunistically.`});
+
+    // TANKING suggestions
+    const sugsTanking=[];
+    sugsTanking.push({type:'tank',text:`Tank hard for the 1.01 — it's ~50% more valuable than the 1.02. A half-assed tank leaves major value on the table.`});
+    if(futureFirsts<2)
+      sugsTanking.push({type:'tank',text:`You only have ${futureFirsts} future 1st${futureFirsts===1?'':'s'} — trade aging vets for additional 1sts before the deadline.`});
+    // Old vets to move
+    const oldVets=[];
+    POS_ORDER.forEach(p=>{
+      byPos[p].forEach(x=>{
+        if(x.age!=null && x.age>=AGE_RISK_AGE[p] && x.tier && ['Elite','T1','T2'].includes(x.tier.key)){
+          oldVets.push({...x, pos:p});
+        }
+      });
+    });
+    if(oldVets.length>0)
+      sugsTanking.push({type:'tank',text:`Aging vets still holding value: ${oldVets.slice(0,4).map(v=>`${v.name} (${v.pos} ${v.age.toFixed(1)})`).join(', ')}${oldVets.length>4?'…':''}. Cash them in for picks while the market still pays.`});
+    if(youngCore.length>0)
+      sugsTanking.push({type:'build',text:`Young core to build around: ${youngCore.slice(0,4).map(v=>v.name).join(', ')}${youngCore.length>4?'…':''}. Don't trade these — they're your next contention window.`});
+    POS_ORDER.forEach(p=>{
+      const g=grades[p];
+      if(g==='Critical') sugsTanking.push({type:'tank',text:`${p} is barren — that's fine for a tank. Target rookie ${p}s in the upcoming draft.`});
+    });
+    if(avgAge!=null && avgAge>=27.5)
+      sugsTanking.push({type:'tank',text:`Roster is still old (${avgAge} avg). A true tank means turning these vets into youth + picks, not just losing.`});
+    if(avgAge!=null && avgAge<=24.5 && youngCore.length>=3)
+      sugsTanking.push({type:'build',text:`Young core is already strong (${avgAge} avg, ${youngCore.length} young studs). You may be closer to contending than you think — consider a 'soft tank' this year then push next.`});
+    sugsTanking.push({type:'rule',text:`Never trade future 1sts away while tanking. They're the whole point.`});
+
+    return {byPos, buckets, grades, starters, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugsContending, sugsTanking, youngCore, hasFc};
   };
 
   // ── Grouped roster renderer ──
@@ -995,6 +1059,11 @@ function TeamTab() {
                 <div style={{fontSize:11,color:'#666'}}>{league?.name}</div>
                 {lastFetched&&<div style={{fontSize:10,color:'#444'}}>· Updated {lastFetched.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>}
               </div>
+              {pendingTrades>0 && (
+                <div style={{marginTop:8,display:'inline-flex',alignItems:'center',gap:8,padding:'5px 11px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:7,fontSize:12,fontWeight:700,color:'#FFD700'}}>
+                  🔔 {pendingTrades} incoming trade request{pendingTrades>1?'s':''} on Sleeper
+                </div>
+              )}
             </div>
             <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${myTeam.arc.color}`,borderRadius:10,flexShrink:0}}>
               <div style={{fontSize:26}}>{myTeam.arc.emoji}</div>
@@ -1153,144 +1222,163 @@ function TeamTab() {
         if(!team) return null;
         const a = analyzeTeam(team);
         if(!a) return null;
-        const {byPos, buckets, grades, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugs, hasFc} = a;
+        const {byPos, buckets, grades, avgAge, ageTierInfo, flags, picks, futureFirsts, windowText, sugsContending, sugsTanking, hasFc} = a;
+        const contenderArcs=['Dynasty','Contender','Win-Now','Aging Contender','Future Dynasty'];
+        const defaultMode = contenderArcs.includes(team.arc.label) ? 'contending' : 'tanking';
+        const mode = suggestionMode || defaultMode;
+        const activeSugs = mode==='tanking' ? sugsTanking : sugsContending;
+        const n = rosters.length || 12;
         return (
           <div style={{display:'flex',flexDirection:'column',gap:16}}>
             {/* Team selector */}
             <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'14px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:1}}>ANALYZE TEAM</span>
-              <select value={analyzerRid||''} onChange={e=>setAnalyzerRid(Number(e.target.value))} style={inp2({flex:1,minWidth:180,maxWidth:360})}>
+              <span style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:1}}>ANALYZE TEAM</span>
+              <select value={analyzerRid||''} onChange={e=>{setAnalyzerRid(Number(e.target.value));setSuggestionMode(null);}} style={inp2({flex:1,minWidth:200,maxWidth:380,fontSize:14})}>
                 {[...ranked].sort((a,b)=>a.dRank-b.dRank).map(t=>(
                   <option key={t.roster_id} value={t.roster_id}>
                     #{t.dRank} · {t.teamName}{t.owner_id===sleeperUser?.user_id?' ★':''}
                   </option>
                 ))}
               </select>
-              <span style={{fontSize:10,color:'#555',letterSpacing:0.5}}>Pick projections assume max-PF scoring</span>
+              <span style={{fontSize:12,color:'#666',letterSpacing:0.3}}>Pick projections assume max-PF scoring</span>
             </div>
 
             {/* Header */}
-            <div style={{background:'#0f0f0f',border:`2px solid ${team.arc.color}`,borderRadius:14,padding:20}}>
-              <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
-                <div style={{flex:1,minWidth:180}}>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:2,marginBottom:4}}>TEAM ANALYZER</div>
-                  <div style={{fontSize:22,fontWeight:900,color:'#f0f0f0'}}>{team.teamName}</div>
-                  <div style={{fontSize:11,color:'#666',marginTop:2}}>{league?.name} · Dyn #{team.dRank}/{ranked.length} · Rdft #{team.rRank}/{ranked.length}</div>
-                  {windowText && <div style={{marginTop:10,fontSize:13,color:team.arc.color,fontWeight:700}}>{windowText}</div>}
+            <div style={{background:'#0f0f0f',border:`2px solid ${team.arc.color}`,borderRadius:14,padding:22}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:18,flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:2,marginBottom:6}}>TEAM ANALYZER</div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#f0f0f0'}}>{team.teamName}</div>
+                  <div style={{fontSize:13,color:'#888',marginTop:4}}>{league?.name} · Dyn #{team.dRank}/{ranked.length} · Rdft #{team.rRank}/{ranked.length}</div>
+                  {pendingTrades>0 && team.owner_id===sleeperUser?.user_id && (
+                    <div style={{marginTop:10,display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:8,fontSize:13,fontWeight:700,color:'#FFD700'}}>
+                      🔔 {pendingTrades} incoming trade request{pendingTrades>1?'s':''} on Sleeper
+                    </div>
+                  )}
+                  {windowText && <div style={{marginTop:12,fontSize:15,color:team.arc.color,fontWeight:700}}>{windowText}</div>}
                 </div>
-                <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${team.arc.color}`,borderRadius:10,flexShrink:0}}>
-                  <div style={{fontSize:24}}>{team.arc.emoji}</div>
-                  <div style={{fontSize:14,fontWeight:900,color:team.arc.color,marginTop:2,letterSpacing:1}}>{team.arc.label.toUpperCase()}</div>
+                <div style={{textAlign:'center',padding:'14px 20px',background:'#111',border:`2px solid ${team.arc.color}`,borderRadius:10,flexShrink:0}}>
+                  <div style={{fontSize:28}}>{team.arc.emoji}</div>
+                  <div style={{fontSize:15,fontWeight:900,color:team.arc.color,marginTop:3,letterSpacing:1}}>{team.arc.label.toUpperCase()}</div>
                 </div>
                 {avgAge!=null && ageTierInfo && (
-                  <div style={{textAlign:'center',padding:'12px 18px',background:'#111',border:`2px solid ${ageTierInfo.color}`,borderRadius:10,flexShrink:0}}>
-                    <div style={{fontSize:20,fontWeight:900,color:ageTierInfo.color}}>{avgAge}</div>
-                    <div style={{fontSize:10,fontWeight:900,color:ageTierInfo.color,marginTop:2,letterSpacing:1}}>{ageTierInfo.label.toUpperCase()}</div>
-                    <div style={{fontSize:9,color:'#888',marginTop:2}}>avg starter age</div>
+                  <div style={{textAlign:'center',padding:'14px 20px',background:'#111',border:`2px solid ${ageTierInfo.color}`,borderRadius:10,flexShrink:0}}>
+                    <div style={{fontSize:22,fontWeight:900,color:ageTierInfo.color}}>{avgAge}</div>
+                    <div style={{fontSize:12,fontWeight:900,color:ageTierInfo.color,marginTop:3,letterSpacing:1}}>{ageTierInfo.label.toUpperCase()}</div>
+                    <div style={{fontSize:11,color:'#888',marginTop:3}}>avg starter age</div>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Positional Breakdown */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
-              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:12,textTransform:'uppercase'}}>Positional Breakdown</div>
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Positional Breakdown</div>
               {POS_ORDER.map(p=>{
                 const list=byPos[p], b=buckets[p], g=grades[p];
                 return (
-                  <div key={p} style={{marginBottom:14}}>
-                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'6px 10px',background:'#0a0a0a',borderLeft:`3px solid ${GRADE_COLOR[g]}`,borderRadius:6,marginBottom:6}}>
-                      <span style={{fontWeight:900,color:'#f0f0f0',fontSize:13,letterSpacing:1,minWidth:24}}>{p}</span>
-                      <span style={{padding:'3px 10px',borderRadius:6,fontSize:10,fontWeight:900,letterSpacing:1,background:'#111',color:GRADE_COLOR[g],border:`1px solid ${GRADE_COLOR[g]}`}}>{g.toUpperCase()}</span>
-                      <span style={{fontSize:10,color:'#666',letterSpacing:0.5}}>
-                        {POS_TIER_BANDS.slice(0,4).map(band=>`${band.key}:${b[band.key]||0}`).join(' · ')} · Depth:{b.Depth||0}
-                      </span>
-                      <span style={{marginLeft:'auto',fontSize:10,color:'#444'}}>{list.length} rostered</span>
+                  <div key={p} style={{marginBottom:16}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'8px 12px',background:'#0a0a0a',borderLeft:`3px solid ${GRADE_COLOR[g]}`,borderRadius:6,marginBottom:8}}>
+                      <span style={{fontWeight:900,color:'#f0f0f0',fontSize:15,letterSpacing:1,minWidth:28}}>{p}</span>
+                      <span style={{padding:'4px 12px',borderRadius:6,fontSize:12,fontWeight:900,letterSpacing:1,background:'#111',color:GRADE_COLOR[g],border:`1px solid ${GRADE_COLOR[g]}`}}>{g.toUpperCase()}</span>
+                      <span style={{marginLeft:'auto',fontSize:12,color:'#666'}}>{list.length} rostered</span>
                     </div>
-                    {list.length===0 && <div style={{fontSize:11,color:'#555',padding:'4px 10px'}}>No rostered {p}s</div>}
+                    {list.length===0 && <div style={{fontSize:13,color:'#555',padding:'4px 12px'}}>No rostered {p}s</div>}
                     {list.length>0 && (
-                      <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-                        {list.map(pl=>(
-                          <span key={pl.pid} style={{padding:'4px 9px',background:'#0a0a0a',border:`1px solid ${pl.tier?pl.tier.color:'#222'}`,borderRadius:6,fontSize:11,color:'#f0f0f0',display:'inline-flex',gap:6,alignItems:'center'}}>
-                            <span style={{fontSize:9,fontWeight:900,color:pl.tier?pl.tier.color:'#555',letterSpacing:0.5}}>{pl.tier?pl.tier.key:'—'}</span>
-                            <span>{pl.name}</span>
-                            {pl.age!=null&&<span style={{fontSize:9,color:'#555'}}>{pl.age.toFixed(1)}</span>}
-                          </span>
-                        ))}
+                      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                        {list.map(pl=>{
+                          const dyn = pl.dynPosRank;
+                          const rdft = pl.rdftPosRank;
+                          const elite = pl.isElite;
+                          const borderCol = elite ? '#FFD700' : (dyn&&dyn<=24) ? '#3b82f6' : '#2a2a2a';
+                          return (
+                            <span key={pl.pid} style={{padding:'6px 10px',background:elite?'#1a1400':'#0a0a0a',border:`1px solid ${borderCol}`,borderRadius:7,fontSize:13,color:'#f0f0f0',display:'inline-flex',gap:8,alignItems:'center'}}>
+                              {elite && <span style={{fontSize:10,fontWeight:900,color:'#FFD700',letterSpacing:1}}>⭐ ELITE</span>}
+                              <span style={{fontWeight:600}}>{pl.name}</span>
+                              <span style={{fontSize:11,color:'#FFD700',fontWeight:700}}>Dyn {p}#{dyn||'—'}</span>
+                              <span style={{fontSize:11,color:'#3b82f6',fontWeight:700}}>Rdft {p}#{rdft||'—'}</span>
+                              {pl.age!=null&&<span style={{fontSize:11,color:'#666'}}>{pl.age.toFixed(1)}y</span>}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 );
               })}
+              <div style={{fontSize:11,color:'#555',marginTop:6}}>⭐ Elite = top 10 in BOTH dynasty and redraft at position (FantasyCalc).</div>
             </div>
 
             {/* Age-Risk Flags */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
-              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:12,textTransform:'uppercase'}}>Age-Risk Flags</div>
-              {flags.length===0 && <div style={{fontSize:12,color:'#10b981'}}>✓ No rostered players past their cliff threshold.</div>}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age-Risk Flags</div>
+              {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No rostered players past their cliff threshold.</div>}
               {flags.length>0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                <div style={{display:'flex',flexDirection:'column',gap:5}}>
                   {flags.map(f=>(
-                    <div key={f.pid} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',background:'#0a0a0a',border:'1px solid #2a1a00',borderRadius:7}}>
-                      <span style={{fontSize:14}}>⚠</span>
-                      <span style={{fontSize:12,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
-                      <span style={{fontSize:10,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}</span>
-                      <span style={{fontSize:10,color:'#888'}}>decline risk</span>
+                    <div key={f.pid} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0a0a0a',border:'1px solid #2a1a00',borderRadius:7}}>
+                      <span style={{fontSize:16,color:'#ef4444',fontWeight:900,lineHeight:1}}>▲</span>
+                      <span style={{fontSize:14,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
+                      <span style={{fontSize:12,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}y</span>
+                      <span style={{fontSize:12,color:'#888'}}>decline risk</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{fontSize:9,color:'#555',marginTop:10}}>Thresholds: RB ≥29 · WR ≥29 · TE ≥27 · QB ≥31</div>
+              <div style={{fontSize:11,color:'#555',marginTop:12}}>Thresholds: RB ≥29 · WR ≥29 · TE ≥27 · QB ≥31</div>
             </div>
 
             {/* Pick Capital */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
-                <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Pick Capital</span>
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
+                <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Pick Capital</span>
                 {futureFirsts===0 && team.arc.label!=='Dynasty' && (
-                  <span style={{padding:'3px 10px',borderRadius:6,fontSize:10,fontWeight:900,letterSpacing:1,background:'#2a0000',color:'#ef4444',border:'1px solid #ef4444'}}>🚩 NO FUTURE 1sts</span>
+                  <span style={{padding:'4px 12px',borderRadius:6,fontSize:12,fontWeight:900,letterSpacing:1,background:'#2a0000',color:'#ef4444',border:'1px solid #ef4444'}}>NO FUTURE 1sts</span>
                 )}
               </div>
-              {picks.length===0 && <div style={{fontSize:12,color:'#666'}}>No tracked picks.</div>}
+              {picks.length===0 && <div style={{fontSize:13,color:'#666'}}>No tracked picks.</div>}
               {picks.length>0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                <div style={{display:'flex',flexDirection:'column',gap:5}}>
                   {picks.map((p,i)=>{
-                    const n = rosters.length || 12;
-                    const tier = p.isCurrent && p.slotNum ? pickTierFromStand(p.slotNum) : null;
+                    const tier = p.isCurrent && p.slotNum ? pickTierFromStand(p.slotNum, n) : null;
                     const ord = ORDINALS[p.round-1]||`${p.round}th`;
                     const label = p.slotStr ? `${p.round}.${p.slotStr}` : `${p.year} ${ord}`;
                     const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
                     return (
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',background:'#0a0a0a',border:'1px solid #181818',borderRadius:7}}>
-                        <span style={{fontSize:12,fontWeight:900,color:p.round===1?'#FFD700':p.round===2?'#bbb':'#8B6914',minWidth:56,flexShrink:0}}>{p.year} · {label}</span>
-                        <span style={{fontSize:11,color:'#666',flex:1}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
-                        {tier && <span style={{padding:'2px 8px',borderRadius:5,fontSize:9,fontWeight:900,letterSpacing:0.5,background:'#111',color:tier.color,border:`1px solid ${tier.color}`}}>{tier.key.toUpperCase()}</span>}
-                        {!tier && !p.isCurrent && <span style={{fontSize:10,color:'#555'}}>future</span>}
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0a0a0a',border:'1px solid #181818',borderRadius:7}}>
+                        <span style={{fontSize:14,fontWeight:900,color:p.round===1?'#FFD700':p.round===2?'#bbb':'#8B6914',minWidth:72,flexShrink:0}}>{p.year} · {label}</span>
+                        <span style={{fontSize:13,color:'#888',flex:1}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
+                        {tier && <span style={{padding:'3px 10px',borderRadius:5,fontSize:11,fontWeight:900,letterSpacing:0.5,background:'#111',color:tier.color,border:`1px solid ${tier.color}`}}>{tier.key.toUpperCase()}</span>}
+                        {!tier && !p.isCurrent && <span style={{fontSize:12,color:'#666'}}>future</span>}
                       </div>
                     );
                   })}
                 </div>
               )}
-              <div style={{fontSize:9,color:'#555',marginTop:10}}>Slot tiers: Very Early 1–3 · Early-Mid 4–7 · Mid-Late 8–10 · Late 11+. When close, predict later.</div>
+              <div style={{fontSize:11,color:'#555',marginTop:12}}>Slot tiers (split in thirds): Early 1–{Math.round(n/3)} · Mid {Math.round(n/3)+1}–{Math.round(2*n/3)} · Late {Math.round(2*n/3)+1}–{n}.</div>
             </div>
 
             {/* Suggestions */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:18}}>
-              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:12,textTransform:'uppercase'}}>Team-Building Suggestions</div>
-              {sugs.length===0 && <div style={{fontSize:12,color:'#10b981'}}>✓ No major issues flagged — roster looks balanced for your arc.</div>}
-              {sugs.length>0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                  {sugs.map((s,i)=>{
-                    const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : '#FFD700';
-                    return (
-                      <div key={i} style={{display:'flex',gap:10,padding:'9px 12px',background:'#0a0a0a',borderLeft:`3px solid ${col}`,borderRadius:'0 7px 7px 0'}}>
-                        <span style={{fontSize:12,color:'#f0f0f0',lineHeight:1.4}}>{s.text}</span>
-                      </div>
-                    );
-                  })}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+                <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Team-Building Suggestions</span>
+                <div style={{display:'flex',gap:4,marginLeft:'auto',background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:3}}>
+                  {[['contending','🥇 Contending'],['tanking','🏗️ Tanking']].map(([k,l])=>(
+                    <button key={k} onClick={()=>setSuggestionMode(k)} style={{padding:'6px 12px',background:mode===k?'#FFD700':'transparent',color:mode===k?'#000':'#888',border:'none',borderRadius:5,cursor:'pointer',fontSize:12,fontWeight:800,letterSpacing:0.5}}>{l}</button>
+                  ))}
                 </div>
-              )}
-              <div style={{fontSize:9,color:'#555',marginTop:10}}>Broad guidance only — no specific trade offers. Never suggests trading future picks away.</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:7}}>
+                {activeSugs.map((s,i)=>{
+                  const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : s.type==='tank' ? '#c084fc' : s.type==='build' ? '#10b981' : s.type==='rule' ? '#888' : '#FFD700';
+                  return (
+                    <div key={i} style={{display:'flex',gap:12,padding:'11px 14px',background:'#0a0a0a',borderLeft:`3px solid ${col}`,borderRadius:'0 7px 7px 0'}}>
+                      <span style={{fontSize:14,color:'#f0f0f0',lineHeight:1.45}}>{s.text}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{fontSize:11,color:'#555',marginTop:12}}>Broad guidance — no specific trade offers. Never suggests trading future picks away.</div>
             </div>
           </div>
         );
