@@ -15,9 +15,9 @@ input, select { font-family:inherit; }
 }
 @media (max-width:600px){
   .pfk-sticky-header { padding:8px 12px !important; }
-  .pfk-logo-img { width:34px !important; height:34px !important; }
+  .pfk-logo-img { width:44px !important; height:44px !important; }
   .pfk-header-subtitle { display:none !important; }
-  .pfk-header-title { font-size:18px !important; letter-spacing:2px !important; }
+  .pfk-header-title { font-size:22px !important; letter-spacing:2px !important; }
   .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
   .pfk-top-tabs button { flex:1 !important; padding:7px 2px !important; font-size:11px !important; letter-spacing:0 !important; }
   .pfk-content { padding:10px 4px 16px !important; }

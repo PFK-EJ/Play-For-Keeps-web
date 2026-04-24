@@ -2137,10 +2137,10 @@ function App(){
       )}
       <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-          <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:54,height:54,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+          <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:68,height:68,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
           <div>
-            <div className="pfk-header-title" style={{fontSize:21,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
-            <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Fantasy Football · Dynasty Analyzer</div>
+            <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
+            <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Rookie Draft Ranks</div>
           </div>
           {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
           <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -2152,7 +2152,7 @@ function App(){
             {session?(
               <>
                 <div style={{fontSize:13,color:"#FFD700",fontWeight:700,textAlign:"right"}}>
-                  <div style={{fontSize:12}}>{session.user.email}</div>
+                  <div style={{fontSize:12}}><a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{color:"#FFD700",textDecoration:"none"}}>@PlayForKeepsFF</a></div>
                   {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
                 </div>
                 <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:13}}>Sign out</button>
@@ -2167,7 +2167,7 @@ function App(){
         {tab==="pfk"&&(
           <div>
             <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
-              <span style={{fontSize:18}}>👑</span>
+              <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:28,height:28,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
               <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
             </div>
             <div style={{marginBottom:14,padding:'10px 12px',background:'#0a0a0a',border:'1px solid #222',borderRadius:10}}>
