@@ -159,6 +159,21 @@ const AGE_TIERS = [
   {max:999,  label:'Old',    desc:'Rebuild risk',     color:'#ef4444'},
 ];
 const ageTier = a => AGE_TIERS.find(t=>a<=t.max) || AGE_TIERS[AGE_TIERS.length-1];
+// 2026 NFL Draft round 1 overlay (skill positions only). Keyed by normalized name.
+// Sourced from nfl.com draft tracker; updated 2026-04-23.
+const DRAFT_2026 = {
+  'fernandomendoza': {team:'LV',  pick:'1.01'},
+  'jeremiyahlove':   {team:'ARI', pick:'1.03'},
+  'carnelltate':     {team:'TEN', pick:'1.04'},
+  'jordyntyson':     {team:'NO',  pick:'1.08'},
+  'tysimpson':       {team:'LAR', pick:'1.13'},
+  'kenyonsadiq':     {team:'NYJ', pick:'1.16'},
+  'makailemon':      {team:'PHI', pick:'1.20'},
+  'kcconcepcion':    {team:'CLE', pick:'1.24'},
+  'omarcooperjr':    {team:'NYJ', pick:'1.30'},
+  'jadarianprice':   {team:'SEA', pick:'1.32'},
+};
+const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 const POS_TIER_BANDS = [
   {max:5,   key:'Elite', color:'#FFD700'},
   {max:12,  key:'T1',    color:'#c084fc'},
@@ -1645,12 +1660,16 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                   return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
                 })()}
                 <span style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
-                {item.pick&&item.nflTeam&&item.nflTeam!=='TBD'&&item.nflTeam!=='UDFA'&&(
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
-                    <img src={`https://sleepercdn.com/images/team_logos/nfl/${item.nflTeam.toLowerCase()}.png`} alt={item.nflTeam} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
-                    <span style={{fontSize:12,fontWeight:800,color:'#FFD700',letterSpacing:0.5}}>{item.nflTeam} · {item.pick}</span>
-                  </span>
-                )}
+                {(()=>{
+                  const d = DRAFT_2026[normDraftName(item.name)] || (item.pick&&item.nflTeam&&item.nflTeam!=='TBD'&&item.nflTeam!=='UDFA'?{team:item.nflTeam,pick:item.pick}:null);
+                  if(!d) return null;
+                  return (
+                    <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
+                      <img src={`https://sleepercdn.com/images/team_logos/nfl/${d.team.toLowerCase()}.png`} alt={d.team} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
+                      <span style={{fontSize:12,fontWeight:800,color:'#FFD700',letterSpacing:0.5}}>{d.team} · {d.pick}</span>
+                    </span>
+                  );
+                })()}
                 <span style={{flex:1}}/>
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
