@@ -39,8 +39,8 @@ const publishOfficialRankings = async (items, settings) => {
 
 function SettingsToggleBar({value,onChange,compact}){
   const Group = ({label,choices,suffix,current,field})=>(
-    <div style={{display:'flex',flexDirection:'column',gap:3}}>
-      <div style={{fontSize:11,color:'#777',letterSpacing:1,fontWeight:700}}>{label}</div>
+    <div style={{display:'flex',flexDirection:'column',gap:3,alignItems:'center'}}>
+      <div style={{fontSize:11,color:'#777',letterSpacing:1,fontWeight:700,textAlign:'center'}}>{label}</div>
       <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}}>
         {choices.map(c=>(
           <button key={c} onClick={()=>onChange({...value,[field]:c})} style={{padding:compact?'3px 8px':'5px 10px',background:current===c?'#FFD700':'transparent',color:current===c?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:13,fontWeight:700}}>{c}{suffix}</button>
@@ -49,7 +49,7 @@ function SettingsToggleBar({value,onChange,compact}){
     </div>
   );
   return (
-    <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+    <div style={{display:'flex',gap:10,flexWrap:'wrap',justifyContent:'center'}}>
       <Group label="FORMAT" choices={FORMAT_CHOICES} suffix="" current={value.format||'Superflex'} field="format"/>
       <Group label="TEP" choices={TEP_CHOICES} suffix="" current={value.tep} field="tep"/>
       <Group label="PPR" choices={PPR_CHOICES} suffix="" current={value.ppr} field="ppr"/>
