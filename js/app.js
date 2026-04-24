@@ -1607,6 +1607,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
           );
         }
         const pidx=getPlayerIndex(item.id,src),slot=slotLabel(pidx),tname=getPlayerTier(item.id,src),col=getTierColor(tname,src),isEd=editingPlayer===item.id;
+        const draftInfo = DRAFT_2026[normDraftName(item.name)] || null;
         if(isEd)return(
           <React.Fragment key={item.id}>
             {showLine&&<DropLine/>}
@@ -1660,16 +1661,12 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                   return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
                 })()}
                 <span style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
-                {(()=>{
-                  const d = DRAFT_2026[normDraftName(item.name)] || (item.pick&&item.nflTeam&&item.nflTeam!=='TBD'&&item.nflTeam!=='UDFA'?{team:item.nflTeam,pick:item.pick}:null);
-                  if(!d) return null;
-                  return (
-                    <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
-                      <img src={`https://sleepercdn.com/images/team_logos/nfl/${d.team.toLowerCase()}.png`} alt={d.team} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
-                      <span style={{fontSize:12,fontWeight:800,color:'#FFD700',letterSpacing:0.5}}>{d.team} · {d.pick}</span>
-                    </span>
-                  );
-                })()}
+                {draftInfo&&(
+                  <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
+                    <img src={`https://a.espncdn.com/i/teamlogos/nfl/500/${draftInfo.team.toLowerCase()}.png`} alt={draftInfo.team} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
+                    <span style={{fontSize:12,fontWeight:800,color:'#FFD700',letterSpacing:0.5}}>{draftInfo.team} · {draftInfo.pick}</span>
+                  </span>
+                )}
                 <span style={{flex:1}}/>
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
