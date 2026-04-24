@@ -2105,7 +2105,8 @@ function App(){
         out.push(`${count}. ${it.name} (${it.pos})`);
       }
     }
-    return `My 2026 Dynasty Rookie 1st Round 🏆\n\n${out.join('\n')}\n\nvia @PlayForKeepsFF\nplayforkeeps-web.pages.dev`;
+    const fmt=(pfkSettings.format||'Superflex');
+    return `My 2026 ${fmt} Dynasty Rookie 1st Round 🏆\n\n${out.join('\n')}\n\nvia @PlayForKeepsFF\nplayforkeeps-web.pages.dev`;
   };
   const shareTop12=async()=>{
     const players=list.filter(x=>x.type==='player');
