@@ -49,7 +49,7 @@ function SettingsToggleBar({value,onChange,compact}){
     </div>
   );
   return (
-    <div style={{display:'flex',gap:10,flexWrap:'wrap',justifyContent:'center'}}>
+    <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
       <Group label="FORMAT" choices={FORMAT_CHOICES} suffix="" current={value.format||'Superflex'} field="format"/>
       <Group label="TEP" choices={TEP_CHOICES} suffix="" current={value.tep} field="tep"/>
       <Group label="PPR" choices={PPR_CHOICES} suffix="" current={value.ppr} field="ppr"/>
