@@ -65,20 +65,20 @@ const INITIAL_TIERS = ["Untouchable","X-Factor","Super-Star","Star","Starter","G
 
 const buildInitialList = () => {
   const players = [
-    {id:"p1",name:"Jeremiyah Love",pos:"RB",age:21.3,college:"Notre Dame",nflTeam:"NO"},
-    {id:"p2",name:"Fernando Mendoza",pos:"QB",age:22.9,college:"Indiana",nflTeam:"CHI"},
-    {id:"p3",name:"Carnell Tate",pos:"WR",age:21.6,college:"Ohio State",nflTeam:"CHI"},
-    {id:"p4",name:"Makai Lemon",pos:"WR",age:22.3,college:"USC",nflTeam:"NE"},
-    {id:"p5",name:"KC Concepcion",pos:"WR",age:21.9,college:"Texas A&M",nflTeam:"PHI"},
-    {id:"p6",name:"Kenyon Sadiq",pos:"TE",age:21.5,college:"Oregon",nflTeam:"LAR"},
+    {id:"p1",name:"Jeremiyah Love",pos:"RB",age:21.3,college:"Notre Dame",nflTeam:"ARI",pick:"1.03"},
+    {id:"p2",name:"Fernando Mendoza",pos:"QB",age:22.9,college:"Indiana",nflTeam:"LV",pick:"1.01"},
+    {id:"p3",name:"Carnell Tate",pos:"WR",age:21.6,college:"Ohio State",nflTeam:"TEN",pick:"1.04"},
+    {id:"p4",name:"Makai Lemon",pos:"WR",age:22.3,college:"USC",nflTeam:"PHI",pick:"1.20"},
+    {id:"p5",name:"KC Concepcion",pos:"WR",age:21.9,college:"Texas A&M",nflTeam:"CLE",pick:"1.24"},
+    {id:"p6",name:"Kenyon Sadiq",pos:"TE",age:21.5,college:"Oregon",nflTeam:"NYJ",pick:"1.16"},
     {id:"p7",name:"Denzel Boston",pos:"WR",age:22.7,college:"Washington",nflTeam:"NYG"},
-    {id:"p8",name:"Jordyn Tyson",pos:"WR",age:22.1,college:"Arizona State",nflTeam:"CLE"},
-    {id:"p9",name:"Omar Cooper Jr.",pos:"WR",age:22.7,college:"Indiana",nflTeam:"HOU"},
-    {id:"p10",name:"Jadarian Price",pos:"RB",age:22.9,college:"Notre Dame",nflTeam:"DAL"},
+    {id:"p8",name:"Jordyn Tyson",pos:"WR",age:22.1,college:"Arizona State",nflTeam:"NO",pick:"1.08"},
+    {id:"p9",name:"Omar Cooper Jr.",pos:"WR",age:22.7,college:"Indiana",nflTeam:"NYJ",pick:"1.30"},
+    {id:"p10",name:"Jadarian Price",pos:"RB",age:22.9,college:"Notre Dame",nflTeam:"SEA",pick:"1.32"},
     {id:"p11",name:"Zachariah Branch",pos:"WR",age:22.4,college:"Georgia",nflTeam:"LAR"},
     {id:"p12",name:"Jonah Coleman",pos:"RB",age:22.9,college:"Washington",nflTeam:"DEN"},
     {id:"p13",name:"Kaytron Allen",pos:"RB",age:23.7,college:"Penn State",nflTeam:"IND"},
-    {id:"p14",name:"Ty Simpson",pos:"QB",age:23.0,college:"Alabama",nflTeam:"TEN"},
+    {id:"p14",name:"Ty Simpson",pos:"QB",age:23.0,college:"Alabama",nflTeam:"LAR",pick:"1.13"},
     {id:"p15",name:"Elijah Sarratt",pos:"WR",age:23.3,college:"Indiana",nflTeam:"IND"},
     {id:"p16",name:"Michael Trigg",pos:"TE",age:24.2,college:"Baylor",nflTeam:"MIN"},
     {id:"p17",name:"Eli Stowers",pos:"TE",age:23.3,college:"Vanderbilt",nflTeam:"ATL"},
@@ -1645,6 +1645,12 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                   return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
                 })()}
                 <span style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
+                {item.pick&&item.nflTeam&&item.nflTeam!=='TBD'&&item.nflTeam!=='UDFA'&&(
+                  <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
+                    <img src={`https://sleepercdn.com/images/team_logos/nfl/${item.nflTeam.toLowerCase()}.png`} alt={item.nflTeam} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
+                    <span style={{fontSize:12,fontWeight:800,color:'#FFD700',letterSpacing:0.5}}>{item.nflTeam} · {item.pick}</span>
+                  </span>
+                )}
                 <span style={{flex:1}}/>
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
