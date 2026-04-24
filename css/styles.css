@@ -1,5 +1,5 @@
 * { box-sizing: border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-body { background:#080808; color:#f0f0f0; font-family:'Inter','Segoe UI',sans-serif; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
+body { background:#080808; color:#f0f0f0; font-family:'Inter','Segoe UI',sans-serif; font-size:16px; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
 body.pfk-dragging, body.pfk-dragging * { user-select:none !important; -webkit-user-select:none !important; cursor:grabbing !important; }
 .pfk-row { touch-action:pan-y; }
 .pfk-row.pfk-dragging-row { touch-action:none; }
@@ -16,8 +16,8 @@ input, select { font-family:inherit; }
   .pfk-sticky-header { padding:8px 12px !important; }
   .pfk-logo-img { width:34px !important; height:34px !important; }
   .pfk-header-subtitle { display:none !important; }
-  .pfk-header-title { font-size:16px !important; letter-spacing:2px !important; }
+  .pfk-header-title { font-size:18px !important; letter-spacing:2px !important; }
   .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
-  .pfk-top-tabs button { flex:1 !important; padding:6px 2px !important; font-size:9px !important; letter-spacing:0 !important; }
+  .pfk-top-tabs button { flex:1 !important; padding:7px 2px !important; font-size:11px !important; letter-spacing:0 !important; }
   .pfk-content { padding:10px 10px 16px !important; }
 }
