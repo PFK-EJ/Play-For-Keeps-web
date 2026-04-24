@@ -920,9 +920,10 @@ function TeamTab() {
             </span>
           )}
           {hasFc&&(
-            <span style={{marginLeft:'auto',fontSize:12,color:'#555'}}>
-              Dynasty · Redraft
-            </span>
+            <div style={{marginLeft:'auto',display:'flex',alignItems:'center',width:96,justifyContent:'flex-end'}}>
+              <span style={{fontSize:11,color:'#FFD700',fontWeight:700,width:44,textAlign:'right',letterSpacing:0.5}}>DYN</span>
+              <span style={{fontSize:11,color:'#3b82f6',fontWeight:700,width:44,textAlign:'right',letterSpacing:0.5}}>RDFT</span>
+            </div>
           )}
         </div>
 
