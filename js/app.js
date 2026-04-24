@@ -962,17 +962,17 @@ function TeamTab() {
                     : {purple:20, blue:35, green:50};
                   let borderCol = '#181818';
                   let bgCol = '#0a0a0a';
-                  if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; }
-                  else if (dyn && dyn<=10) borderCol = '#c084fc';
-                  else if (dyn && dyn<=bands.purple) borderCol = '#c084fc';
-                  else if (dyn && dyn<=bands.blue) borderCol = '#3b82f6';
-                  else if (dyn && dyn<=bands.green) borderCol = '#10b981';
+                  let tierBadge = null;
+                  if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#FFD700'}; }
+                  else if (dyn && dyn<=bands.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
+                  else if (dyn && dyn<=bands.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'⚡',label:'STARTER',color:'#3b82f6'}; }
+                  else if (dyn && dyn<=bands.green)  { borderCol = '#10b981'; }
                   const age = fc?.player?.age ? Number(fc.player.age).toFixed(1) : null;
                   const nflTeam = fc?.player?.team || null;
                   return (
                     <div key={pid} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 4px',minWidth:0}}>
                       <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 10px',background:bgCol,border:`1px solid ${borderCol}`,borderRadius:7,minWidth:0,flex:'0 1 auto',maxWidth:'100%'}}>
-                        {elite && <span style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:1,flexShrink:0}}>⭐ ELITE</span>}
+                        {tierBadge && <span style={{fontSize:12,fontWeight:900,color:tierBadge.color,letterSpacing:1,flexShrink:0}}>{tierBadge.icon} {tierBadge.label}</span>}
                         <span style={{fontSize:13,fontWeight:700,color:fc?'#f0f0f0':'#444',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{fc?.player?.name||pid}</span>
                         {age && <span style={{fontSize:12,color:'#888',flexShrink:0,whiteSpace:'nowrap'}}>{age}y</span>}
                         {nflTeam && <span style={{fontSize:12,color:'#666',flexShrink:0,fontWeight:700}}>{nflTeam}</span>}
