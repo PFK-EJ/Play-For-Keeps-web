@@ -2095,9 +2095,17 @@ function App(){
   const moveItem=(id,dir)=>{push(list);setList(prev=>{const l=[...prev],i=l.findIndex(x=>x.id===id),sw=i+dir;if(sw<0||sw>=l.length)return l;[l[i],l[sw]]=[l[sw],l[i]];return l;});};
   const undo=()=>{if(!history.length)return;setList(history[history.length-1]);setHistory(h=>h.slice(0,-1));};
   const buildShareText=()=>{
-    const players=list.filter(x=>x.type==='player').slice(0,12);
-    const lines=players.map((p,i)=>`${i+1}. ${p.name} (${p.pos})`).join('\n');
-    return `My 2026 Dynasty Rookie 1st Round 🏆\n\n${lines}\n\nvia @PlayForKeepsFF\nplayforkeeps-web.pages.dev`;
+    const out=[]; let count=0, pendingTier=false;
+    for(const it of list){
+      if(count>=12) break;
+      if(it.type==='tier'){ if(count>0) pendingTier=true; continue; }
+      if(it.type==='player'){
+        if(pendingTier){ out.push('-TIER-'); pendingTier=false; }
+        count++;
+        out.push(`${count}. ${it.name} (${it.pos})`);
+      }
+    }
+    return `My 2026 Dynasty Rookie 1st Round 🏆\n\n${out.join('\n')}\n\nvia @PlayForKeepsFF\nplayforkeeps-web.pages.dev`;
   };
   const shareTop12=async()=>{
     const players=list.filter(x=>x.type==='player');
@@ -2244,7 +2252,7 @@ function App(){
               <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Tier</button>
               <button onClick={()=>setShowAdd(v=>!v)} style={{padding:"6px 12px",background:"#222",border:"1px solid #444",borderRadius:7,color:"#ccc",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Player</button>
               <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#FFD700":"#333"),borderRadius:7,color:history.length?"#FFD700":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:14}}>↩ Undo</button>
-              <button onClick={()=>{setHistory([]);setList(buildInitialList());}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:14}}>↺ Reset</button>
+              <button onClick={()=>{if(!confirm('Reset to the latest published PFK rankings? Your edits to this list will be lost.')) return; setHistory([]);setList(officialList||buildInitialList());}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:14}}>↺ Reset</button>
               <button onClick={shareTop12} style={{padding:"6px 12px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14,letterSpacing:0.5}}>📤 Share 1st Round</button>
             </div>
             {showAddTier&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
