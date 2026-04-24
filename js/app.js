@@ -1226,6 +1226,88 @@ function TeamTab() {
             )}
             {fcError&&<div style={{padding:'8px 12px',background:'#1a0e00',border:'1px solid #f59e0b',borderRadius:7,fontSize:13,color:'#f59e0b',marginBottom:14}}>⚠️ Player values unavailable — showing Sleeper roster only.</div>}
             <div className="pfk-wide-scroll"><RosterSection team={selTeam}/></div>
+            {aSel && (()=>{
+              const {flags, picks, futureFirsts, windowText, sugsContending, sugsTanking} = aSel;
+              const contenderArcs=['Dynasty','Contender','Win-Now','Aging Contender','Future Dynasty'];
+              const defaultMode = contenderArcs.includes(selTeam.arc.label) ? 'contending' : 'tanking';
+              const mode = suggestionMode || defaultMode;
+              const activeSugs = mode==='tanking' ? sugsTanking : sugsContending;
+              const n = rosters.length || 12;
+              return (
+                <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:20}}>
+                  <div style={{background:'#0a0a0a',border:`1px solid ${selTeam.arc.color}`,borderRadius:12,padding:'12px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                    <span style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:1}}>CONTENDER / REBUILD ANALYSIS</span>
+                    {windowText && <span style={{marginLeft:'auto',fontSize:14,color:selTeam.arc.color,fontWeight:700}}>{windowText}</span>}
+                  </div>
+                  <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+                    <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age Cliff Red Flags</div>
+                    {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No startable players past their cliff threshold.</div>}
+                    {flags.length>0 && (
+                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                        {flags.map(f=>(
+                          <div key={f.pid} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0f0f0f',border:'1px solid #2a1a00',borderRadius:7}}>
+                            <span style={{fontSize:16,lineHeight:1}}>🚩</span>
+                            <span style={{fontSize:14,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
+                            <span style={{fontSize:14,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}y</span>
+                            <span style={{fontSize:13,color:'#888'}}>Dyn {f.pos}#{f.dynPosRank||'NR'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{fontSize:13,color:'#555',marginTop:12}}>Age cutoffs: RB/WR ≥29 · TE ≥27 · QB ≥31. Rank cutoffs: WR/RB top 50 · QB/TE top 28. Sorted by dynasty value.</div>
+                  </div>
+                  <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+                    <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
+                      <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Pick Capital</span>
+                      {futureFirsts===0 && selTeam.arc.label!=='Dynasty' && (
+                        <span style={{padding:'4px 12px',borderRadius:6,fontSize:14,fontWeight:900,letterSpacing:1,background:'#2a0000',color:'#ef4444',border:'1px solid #ef4444'}}>NO FUTURE 1sts</span>
+                      )}
+                    </div>
+                    {picks.length===0 && <div style={{fontSize:13,color:'#666'}}>No tracked picks.</div>}
+                    {picks.length>0 && (
+                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                        {picks.map((p,i)=>{
+                          const tier = p.isCurrent && p.slotNum ? pickTierFromStand(p.slotNum, n) : null;
+                          const ord = ORDINALS[p.round-1]||`${p.round}th`;
+                          const label = p.slotStr ? `${p.round}.${p.slotStr}` : `${p.year} ${ord}`;
+                          const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
+                          return (
+                            <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0f0f0f',border:'1px solid #181818',borderRadius:7}}>
+                              <span style={{fontSize:14,fontWeight:900,color:p.round===1?'#FFD700':p.round===2?'#bbb':'#8B6914',minWidth:72,flexShrink:0}}>{p.year} · {label}</span>
+                              <span style={{fontSize:13,color:'#888',flex:1}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
+                              {tier && <span style={{padding:'3px 10px',borderRadius:5,fontSize:13,fontWeight:900,letterSpacing:0.5,background:'#111',color:tier.color,border:`1px solid ${tier.color}`}}>{tier.key.toUpperCase()}</span>}
+                              {!tier && !p.isCurrent && <span style={{fontSize:14,color:'#666'}}>future</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div style={{fontSize:13,color:'#555',marginTop:12}}>Slot tiers (split in thirds): Early 1–{Math.round(n/3)} · Mid {Math.round(n/3)+1}–{Math.round(2*n/3)} · Late {Math.round(2*n/3)+1}–{n}.</div>
+                  </div>
+                  <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+                      <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Team-Building Suggestions</span>
+                      <div style={{display:'flex',gap:4,marginLeft:'auto',background:'#0f0f0f',border:'1px solid #222',borderRadius:8,padding:3}}>
+                        {[['contending','🥇 Contending'],['tanking','🏗️ Tanking']].map(([k,l])=>(
+                          <button key={k} onClick={()=>setSuggestionMode(k)} style={{padding:'6px 12px',background:mode===k?'#FFD700':'transparent',color:mode===k?'#000':'#888',border:'none',borderRadius:5,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:0.5}}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:7}}>
+                      {activeSugs.map((s,i)=>{
+                        const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : s.type==='tank' ? '#c084fc' : s.type==='build' ? '#10b981' : s.type==='rule' ? '#888' : '#FFD700';
+                        return (
+                          <div key={i} style={{display:'flex',gap:12,padding:'11px 14px',background:'#0f0f0f',borderLeft:`3px solid ${col}`,borderRadius:'0 7px 7px 0'}}>
+                            <span style={{fontSize:14,color:'#f0f0f0',lineHeight:1.45}}>{s.text}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{fontSize:13,color:'#555',marginTop:12}}>Broad guidance — no specific trade offers. Never suggests trading future picks away.</div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
@@ -1352,101 +1434,6 @@ function TeamTab() {
         <div style={{padding:'30px',textAlign:'center',color:'#555',fontSize:13}}>← Select a league above to see your team analysis</div>
       )}
 
-      {/* Team Analyzer deep-dive — appears below Championship History */}
-      {league && ranked.length>0 && (()=>{
-        const team = ranked.find(t=>t.roster_id===analyzerRid) || myTeam || ranked[0];
-        if(!team) return null;
-        const a = analyzeTeam(team);
-        if(!a) return null;
-        const {flags, picks, futureFirsts, windowText, sugsContending, sugsTanking} = a;
-        const contenderArcs=['Dynasty','Contender','Win-Now','Aging Contender','Future Dynasty'];
-        const defaultMode = contenderArcs.includes(team.arc.label) ? 'contending' : 'tanking';
-        const mode = suggestionMode || defaultMode;
-        const activeSugs = mode==='tanking' ? sugsTanking : sugsContending;
-        const n = rosters.length || 12;
-        return (
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            {/* Arc window banner */}
-            <div style={{background:'#0f0f0f',border:`1px solid ${team.arc.color}`,borderRadius:12,padding:'12px 18px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:13,color:'#888',fontWeight:700,letterSpacing:1}}>CONTENDER / REBUILD ANALYSIS</span>
-              <span style={{fontSize:13,color:'#666'}}>· {team.teamName}</span>
-              {windowText && <span style={{marginLeft:'auto',fontSize:14,color:team.arc.color,fontWeight:700}}>{windowText}</span>}
-            </div>
-
-            {/* Age Cliff Red Flags */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age Cliff Red Flags</div>
-              {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No startable players past their cliff threshold.</div>}
-              {flags.length>0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                  {flags.map(f=>(
-                    <div key={f.pid} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0a0a0a',border:'1px solid #2a1a00',borderRadius:7}}>
-                      <span style={{fontSize:16,lineHeight:1}}>🚩</span>
-                      <span style={{fontSize:14,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
-                      <span style={{fontSize:14,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}y</span>
-                      <span style={{fontSize:13,color:'#888'}}>Dyn {f.pos}#{f.dynPosRank||'NR'}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div style={{fontSize:13,color:'#555',marginTop:12}}>Age cutoffs: RB/WR ≥29 · TE ≥27 · QB ≥31. Rank cutoffs: WR/RB top 50 · QB/TE top 28. Sorted by dynasty value.</div>
-            </div>
-
-            {/* Pick Capital */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
-                <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Pick Capital</span>
-                {futureFirsts===0 && team.arc.label!=='Dynasty' && (
-                  <span style={{padding:'4px 12px',borderRadius:6,fontSize:14,fontWeight:900,letterSpacing:1,background:'#2a0000',color:'#ef4444',border:'1px solid #ef4444'}}>NO FUTURE 1sts</span>
-                )}
-              </div>
-              {picks.length===0 && <div style={{fontSize:13,color:'#666'}}>No tracked picks.</div>}
-              {picks.length>0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                  {picks.map((p,i)=>{
-                    const tier = p.isCurrent && p.slotNum ? pickTierFromStand(p.slotNum, n) : null;
-                    const ord = ORDINALS[p.round-1]||`${p.round}th`;
-                    const label = p.slotStr ? `${p.round}.${p.slotStr}` : `${p.year} ${ord}`;
-                    const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
-                    return (
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 14px',background:'#0a0a0a',border:'1px solid #181818',borderRadius:7}}>
-                        <span style={{fontSize:14,fontWeight:900,color:p.round===1?'#FFD700':p.round===2?'#bbb':'#8B6914',minWidth:72,flexShrink:0}}>{p.year} · {label}</span>
-                        <span style={{fontSize:13,color:'#888',flex:1}}>{fromTeam?`via ${fromTeam}`:'Own pick'}</span>
-                        {tier && <span style={{padding:'3px 10px',borderRadius:5,fontSize:13,fontWeight:900,letterSpacing:0.5,background:'#111',color:tier.color,border:`1px solid ${tier.color}`}}>{tier.key.toUpperCase()}</span>}
-                        {!tier && !p.isCurrent && <span style={{fontSize:14,color:'#666'}}>future</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div style={{fontSize:13,color:'#555',marginTop:12}}>Slot tiers (split in thirds): Early 1–{Math.round(n/3)} · Mid {Math.round(n/3)+1}–{Math.round(2*n/3)} · Late {Math.round(2*n/3)+1}–{n}.</div>
-            </div>
-
-            {/* Suggestions */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-                <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Team-Building Suggestions</span>
-                <div style={{display:'flex',gap:4,marginLeft:'auto',background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:3}}>
-                  {[['contending','🥇 Contending'],['tanking','🏗️ Tanking']].map(([k,l])=>(
-                    <button key={k} onClick={()=>setSuggestionMode(k)} style={{padding:'6px 12px',background:mode===k?'#FFD700':'transparent',color:mode===k?'#000':'#888',border:'none',borderRadius:5,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:0.5}}>{l}</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{display:'flex',flexDirection:'column',gap:7}}>
-                {activeSugs.map((s,i)=>{
-                  const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : s.type==='tank' ? '#c084fc' : s.type==='build' ? '#10b981' : s.type==='rule' ? '#888' : '#FFD700';
-                  return (
-                    <div key={i} style={{display:'flex',gap:12,padding:'11px 14px',background:'#0a0a0a',borderLeft:`3px solid ${col}`,borderRadius:'0 7px 7px 0'}}>
-                      <span style={{fontSize:14,color:'#f0f0f0',lineHeight:1.45}}>{s.text}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{fontSize:13,color:'#555',marginTop:12}}>Broad guidance — no specific trade offers. Never suggests trading future picks away.</div>
-            </div>
-          </div>
-        );
-      })()}
 
     </div>
   );

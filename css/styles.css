@@ -20,10 +20,12 @@ input, select { font-family:inherit; }
   .pfk-header-title { font-size:18px !important; letter-spacing:2px !important; }
   .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
   .pfk-top-tabs button { flex:1 !important; padding:7px 2px !important; font-size:11px !important; letter-spacing:0 !important; }
-  .pfk-content { padding:10px 8px 16px !important; }
-  /* Horizontal scroll containers so mobile shows the full PC layout */
-  .pfk-wide-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -8px; padding:0 8px 2px; }
+  .pfk-content { padding:10px 4px 16px !important; }
+  /* Tight card + row padding so content starts near the left edge */
+  .pfk-wide-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -4px; padding:0 4px 2px; }
   .pfk-wide-scroll > * { min-width:720px; }
+  .pfk-wide-scroll > div > div[style*="padding: 24px"], .pfk-content > div > div[style*="padding: 24px"] { padding:12px 10px !important; }
+  .pfk-content > div > div[style*="padding: 20px"] { padding:12px 10px !important; }
   /* Standings / championship history grid stacks vertically on mobile; each card scrolls its own rows */
   .pfk-pr-grid { display:block !important; }
   .pfk-pr-grid > div { margin-bottom:14px; }
