@@ -965,7 +965,7 @@ function TeamTab() {
                   let tierBadge = null;
                   if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#FFD700'}; }
                   else if (dyn && dyn<=bands.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
-                  else if (dyn && dyn<=bands.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'⚡',label:'STARTER',color:'#3b82f6'}; }
+                  else if (dyn && dyn<=bands.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'💪',label:'STARTER',color:'#3b82f6'}; }
                   else if (dyn && dyn<=bands.green)  { borderCol = '#10b981'; }
                   const age = fc?.player?.age ? Number(fc.player.age).toFixed(1) : null;
                   const nflTeam = fc?.player?.team || null;
@@ -978,9 +978,13 @@ function TeamTab() {
                         {nflTeam && <span style={{fontSize:12,color:'#666',flexShrink:0,fontWeight:700}}>{nflTeam}</span>}
                       </div>
                       {hasFc&&(
+                        <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
+                          <span style={{fontSize:12,color:'#FFD700',fontWeight:700}}>Dyn {pos}#{dyn||'NR'}</span>
+                          <span style={{fontSize:12,color:'#3b82f6',fontWeight:700}}>Rdft {pos}#{rdft||'NR'}</span>
+                        </div>
+                      )}
+                      {hasFc&&(
                         <div style={{marginLeft:'auto',display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
-                          <span style={{fontSize:12,color:'#FFD700',fontWeight:700,minWidth:52,textAlign:'right'}}>Dyn {pos}#{dyn||'NR'}</span>
-                          <span style={{fontSize:12,color:'#3b82f6',fontWeight:700,minWidth:52,textAlign:'right'}}>Rdft {pos}#{rdft||'NR'}</span>
                           <span style={{fontSize:13,fontWeight:700,color:'#FFD700',minWidth:34,textAlign:'right'}}>{dv>0?(dv/1000).toFixed(1)+'k':'—'}</span>
                           <span style={{fontSize:13,fontWeight:600,color:'#3b82f6',minWidth:34,textAlign:'right'}}>{rv>0?(rv/1000).toFixed(1)+'k':'—'}</span>
                         </div>
