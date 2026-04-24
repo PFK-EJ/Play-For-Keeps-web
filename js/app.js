@@ -2167,7 +2167,7 @@ function App(){
         {tab==="pfk"&&(
           <div>
             <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
-              <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
+              <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL ROOKIE RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
             </div>
             <div style={{marginBottom:14,padding:'10px 12px',background:'#0a0a0a',border:'1px solid #222',borderRadius:10}}>
               <SettingsToggleBar value={pfkSettings} onChange={setPfkSettings}/>
