@@ -958,11 +958,11 @@ function TeamTab() {
                   // Per-position tier config:
                   //   WR/RB: Elite both top 5, Stud 6-15, Starter 16-24, Flex Play 25-36
                   //   QB:    Elite both top 5, Stud 6-12, Starter 13-20, QB3 21-28
-                  //   TE:    Elite both top 10, Stud ≤15, Starter ≤21, green ≤28 (unchanged)
+                  //   TE:    Elite both top 5, Stud 6-10, Starter 11-15, no green
                   const tierCfg =
-                    pos==='QB' ? {eliteMax:5,  purple:12, blue:20, green:28, greenBadge:{icon:'📋',label:'QB3',color:'#10b981'}} :
-                    pos==='TE' ? {eliteMax:10, purple:15, blue:21, green:28, greenBadge:null} :
-                                 {eliteMax:5,  purple:15, blue:24, green:36, greenBadge:{icon:'🔄',label:'FLEX PLAY',color:'#10b981'}};
+                    pos==='QB' ? {eliteMax:5, purple:12, blue:20, green:28, greenBadge:{icon:'📋',label:'QB3',color:'#10b981'}} :
+                    pos==='TE' ? {eliteMax:5, purple:10, blue:15, green:0,  greenBadge:null} :
+                                 {eliteMax:5, purple:15, blue:24, green:36, greenBadge:{icon:'🔄',label:'FLEX PLAY',color:'#10b981'}};
                   const elite = dyn && dyn<=tierCfg.eliteMax && rdft && rdft<=tierCfg.eliteMax;
                   let borderCol = '#181818';
                   let bgCol = '#0a0a0a';
@@ -971,14 +971,16 @@ function TeamTab() {
                   else if (dyn && dyn<=tierCfg.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
                   else if (dyn && dyn<=tierCfg.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'💪',label:'STARTER',color:'#3b82f6'}; }
                   else if (dyn && dyn<=tierCfg.green)  { borderCol = '#10b981'; tierBadge = tierCfg.greenBadge; }
-                  const age = fc?.player?.age ? Number(fc.player.age).toFixed(1) : null;
+                  const ageNum = fc?.player?.maybeAge ?? fc?.player?.age ?? null;
+                  const age = ageNum!=null ? Number(ageNum).toFixed(1) : null;
+                  const ageCliff = ageNum!=null && AGE_RISK_AGE[pos]!=null && ageNum >= AGE_RISK_AGE[pos];
                   const nflTeam = fc?.player?.team || null;
                   return (
                     <div key={pid} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 4px',minWidth:0}}>
                       <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 10px',background:bgCol,border:`1px solid ${borderCol}`,borderRadius:7,minWidth:0,flex:'0 1 auto',maxWidth:'100%'}}>
                         {tierBadge && <span style={{fontSize:12,fontWeight:900,color:tierBadge.color,letterSpacing:1,flexShrink:0}}>{tierBadge.icon} {tierBadge.label}</span>}
                         <span style={{fontSize:13,fontWeight:700,color:fc?'#f0f0f0':'#444',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{fc?.player?.name||pid}</span>
-                        {age && <span style={{fontSize:12,color:'#888',flexShrink:0,whiteSpace:'nowrap'}}>{age}y</span>}
+                        {age && <span style={{fontSize:12,color:ageCliff?'#ef4444':'#888',fontWeight:ageCliff?900:400,flexShrink:0,whiteSpace:'nowrap'}}>{ageCliff?'🚩 ':''}{age}y</span>}
                         {nflTeam && <span style={{fontSize:12,color:'#666',flexShrink:0,fontWeight:700}}>{nflTeam}</span>}
                       </div>
                       {hasFc&&(
