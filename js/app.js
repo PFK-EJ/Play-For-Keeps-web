@@ -474,11 +474,19 @@ function TeamTab() {
         try {
           const myRoster = (Array.isArray(rs)?rs:[]).find(r=>r.owner_id===sleeperUser?.user_id);
           if(!myRoster) return;
-          const weeks=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+          // Sleeper stores trades under the current "leg" week; during offseason that's often 1.
+          // We fan out across all possible legs so off-season and in-season both work.
+          const weeks=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
           const results = await Promise.all(weeks.map(w=>
             fetch(`${SLEEPER}/league/${lg.league_id}/transactions/${w}`,NO_CACHE).then(r=>r.ok?r.json():[]).catch(()=>[])
           ));
-          const txns = results.flat().filter(t=>t&&t.type==='trade'&&t.status==='pending');
+          // De-dupe by transaction_id since the same trade can show in multiple leg queries
+          const seen=new Set();
+          const txns = results.flat().filter(t=>{
+            if(!t||t.type!=='trade'||t.status!=='pending') return false;
+            if(seen.has(t.transaction_id)) return false;
+            seen.add(t.transaction_id); return true;
+          });
           const mine = txns.filter(t=>Array.isArray(t.roster_ids)&&t.roster_ids.includes(myRoster.roster_id));
           setPendingTrades(mine.length);
         } catch {}
@@ -778,20 +786,21 @@ function TeamTab() {
       ? +(agesWithValues.reduce((s,x)=>s+x.age,0)/agesWithValues.length).toFixed(1)
       : null;
     const ageTierInfo = avgAge!=null ? ageTier(avgAge) : null;
-    // Age-risk flags across rostered players (exclude deep cloggers — dyn & rdft both NR or >50)
+    // Age-cliff red flags — per-position dyn rank cutoffs (WR/RB top 50, QB/TE top 28).
+    // Sorted by dynasty value desc so biggest assets surface first.
+    const AGE_FLAG_CUTOFF = { WR:50, RB:50, QB:28, TE:28 };
     const flags=[];
     POS_ORDER.forEach(p=>{
       byPos[p].forEach(x=>{
         if(x.age==null) return;
         const thr=AGE_RISK_AGE[p];
         if(!thr || x.age<thr) return;
-        const dynOk  = x.dynPosRank  && x.dynPosRank  <= 50;
-        const rdftOk = x.rdftPosRank && x.rdftPosRank <= 50;
-        if(!dynOk && !rdftOk) return; // clogger — skip
+        const cutoff = AGE_FLAG_CUTOFF[p];
+        if(!x.dynPosRank || x.dynPosRank>cutoff) return;
         flags.push({...x, pos:p});
       });
     });
-    flags.sort((a,b)=>b.age-a.age);
+    flags.sort((a,b)=>b.value-a.value);
     // Pick capital
     const picks = picksByRoster[team.roster_id]||[];
     const now=new Date(); const startYr=now.getFullYear()+(now.getMonth()>=8?1:0);
@@ -1057,14 +1066,59 @@ function TeamTab() {
         </div>
       )}
 
-      {/* Sub-view toggle */}
+      {/* Sub-view toggle + pending-trade indicator */}
       {league && ranked.length>0 && (
-        <div style={{display:'flex',gap:6,background:'#0a0a0a',border:'1px solid #222',borderRadius:10,padding:4,alignSelf:'flex-start'}}>
-          {[['standings','📊 Standings'],['analyzer','🔍 Team Analyzer']].map(([k,l])=>(
-            <button key={k} onClick={()=>setSubView(k)} style={{padding:'8px 16px',background:subView===k?'#FFD700':'transparent',color:subView===k?'#000':'#888',border:'none',borderRadius:7,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:1}}>{l}</button>
-          ))}
+        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:6,background:'#0a0a0a',border:'1px solid #222',borderRadius:10,padding:4}}>
+            {[['standings','📊 Standings'],['analyzer','🔍 Team Analyzer']].map(([k,l])=>(
+              <button key={k} onClick={()=>setSubView(k)} style={{padding:'8px 16px',background:subView===k?'#FFD700':'transparent',color:subView===k?'#000':'#888',border:'none',borderRadius:7,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:1}}>{l}</button>
+            ))}
+          </div>
+          {pendingTrades>0 && (
+            <a href={`https://sleeper.com/leagues/${league.league_id}/trade`} target="_blank" rel="noopener" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:8,fontSize:14,fontWeight:800,color:'#FFD700',textDecoration:'none',letterSpacing:0.5,animation:'pfk-pulse 1.8s ease-in-out infinite'}}>
+              🔔 {pendingTrades} pending trade{pendingTrades>1?'s':''}
+            </a>
+          )}
         </div>
       )}
+
+      {/* League Settings bar */}
+      {league && (()=>{
+        const rp  = league.roster_positions||[];
+        const ss  = league.scoring_settings||{};
+        const isSF= rp.includes('SUPER_FLEX');
+        const starters = rp.filter(s=>s!=='BN' && s!=='IR' && s!=='TAXI').length;
+        const ppr  = ss.rec ?? 0;
+        const tep  = ss.bonus_rec_te ?? 0;
+        const pTD  = ss.pass_td ?? 4;
+        const recFD= ss.bonus_rec_fd ?? 0;
+        const rushFD = ss.bonus_rush_fd ?? 0;
+        const pprLabel = ppr>=1?'Full PPR':ppr>=0.5?'Half PPR':ppr>0?`${ppr} PPR`:'Standard';
+        const pills = [
+          {l:'Format', v:isSF?'Superflex':'1-QB'},
+          {l:'Starters', v:String(starters)},
+          {l:'Pass TD', v:`${pTD} pts`},
+          {l:'PPR', v:pprLabel},
+          {l:'TE Premium', v:tep>0?`+${tep}`:'—'},
+          {l:'PPFD', v:recFD>0?`+${recFD} rec`+(rushFD>0?`/+${rushFD} rush`:''):(rushFD>0?`+${rushFD} rush`:'—')},
+        ];
+        return (
+          <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'10px 14px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+              <span style={{fontSize:12,fontWeight:800,color:'#888',letterSpacing:2}}>LEAGUE SETTINGS</span>
+              <span style={{fontSize:13,color:'#666'}}>· {league.name}</span>
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+              {pills.map(p=>(
+                <div key={p.l} style={{background:'#111',border:'1px solid #1e1e1e',borderRadius:7,padding:'6px 10px',display:'flex',flexDirection:'column',minWidth:92}}>
+                  <span style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{p.l}</span>
+                  <span style={{fontSize:14,fontWeight:800,color:'#f0f0f0',marginTop:1}}>{p.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* STANDINGS VIEW — existing content */}
       {subView==='standings' && (<>
@@ -1338,10 +1392,10 @@ function TeamTab() {
               <div style={{fontSize:13,color:'#555',marginTop:6}}>⭐ Elite (gold) = top 10 dynasty AND redraft · Purple = top 20 · Blue = top 35 · Green = top 49 · Grey = deeper/unranked.</div>
             </div>
 
-            {/* Age-Risk Flags */}
+            {/* Age Cliff Red Flags */}
             <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age-Risk Flags</div>
-              {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No rostered players past their cliff threshold.</div>}
+              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age Cliff Red Flags</div>
+              {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No startable players past their cliff threshold.</div>}
               {flags.length>0 && (
                 <div style={{display:'flex',flexDirection:'column',gap:5}}>
                   {flags.map(f=>(
@@ -1349,12 +1403,12 @@ function TeamTab() {
                       <span style={{fontSize:16,lineHeight:1}}>🚩</span>
                       <span style={{fontSize:14,fontWeight:700,color:'#f0f0f0',flex:1}}>{f.name}</span>
                       <span style={{fontSize:14,fontWeight:900,color:'#f59e0b',letterSpacing:0.5}}>{f.pos} · {f.age.toFixed(1)}y</span>
-                      <span style={{fontSize:14,color:'#888'}}>decline risk</span>
+                      <span style={{fontSize:13,color:'#888'}}>Dyn {f.pos}#{f.dynPosRank||'NR'}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{fontSize:13,color:'#555',marginTop:12}}>Thresholds: RB ≥29 · WR ≥29 · TE ≥27 · QB ≥31</div>
+              <div style={{fontSize:13,color:'#555',marginTop:12}}>Age cutoffs: RB/WR ≥29 · TE ≥27 · QB ≥31. Rank cutoffs: WR/RB top 50 · QB/TE top 28. Sorted by dynasty value.</div>
             </div>
 
             {/* Pick Capital */}
