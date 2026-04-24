@@ -6,7 +6,7 @@ const sb = (window.supabase && window.supabase.createClient) ? window.supabase.c
 
 const DEFAULT_SETTINGS = { format:'Superflex', tep:0.5, ppr:1.0, passTd:6, ppc:0 };
 const FORMAT_CHOICES=['1QB','Superflex'];
-const TEP_CHOICES=[0,0.5,0.75,1.0], PPR_CHOICES=[0.5,1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0,0.25,0.5];
+const TEP_CHOICES=[0.5,0.75,1.0], PPR_CHOICES=[0.5,1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0,0.25];
 
 const sameSettings = (a,b)=> a && b && (a.format||'Superflex')===(b.format||'Superflex') && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
 
