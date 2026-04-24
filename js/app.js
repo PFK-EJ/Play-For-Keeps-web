@@ -955,18 +955,22 @@ function TeamTab() {
                   const rv=fc?.redraftValue||0;
                   const dyn = fc?.positionRank||null;
                   const rdft = fc?.redraftPositionRank||null;
-                  const elite = dyn && dyn<=10 && rdft && rdft<=10;
-                  // Per-position tier caps — WR/RB top 50, QB/TE top 28
-                  const bands = (pos==='QB'||pos==='TE')
-                    ? {purple:15, blue:21, green:28}
-                    : {purple:20, blue:35, green:50};
+                  // Per-position tier config:
+                  //   WR/RB: Elite both top 5, Stud 6-15, Starter 16-24, Flex Play 25-36
+                  //   QB:    Elite both top 5, Stud 6-12, Starter 13-20, QB3 21-28
+                  //   TE:    Elite both top 10, Stud ≤15, Starter ≤21, green ≤28 (unchanged)
+                  const tierCfg =
+                    pos==='QB' ? {eliteMax:5,  purple:12, blue:20, green:28, greenBadge:{icon:'📋',label:'QB3',color:'#10b981'}} :
+                    pos==='TE' ? {eliteMax:10, purple:15, blue:21, green:28, greenBadge:null} :
+                                 {eliteMax:5,  purple:15, blue:24, green:36, greenBadge:{icon:'🔄',label:'FLEX PLAY',color:'#10b981'}};
+                  const elite = dyn && dyn<=tierCfg.eliteMax && rdft && rdft<=tierCfg.eliteMax;
                   let borderCol = '#181818';
                   let bgCol = '#0a0a0a';
                   let tierBadge = null;
                   if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#FFD700'}; }
-                  else if (dyn && dyn<=bands.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
-                  else if (dyn && dyn<=bands.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'💪',label:'STARTER',color:'#3b82f6'}; }
-                  else if (dyn && dyn<=bands.green)  { borderCol = '#10b981'; }
+                  else if (dyn && dyn<=tierCfg.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
+                  else if (dyn && dyn<=tierCfg.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'💪',label:'STARTER',color:'#3b82f6'}; }
+                  else if (dyn && dyn<=tierCfg.green)  { borderCol = '#10b981'; tierBadge = tierCfg.greenBadge; }
                   const age = fc?.player?.age ? Number(fc.player.age).toFixed(1) : null;
                   const nflTeam = fc?.player?.team || null;
                   return (
