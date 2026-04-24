@@ -15,7 +15,7 @@ input, select { font-family:inherit; }
 }
 @media (max-width:600px){
   .pfk-sticky-header { padding:8px 12px !important; }
-  .pfk-logo-img { width:44px !important; height:44px !important; }
+  .pfk-logo-img { width:56px !important; height:56px !important; }
   .pfk-header-subtitle { display:none !important; }
   .pfk-header-title { font-size:22px !important; letter-spacing:2px !important; }
   .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
