@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "Play For Keeps",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "3000"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["/Users/ej/Desktop/Play For Keeps Web/.claude/serve.sh"],
       "port": 3000
     }
   ]

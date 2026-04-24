@@ -983,7 +983,8 @@ function TeamTab() {
                   let borderCol = '#181818';
                   let bgCol = '#0a0a0a';
                   let tierBadge = null;
-                  if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#FFD700'}; }
+                  if (dyn===1) { borderCol = '#ff6a00'; bgCol = '#2a1400'; tierBadge = {icon:'🐐',label:'GOAT',color:'#ff6a00'}; }
+                  else if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#FFD700'}; }
                   else if (dyn && dyn<=tierCfg.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
                   else if (dyn && dyn<=tierCfg.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'💪',label:'STARTER',color:'#3b82f6'}; }
                   else if (dyn && dyn<=tierCfg.green)  { borderCol = '#10b981'; tierBadge = tierCfg.greenBadge; }

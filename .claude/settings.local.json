@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(chmod +x \"/Users/ej/Desktop/Play For Keeps Web/.claude/serve.sh\")"
+    ]
+  }
+}
