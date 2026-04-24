@@ -984,9 +984,9 @@ function TeamTab() {
                         </div>
                       )}
                       {hasFc&&(
-                        <div style={{marginLeft:'auto',display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
-                          <span style={{fontSize:13,fontWeight:700,color:'#FFD700',minWidth:34,textAlign:'right'}}>{dv>0?(dv/1000).toFixed(1)+'k':'—'}</span>
-                          <span style={{fontSize:13,fontWeight:600,color:'#3b82f6',minWidth:34,textAlign:'right'}}>{rv>0?(rv/1000).toFixed(1)+'k':'—'}</span>
+                        <div style={{marginLeft:'auto',display:'flex',flexShrink:0,alignItems:'center',width:96,justifyContent:'flex-end'}}>
+                          <span style={{fontSize:13,fontWeight:700,color:'#FFD700',width:44,textAlign:'right'}}>{dv>0?(dv/1000).toFixed(1)+'k':'—'}</span>
+                          <span style={{fontSize:13,fontWeight:700,color:'#3b82f6',width:44,textAlign:'right'}}>{rv>0?(rv/1000).toFixed(1)+'k':'—'}</span>
                         </div>
                       )}
                     </div>
