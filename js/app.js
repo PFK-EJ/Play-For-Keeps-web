@@ -36,28 +36,59 @@ const publishOfficialRankings = async (items, settings) => {
   const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings });
   return { error };
 };
-// Rookie model storage — sentinel row in pfk_rankings keyed by settings.kind === 'rookie_model'.
-const MODEL_SETTINGS = { kind:'rookie_model' };
-const isModelSettings = s => s && s.kind === 'rookie_model';
+// Rookie model storage — TWO sentinel rows in pfk_rankings:
+//   kind='rookie_model'        → published (read by PROD public site, written by PUBLISH MODEL button)
+//   kind='rookie_model_draft'  → draft     (read by DEV public site & admin, written by every admin auto-save)
+const MODEL_SETTINGS_PUB   = { kind:'rookie_model' };
+const MODEL_SETTINGS_DRAFT = { kind:'rookie_model_draft' };
+const isDevHost = () => typeof window!=='undefined' && /^(dev\.|localhost|127\.|192\.168\.)/.test(window.location.hostname);
+const _kind = s => (s && typeof s==='object') ? s.kind : null;
+// Public reader: route by hostname. Dev reads draft (fallback to published if draft missing); prod reads published only.
 const fetchModelData = async () => {
   if(!sb) return null;
   try{
     const { data } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
     if(!data?.length) return null;
-    return data.find(r=>isModelSettings(r.settings)) || null;
+    const pub   = data.find(r=>_kind(r.settings)==='rookie_model');
+    const draft = data.find(r=>_kind(r.settings)==='rookie_model_draft');
+    return isDevHost() ? (draft || pub) : pub;
   }catch{ return null; }
 };
+// Admin reader: always draft, fallback to published on first load.
+const fetchModelDraft = async () => {
+  if(!sb) return null;
+  try{
+    const { data } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
+    if(!data?.length) return null;
+    return data.find(r=>_kind(r.settings)==='rookie_model_draft') || data.find(r=>_kind(r.settings)==='rookie_model') || null;
+  }catch{ return null; }
+};
+// Admin auto-save: writes the DRAFT row only.
 const saveModelData = async (items) => {
   if(!sb) return { error:'Supabase not loaded' };
   const { data:userData } = await sb.auth.getUser();
   const email = userData?.user?.email || 'PFK Staff';
   const { data:existing } = await sb.from('pfk_rankings').select('id,settings').order('updated_at',{ascending:false});
-  const match = (existing||[]).find(r=>isModelSettings(r.settings));
+  const match = (existing||[]).find(r=>_kind(r.settings)==='rookie_model_draft');
   if(match){
-    const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings:MODEL_SETTINGS }).eq('id',match.id);
+    const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings:MODEL_SETTINGS_DRAFT }).eq('id',match.id);
     return { error };
   }
-  const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings:MODEL_SETTINGS });
+  const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings:MODEL_SETTINGS_DRAFT });
+  return { error };
+};
+// PUBLISH MODEL button: copies the current draft items into the PUBLISHED row.
+const publishModel = async (items) => {
+  if(!sb) return { error:'Supabase not loaded' };
+  const { data:userData } = await sb.auth.getUser();
+  const email = userData?.user?.email || 'PFK Staff';
+  const { data:existing } = await sb.from('pfk_rankings').select('id,settings').order('updated_at',{ascending:false});
+  const match = (existing||[]).find(r=>_kind(r.settings)==='rookie_model');
+  if(match){
+    const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings:MODEL_SETTINGS_PUB }).eq('id',match.id);
+    return { error };
+  }
+  const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings:MODEL_SETTINGS_PUB });
   return { error };
 };
 
@@ -2752,12 +2783,12 @@ function RookieModelTab(){
 
   useEffect(()=>{
     (async()=>{
-      const row = await fetchModelData();
+      // Admin always reads draft (with fallback to published if draft missing).
+      const row = await fetchModelDraft();
       if(row && Array.isArray(row.data) && row.data.length){
         const migrated = migrate(row.data);
         setItems(migrated);
         setSavedJson(JSON.stringify(migrated));
-        // If migration changed anything, persist immediately.
         if(JSON.stringify(migrated) !== JSON.stringify(row.data)){
           await saveModelData(migrated);
           setSavedJson(JSON.stringify(migrated));
@@ -2848,6 +2879,29 @@ function RookieModelTab(){
 
   const removeRow = (id) => { if(!confirm('Remove this player from the model?')) return; setItems(prev=>prev.filter(it=>it.id!==id)); };
 
+  // PUBLISH MODEL — copies current (auto-saved) draft into the published row that prod reads.
+  const [publishingModel,setPublishingModel] = useState(false);
+  const [publishedSig,setPublishedSig] = useState(null);
+  // Load the currently-published row signature so the button can show diff/no-diff state.
+  useEffect(()=>{
+    (async()=>{
+      if(!sb) return;
+      const { data } = await sb.from('pfk_rankings').select('id,data,settings').order('updated_at',{ascending:false});
+      const pub = (data||[]).find(r=>r.settings && r.settings.kind==='rookie_model');
+      if(pub) setPublishedSig(JSON.stringify(pub.data));
+    })();
+  },[]);
+  const draftDiffersFromPub = items!==null && publishedSig !== JSON.stringify(items);
+  const onPublishModel = async () => {
+    if(!items?.length) { setMsg('Nothing to publish.'); setTimeout(()=>setMsg(''),2000); return; }
+    if(!confirm('Publish current model state to PRODUCTION? This pushes every player\'s scores, overrides, and edits live to the public site.')) return;
+    setPublishingModel(true); setMsg('Publishing model...');
+    const { error } = await publishModel(items);
+    setPublishingModel(false);
+    if(error){ setMsg('Publish error: '+(error.message||error)); }
+    else{ setPublishedSig(JSON.stringify(items)); setMsg('✓ Model published to production'); setTimeout(()=>setMsg(''),3500); }
+  };
+
   const addRow = () => {
     if(!newP.name.trim()) return;
     const k = normDraftName(newP.name);
@@ -2909,10 +2963,23 @@ function RookieModelTab(){
 
   return (
     <div style={{padding:'12px 16px'}}>
-      <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:10,marginBottom:12}}>
-        <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>VIEWING COMBO — settings drive PFK column & per-combo override edits</div>
-        <SettingsToggleBar value={modelSettings} onChange={setModelSettings}/>
-        <div style={{fontSize:11,color:'#555',marginTop:6}}>Stats / DC / Film / Landing are baseline inputs and stay the same across combos. PFK column and Override apply only to the selected combo.</div>
+      <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:10,marginBottom:12,display:'flex',alignItems:'flex-start',gap:14,flexWrap:'wrap'}}>
+        <div style={{flex:1,minWidth:280}}>
+          <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>VIEWING COMBO — settings drive PFK column & per-combo override edits</div>
+          <SettingsToggleBar value={modelSettings} onChange={setModelSettings}/>
+          <div style={{fontSize:11,color:'#555',marginTop:6}}>Stats / DC / Film / Landing are baseline inputs and stay the same across combos. PFK column and Override apply only to the selected combo.</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:6,minWidth:180}}>
+          <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:2}}>PUBLISH MODEL</div>
+          <button onClick={onPublishModel} disabled={publishingModel || !draftDiffersFromPub} style={{
+            padding:'10px 14px',
+            background: (publishingModel || !draftDiffersFromPub) ? '#222' : '#FFD700',
+            color: (publishingModel || !draftDiffersFromPub) ? '#666' : '#000',
+            border:'none', borderRadius:8, fontWeight:900, letterSpacing:1, fontSize:13,
+            cursor: (publishingModel || !draftDiffersFromPub) ? 'not-allowed' : 'pointer'
+          }}>{publishingModel ? 'PUBLISHING...' : draftDiffersFromPub ? '🚀 PUBLISH TO PROD' : '✓ IN SYNC'}</button>
+          <div style={{fontSize:10,color:'#555',lineHeight:1.4}}>{draftDiffersFromPub ? 'Draft differs from published. Click to push current scores live to playforkeeps-web.pages.dev.' : 'Draft and published are identical.'}</div>
+        </div>
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
         <span style={{fontSize:12,color:'#888',marginRight:6}}>FILTER</span>
