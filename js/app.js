@@ -302,8 +302,27 @@ const BAKED_STATS_PCT = {
   maxklare:76.2, kenyonsadiq:74.3, jackendries:70.5, elistowers:69.5,
   joeroyer:47.6, dallenbentley:41.0, samroush:36.2, oscardelp:21.0,
 };
-// Film percentiles from Dynasty Zoltan Premium screenshots, 2026-04-25.
-const BAKED_FILM_PCT = {
+// Film source registry — multi-source film grading. Each source defines its native scale
+// and a `toPct` converter that maps the raw grade to a 0-100 percentile. The displayed
+// Film% in the model is the unweighted mean of all populated source pcts.
+const FILM_SOURCES = {
+  zoltan:   { label:'Zoltan',   scaleHint:'0-100',    toPct: v => v==null?null:Math.max(0,Math.min(100,+v)) },
+  zierlein: { label:'Zierlein', scaleHint:'5.0-7.5',  toPct: v => v==null?null:Math.max(0,Math.min(100,(+v-5.0)/2.5*100)) },
+};
+const filmAvgPct = (filmScores) => {
+  if(!filmScores || typeof filmScores!=='object') return null;
+  const vals=[];
+  for(const k of Object.keys(filmScores)){
+    const src=FILM_SOURCES[k]; if(!src) continue;
+    const p = src.toPct(filmScores[k]);
+    if(p!=null && !isNaN(p)) vals.push(p);
+  }
+  return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : null;
+};
+// Film percentiles, baked seed values per source.
+// Zoltan: Dynasty Zoltan Premium screenshots, 2026-04-25 (0-100 scale, raw value used directly).
+// Zierlein: NFL.com prospect grade screenshots, 2026-04-25 (5.0-7.5 scale, converted via FILM_SOURCES.zierlein.toPct).
+const BAKED_FILM_ZOLTAN = {
   jeremiyahlove:91, makailemon:91, kcconcepcion:93, carnelltate:88,
   omarcooperjr:92, fernandomendoza:57, jordyntyson:77, denzelboston:85,
   kenyonsadiq:91, emmettjohnson:88, chrisbrazzellii:75, elistowers:57,
@@ -312,6 +331,20 @@ const BAKED_FILM_PCT = {
   antoniowilliams:49, jakobilane:53, nicholassingleton:35, germiebernard:47,
   mikewashington:24, maxklare:40, brycelance:42, tedhurst:43,
   demondclaiborne:13, roberthenryjr:19, skylerbell:19,
+};
+const BAKED_FILM_ZIERLEIN = {
+  // QB
+  fernandomendoza:6.73, tysimpson:6.30, carsonbeck:6.14, garrettnussmeier:6.00, drewallar:5.98,
+  // RB
+  jeremiyahlove:6.73, jadarianprice:6.38, mikewashington:6.24, adamrandall:6.13,
+  demondclaiborne:6.10, leveonmoss:6.10, emmettjohnson:6.00, nicholassingleton:6.00,
+  rahsulfaison:6.00, jmaritaylor:5.99, kaytronallen:5.97, sethmcgowan:5.97,
+  jonahcoleman:5.94, desmondreid:5.92, eliheidenreich:5.86,
+  jamarionmiller:5.69, jaydnott:5.69, kaelonblack:5.69, roberthenryjr:5.69,
+  // WR
+  carnelltate:6.71, makailemon:6.47, jordyntyson:6.43, kcconcepcion:6.42,
+  denzelboston:6.40, omarcooperjr:6.39, chrisbrazzellii:6.36, zachariahbranch:6.32,
+  skylerbell:6.31, germiebernard:6.29,
 };
 const POS_TIER_BANDS = [
   {max:5,   key:'Elite', color:'#FFD700'},
@@ -2456,28 +2489,48 @@ function RookieModelTab(){
     return roster.filter(p=>['QB','RB','WR','TE'].includes(p.pos)).map(p=>{
       const k = normDraftName(p.name);
       const draft = DRAFT_2026[k] || null;
+      const filmScores = {};
+      if(BAKED_FILM_ZOLTAN[k]   != null) filmScores.zoltan   = BAKED_FILM_ZOLTAN[k];
+      if(BAKED_FILM_ZIERLEIN[k] != null) filmScores.zierlein = BAKED_FILM_ZIERLEIN[k];
       return {
         id: p.id || ('m_'+Date.now()+Math.random().toString(36).slice(2,6)),
         name: p.name, pos: p.pos,
         pick: draft?.pick || null,
         team: draft?.team || null,
         stats: BAKED_STATS_PCT[k] ?? null,
-        film: BAKED_FILM_PCT[k] ?? null,
+        filmScores,
         dcOverride: null,
       };
     });
   },[]);
 
+  // Migrate legacy items with `film` (number) into `filmScores: {zoltan: <film>}`.
+  const migrate = (arr) => (arr||[]).map(it=>{
+    if(it.filmScores && typeof it.filmScores==='object') return it;
+    const fs = {};
+    if(typeof it.film === 'number') fs.zoltan = it.film;
+    // Also pull in any newly-added baked Zierlein for players that pre-existed before the multi-source refactor.
+    const k = normDraftName(it.name);
+    if(fs.zierlein==null && BAKED_FILM_ZIERLEIN[k]!=null) fs.zierlein = BAKED_FILM_ZIERLEIN[k];
+    const {film, ...rest} = it;
+    return {...rest, filmScores: fs};
+  });
+
   useEffect(()=>{
     (async()=>{
       const row = await fetchModelData();
       if(row && Array.isArray(row.data) && row.data.length){
-        setItems(row.data);
-        setSavedJson(JSON.stringify(row.data));
+        const migrated = migrate(row.data);
+        setItems(migrated);
+        setSavedJson(JSON.stringify(migrated));
+        // If migration changed anything, persist immediately.
+        if(JSON.stringify(migrated) !== JSON.stringify(row.data)){
+          await saveModelData(migrated);
+          setSavedJson(JSON.stringify(migrated));
+        }
       }else{
         const seeded = await buildFromRoster();
         setItems(seeded);
-        // auto-save initial seed so it persists
         const { error } = await saveModelData(seeded);
         if(!error) setSavedJson(JSON.stringify(seeded));
       }
@@ -2499,15 +2552,24 @@ function RookieModelTab(){
   },[items,savedJson]);
 
   const computeDc = (it) => it.dcOverride!=null ? +it.dcOverride : dcScoreFromPick(it.pos, it.pick);
-  const computePfk = (it) => pfkScore(it.stats, computeDc(it), it.film);
+  const computeFilm = (it) => filmAvgPct(it.filmScores);
+  const computePfk = (it) => pfkScore(it.stats, computeDc(it), computeFilm(it));
 
   const filtered = (items||[]).filter(it=>posFilter==='ALL' || it.pos===posFilter);
   const sorted = [...filtered].sort((a,b)=>computePfk(b)-computePfk(a));
 
   const updateField = (id,field,val) => setItems(prev=>prev.map(it=>{
     if(it.id!==id) return it;
+    // Film source field: 'film:<source>' e.g. 'film:zoltan', 'film:zierlein'
+    if(field.startsWith('film:')){
+      const source = field.slice(5);
+      const fs = {...(it.filmScores||{})};
+      if(val===''||val===null){ delete fs[source]; }
+      else { fs[source] = +val; }
+      return {...it, filmScores: fs};
+    }
     if(field==='dc') return {...it, dcOverride: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
-    if(field==='stats'||field==='film') return {...it, [field]: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
+    if(field==='stats') return {...it, stats: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
     if(field==='pick') return {...it, pick: val||null};
     return {...it, [field]: val};
   }));
@@ -2518,13 +2580,16 @@ function RookieModelTab(){
     if(!newP.name.trim()) return;
     const k = normDraftName(newP.name);
     const draft = newP.pick ? null : (DRAFT_2026[k]||null);
+    const filmScores = {};
+    if(BAKED_FILM_ZOLTAN[k]   != null) filmScores.zoltan   = BAKED_FILM_ZOLTAN[k];
+    if(BAKED_FILM_ZIERLEIN[k] != null) filmScores.zierlein = BAKED_FILM_ZIERLEIN[k];
     const it = {
       id:'m_'+Date.now(),
       name:newP.name.trim(), pos:newP.pos,
       pick: newP.pick || draft?.pick || null,
       team: draft?.team || null,
       stats: BAKED_STATS_PCT[k] ?? null,
-      film: BAKED_FILM_PCT[k] ?? null,
+      filmScores,
       dcOverride: null,
     };
     setItems(prev=>[...(prev||[]), it]);
@@ -2539,7 +2604,7 @@ function RookieModelTab(){
       const byKey = new Map((prev||[]).map(it=>[normDraftName(it.name), it]));
       return seeded.map(s=>{
         const existing = byKey.get(normDraftName(s.name));
-        return existing ? {...s, stats:existing.stats, film:existing.film, dcOverride:existing.dcOverride, id:existing.id} : s;
+        return existing ? {...s, stats:existing.stats, filmScores:existing.filmScores, dcOverride:existing.dcOverride, id:existing.id} : s;
       });
     });
   };
@@ -2613,16 +2678,20 @@ function RookieModelTab(){
               <th style={headStyle}>Player</th>
               <th style={{...headStyle,width:50,textAlign:'center'}}>Pos</th>
               <th style={{...headStyle,width:80}}>Pick</th>
-              <th style={{...headStyle,width:80,textAlign:'right'}}>Stats%</th>
-              <th style={{...headStyle,width:80,textAlign:'right'}}>DC</th>
-              <th style={{...headStyle,width:80,textAlign:'right'}}>Film%</th>
-              <th style={{...headStyle,width:80,textAlign:'right',color:'#FFD700'}}>PFK</th>
+              <th style={{...headStyle,width:75,textAlign:'right'}}>Stats%</th>
+              <th style={{...headStyle,width:75,textAlign:'right'}}>DC</th>
+              {Object.entries(FILM_SOURCES).map(([k,src])=>(
+                <th key={k} style={{...headStyle,width:75,textAlign:'right'}} title={`${src.label} (raw scale ${src.scaleHint})`}>{src.label}</th>
+              ))}
+              <th style={{...headStyle,width:75,textAlign:'right',color:'#aaa'}} title="Average of all populated film sources, normalized to 0-100">Film%</th>
+              <th style={{...headStyle,width:75,textAlign:'right',color:'#FFD700'}}>PFK</th>
               <th style={{...headStyle,width:40}}></th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((it,i)=>{
               const dc = computeDc(it);
+              const filmPct = computeFilm(it);
               const pfk = computePfk(it);
               const dcOverridden = it.dcOverride!=null;
               return (
@@ -2636,7 +2705,12 @@ function RookieModelTab(){
                     {renderNum(it,'dc', dcOverridden?it.dcOverride:dc)}
                     {dcOverridden && <button onClick={(e)=>{e.stopPropagation(); updateField(it.id,'dc','');}} style={{marginLeft:4,background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:11}} title="Clear override">×</button>}
                   </td>
-                  <td style={numCellStyle}>{renderNum(it,'film',it.film)}</td>
+                  {Object.keys(FILM_SOURCES).map(srcKey=>(
+                    <td key={srcKey} style={numCellStyle} title={`Raw ${FILM_SOURCES[srcKey].label} grade (scale ${FILM_SOURCES[srcKey].scaleHint})`}>
+                      {renderNum(it,'film:'+srcKey, it.filmScores?.[srcKey])}
+                    </td>
+                  ))}
+                  <td style={{...cellStyle,textAlign:'right',color:filmPct==null?'#444':'#aaa',fontWeight:700}} title="Average of populated sources">{filmPct==null?'—':filmPct}</td>
                   <td style={{...cellStyle,textAlign:'right',fontWeight:900,color:'#FFD700',fontSize:14}}>{pfk}</td>
                   <td style={{...cellStyle,textAlign:'center'}}><button onClick={()=>removeRow(it.id)} style={{background:'transparent',border:'none',color:'#444',cursor:'pointer',fontSize:16}} title="Remove from model">×</button></td>
                 </tr>
@@ -2645,7 +2719,9 @@ function RookieModelTab(){
           </tbody>
         </table>
       </div>
-      <div style={{marginTop:10,fontSize:11,color:'#555'}}>PFK = 35% Stats + 50% Draft Capital + 15% Film. Click any number to edit. DC is auto-computed from pick + position tier; click to override (purple), × to clear.</div>
+      <div style={{marginTop:10,fontSize:11,color:'#555'}}>
+        PFK = 35% Stats + 50% Draft Capital + 15% Film. Film% = unweighted average of all film sources you have for that player (scales auto-normalized to 0-100). Click any number to edit. DC turns purple when manually overridden; × clears.
+      </div>
     </div>
   );
 }
