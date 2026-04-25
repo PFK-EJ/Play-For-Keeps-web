@@ -3392,7 +3392,11 @@ function AdminApp(){
         </div>
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
-        <RenderList src={list} allowEdit={true} {...commonProps}/>
+        <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.5}}>
+          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>AUTO-TIER VIEW</span>
+          Players are automatically sorted by PFK score (matches dev page). Tier ▲▼ arrows let you reorder tier names — top tier name labels the highest-PFK bucket. Add/remove/rename tiers and players still work; only manual player drag is disabled (PFK score drives player position).
+        </div>
+        <RenderList src={list} allowEdit={true} autoTier={true} {...commonProps}/>
       </div>
       </>)}
     </div>
