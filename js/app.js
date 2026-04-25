@@ -373,8 +373,8 @@ const BAKED_FILM_ZIERLEIN = {
   // TE (NFL.com /draft/tracker/2026/prospects/te_all)
   kenyonsadiq:6.46, maxklare:6.30, samroush:6.26, elistowers:6.24,
   nateboerkircher:6.17, justinjoly:6.16, eliraridon:6.14, jackendries:6.13,
-  oscardelp:6.13, willkacmarek:6.12, marlinklein:6.10, michaeltrigg:6.00,
-  tannerkoziol:5.95,
+  oscardelp:6.13, joeroyer:6.12, willkacmarek:6.12, marlinklein:6.10,
+  michaeltrigg:6.00, tannerkoziol:5.95, johnmichaelgyllenborg:5.90, carsenryan:5.84,
 };
 const POS_TIER_BANDS = [
   {max:5,   key:'Elite', color:'#FFD700'},
@@ -2534,14 +2534,14 @@ function RookieModelTab(){
     });
   },[]);
 
-  // Migrate legacy items with `film` (number) into `filmScores: {zoltan: <film>}`.
+  // Migrate legacy items + always-on backfill of any missing baked film source values.
+  // Runs every load so newly-added baked values reach existing players without manual backfill.
   const migrate = (arr) => (arr||[]).map(it=>{
-    if(it.filmScores && typeof it.filmScores==='object') return it;
-    const fs = {};
-    if(typeof it.film === 'number') fs.zoltan = it.film;
-    // Also pull in any newly-added baked Zierlein for players that pre-existed before the multi-source refactor.
+    const fs = (it.filmScores && typeof it.filmScores==='object') ? {...it.filmScores} : {};
+    if(typeof it.film === 'number' && fs.zoltan==null) fs.zoltan = it.film;
     const k = normDraftName(it.name);
-    if(fs.zierlein==null && BAKED_FILM_ZIERLEIN[k]!=null) fs.zierlein = BAKED_FILM_ZIERLEIN[k];
+    if(fs.zoltan==null   && BAKED_FILM_ZOLTAN[k]   != null) fs.zoltan   = BAKED_FILM_ZOLTAN[k];
+    if(fs.zierlein==null && BAKED_FILM_ZIERLEIN[k] != null) fs.zierlein = BAKED_FILM_ZIERLEIN[k];
     const {film, ...rest} = it;
     return {...rest, filmScores: fs};
   });
