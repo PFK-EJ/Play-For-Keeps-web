@@ -314,6 +314,32 @@ const pfkScore = (stats, dc, film) => {
   const s = +stats||0, d = +dc||0, f = +film||0;
   return Math.round((PFK_WEIGHTS.stats*s + PFK_WEIGHTS.dc*d + PFK_WEIGHTS.film*f)*10)/10;
 };
+// Per-combo position multipliers. Baseline = Superflex / TEP 0.5 / 6 PTD (DEFAULT_SETTINGS).
+// Sourced from FantasyCalc API (1QB vs SF) + research on TEP/PTD impact (2026-04-25).
+const FORMAT_MULT = {
+  'Superflex': {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
+  '1QB':       {QB:0.54, RB:1.10, WR:1.01, TE:0.93},
+};
+const TEP_MULT = {
+  0.5:  {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
+  0.75: {QB:1.00, RB:0.99, WR:0.99, TE:1.05},
+  1.0:  {QB:0.99, RB:0.97, WR:0.97, TE:1.12},
+  1:    {QB:0.99, RB:0.97, WR:0.97, TE:1.12}, // alias for tep stored as integer 1
+};
+const PTD_MULT = {
+  4: {QB:0.91, RB:1.00, WR:1.00, TE:1.00},
+  5: {QB:0.95, RB:1.00, WR:1.00, TE:1.00},
+  6: {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
+};
+const comboMultiplier = (pos, settings) => {
+  if(!pos || !settings) return 1.00;
+  const f = FORMAT_MULT[settings.format||'Superflex']?.[pos] ?? 1.00;
+  const t = TEP_MULT[settings.tep]?.[pos] ?? 1.00;
+  const p = PTD_MULT[settings.passTd]?.[pos] ?? 1.00;
+  return f * t * p;
+};
+// Stable signature for a settings combo, matches sigOf() inside AdminApp for cross-component lookup.
+const settingsSig = s => `${s?.format||'Superflex'}|${s?.tep}|${s?.ppr}|${s?.passTd}|${s?.ppc}`;
 // Pre-Draft percentile × 100 from 2026 Data Models (QB/RB/WR/TE xlsx, 2026 only).
 const BAKED_STATS_PCT = {
   // QB
@@ -1653,7 +1679,7 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName}){
+function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings}){
   const rowRefs = useRef({});
   const [draggingId,setDraggingId] = useState(null);
   const [insertBefore,setInsertBefore] = useState(null);
@@ -1663,14 +1689,23 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
   const hoverCapable = useMemo(()=>typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(hover:hover)').matches,[]);
   const [popover,setPopover] = useState(null);
   // Compute the PFK model breakdown for a player (or null if no model entry).
+  // Applies the per-combo multiplier (FORMAT × TEP × PTD) to the baseline PFK so the
+  // public site's score reshuffles when settings chips change.
+  // Per-player per-combo override: if m.comboOverrides[settingsSig] is set, use it directly.
   const modelBreakdown = (item) => {
     const m = modelByName && modelByName[normName(item.name)];
     if(!m) return null;
-    const dc = m.dcOverride!=null ? +m.dcOverride : dcScoreFromPick(m.pos||item.pos, m.pick);
+    const pos = m.pos || item.pos;
+    const dc = m.dcOverride!=null ? +m.dcOverride : dcScoreFromPick(pos, m.pick);
     const film = filmAvgPct(m.filmScores);
     const base = pfkScore(m.stats, dc, film);
-    const pfk = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
-    return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk };
+    const baseline = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
+    const sig = settingsSig(pfkSettings);
+    const override = m.comboOverrides?.[sig];
+    const pfk = override!=null && !isNaN(+override)
+      ? Math.round(+override * 10) / 10
+      : Math.round(baseline * comboMultiplier(pos, pfkSettings) * 10) / 10;
+    return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk, baseline, isOverride: override!=null };
   };
   // Read-only views: dynamic per-class auto-tiering by PFK gaps + position targets.
   // Tier names come from src in order; players bucket by autoTierBoundaries; empty tiers hidden.
@@ -2496,7 +2531,7 @@ function App(){
     </div>
   );
 
-  const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter,modelByName};
+  const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter,modelByName,pfkSettings};
 
   return(
     <div style={{background:"#080808",minHeight:"100vh",color:"#f0f0f0",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
@@ -2659,6 +2694,8 @@ function RookieModelTab(){
   const [msg,setMsg]=useState('');
   const [editing,setEditing]=useState(null); // {id, field}
   const [editVal,setEditVal]=useState('');
+  // Combo selector for the model tab — drives the per-combo PFK column and override editing.
+  const [modelSettings,setModelSettings]=useState(DEFAULT_SETTINGS);
 
   // Build initial model from current default-combo roster + DRAFT_2026 + baked maps.
   const buildFromRoster = useCallback(async()=>{
@@ -2731,9 +2768,17 @@ function RookieModelTab(){
 
   const computeDc = (it) => it.dcOverride!=null ? +it.dcOverride : dcScoreFromPick(it.pos, it.pick);
   const computeFilm = (it) => filmAvgPct(it.filmScores);
-  const computePfk = (it) => {
+  // Baseline PFK = before per-combo multiplier and per-combo override.
+  const computeBaselinePfk = (it) => {
     const base = pfkScore(it.stats, computeDc(it), computeFilm(it));
     return Math.round(base * landingMultiplier(it.landing) * 10) / 10;
+  };
+  // Combo-adjusted PFK = baseline × FORMAT × TEP × PTD multiplier; per-player override wins if present.
+  const computePfk = (it) => {
+    const sig = settingsSig(modelSettings);
+    const ov = it.comboOverrides?.[sig];
+    if(ov!=null && !isNaN(+ov)) return Math.round(+ov*10)/10;
+    return Math.round(computeBaselinePfk(it) * comboMultiplier(it.pos, modelSettings) * 10) / 10;
   };
 
   const filtered = (items||[]).filter(it=>posFilter==='ALL' || it.pos===posFilter);
@@ -2750,6 +2795,14 @@ function RookieModelTab(){
       else if(src && src.kind==='categorical'){ fs[source] = String(val); }
       else { fs[source] = +val; }
       return {...it, filmScores: fs};
+    }
+    // Per-combo override: 'override' = current modelSettings combo's override value.
+    if(field==='override'){
+      const sig = settingsSig(modelSettings);
+      const co = {...(it.comboOverrides||{})};
+      if(val===''||val===null||val===undefined) delete co[sig];
+      else co[sig] = Math.max(0, +val);
+      return {...it, comboOverrides: co};
     }
     if(field==='dc') return {...it, dcOverride: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
     if(field==='stats') return {...it, stats: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
@@ -2837,6 +2890,11 @@ function RookieModelTab(){
 
   return (
     <div style={{padding:'12px 16px'}}>
+      <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:10,marginBottom:12}}>
+        <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>VIEWING COMBO — settings drive PFK column & per-combo override edits</div>
+        <SettingsToggleBar value={modelSettings} onChange={setModelSettings}/>
+        <div style={{fontSize:11,color:'#555',marginTop:6}}>Stats / DC / Film / Landing are baseline inputs and stay the same across combos. PFK column and Override apply only to the selected combo.</div>
+      </div>
       <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
         <span style={{fontSize:12,color:'#888',marginRight:6}}>FILTER</span>
         {['ALL','QB','RB','WR','TE'].map(p=>(
@@ -2885,7 +2943,8 @@ function RookieModelTab(){
               ))}
               <th style={{...headStyle,width:75,textAlign:'right',color:'#aaa'}} title="Average of all populated film sources, normalized to 0-100">Film%</th>
               <th style={{...headStyle,width:75,textAlign:'center'}} title="Landing spot multiplier — 5=best (×1.08), 4 (×1.04), 3=neutral (×1.00), 2 (×0.96), 1=worst (×0.92). Default — = ×1.00 (no impact).">Landing</th>
-              <th style={{...headStyle,width:75,textAlign:'right',color:'#FFD700'}}>PFK</th>
+              <th style={{...headStyle,width:75,textAlign:'right'}} title="Per-combo manual override of PFK score. Empty = use formula. Only applies to the currently-selected combo.">Override</th>
+              <th style={{...headStyle,width:75,textAlign:'right',color:'#FFD700'}} title="PFK = baseline × FORMAT × TEP × PTD multiplier (or override if set)">PFK</th>
               <th style={{...headStyle,width:40}}></th>
             </tr>
           </thead>
@@ -2961,7 +3020,22 @@ function RookieModelTab(){
                       </td>
                     );
                   })()}
-                  <td style={{...cellStyle,textAlign:'right',fontWeight:900,color:'#FFD700',fontSize:14}}>{pfk}</td>
+                  {(() => {
+                    const sig = settingsSig(modelSettings);
+                    const ov = it.comboOverrides?.[sig];
+                    const isOv = ov!=null && !isNaN(+ov);
+                    return (
+                      <td style={{...numCellStyle,color: isOv?'#c084fc':'#666'}} title={isOv?`Override for this combo (×${comboMultiplier(it.pos,modelSettings).toFixed(2)} bypassed). Click to edit / clear.`:`No override — using formula × ${comboMultiplier(it.pos,modelSettings).toFixed(2)} multiplier`}>
+                        {renderNum(it,'override', isOv?ov:null)}
+                        {isOv && <button onClick={(e)=>{e.stopPropagation(); updateField(it.id,'override','');}} style={{marginLeft:4,background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:11}} title="Clear override">×</button>}
+                      </td>
+                    );
+                  })()}
+                  {(() => {
+                    const sig = settingsSig(modelSettings);
+                    const isOv = it.comboOverrides?.[sig]!=null;
+                    return <td style={{...cellStyle,textAlign:'right',fontWeight:900,color: isOv?'#c084fc':'#FFD700',fontSize:14}} title={isOv?'Override active for this combo':`Auto: baseline × ${comboMultiplier(it.pos,modelSettings).toFixed(2)} combo multiplier`}>{pfk}</td>;
+                  })()}
                   <td style={{...cellStyle,textAlign:'center'}}><button onClick={()=>removeRow(it.id)} style={{background:'transparent',border:'none',color:'#444',cursor:'pointer',fontSize:16}} title="Remove from model">×</button></td>
                 </tr>
               );
@@ -2969,8 +3043,11 @@ function RookieModelTab(){
           </tbody>
         </table>
       </div>
-      <div style={{marginTop:10,fontSize:11,color:'#555'}}>
-        PFK = (35% Stats + 50% Draft Capital + 15% Film) × Landing multiplier. Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize. Landing: 5=best (×1.08) ... 1=worst (×0.92), — = ×1.00 (no impact). Click any number to edit. DC turns purple when manually overridden; × clears.
+      <div style={{marginTop:10,fontSize:11,color:'#555',lineHeight:1.6}}>
+        <div>PFK = (35% Stats + 50% Draft Capital + 15% Film) × Landing multiplier × per-combo multiplier (FORMAT × TEP × PTD).</div>
+        <div>Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize.</div>
+        <div>Landing: 5=best (×1.08) ... 1=worst (×0.92), — = ×1.00 (no impact). Override (per-combo) bypasses the formula entirely for the selected combo only — other combos unaffected.</div>
+        <div>Click any number to edit. DC and Override cells turn purple when manually set; × clears.</div>
       </div>
     </div>
   );
