@@ -302,22 +302,33 @@ const BAKED_STATS_PCT = {
   maxklare:76.2, kenyonsadiq:74.3, jackendries:70.5, elistowers:69.5,
   joeroyer:47.6, dallenbentley:41.0, samroush:36.2, oscardelp:21.0,
 };
-// Film source registry — multi-source film grading. Each source defines its native scale
-// and a `toPct` converter that maps the raw grade to a 0-100 percentile. The displayed
-// Film% in the model is the unweighted mean of all populated source pcts.
+// Film source registry — multi-source film grading. Each source defines:
+//   weight    — relative weight in the composite Film score (any positive number; renormalized when sources missing)
+//   kind      — 'numeric' or 'categorical' (drives UI editor)
+//   scaleHint — human label for the raw scale
+//   toPct     — converts raw value to 0-100 percentile
 const FILM_SOURCES = {
-  zoltan:   { label:'Zoltan',   scaleHint:'0-100',    toPct: v => v==null?null:Math.max(0,Math.min(100,+v)) },
-  zierlein: { label:'Zierlein', scaleHint:'5.0-7.5',  toPct: v => v==null?null:Math.max(0,Math.min(100,(+v-5.0)/2.5*100)) },
+  zoltan:   { label:'Zoltan',   weight:50, kind:'numeric',     scaleHint:'0-100',
+              toPct: v => v==null?null:Math.max(0,Math.min(100,+v)) },
+  evan:     { label:'You',      weight:30, kind:'categorical', scaleHint:'In/Neutral/Out',
+              options:[{key:'in',label:'IN',pct:100,color:'#10b981'},
+                       {key:'neutral',label:'NTL',pct:50,color:'#FFC107'},
+                       {key:'out',label:'OUT',pct:0,color:'#ef4444'}],
+              toPct: v => { if(v==null) return null; const o=FILM_SOURCES.evan.options.find(x=>x.key===v); return o?o.pct:null; } },
+  zierlein: { label:'Zierlein', weight:20, kind:'numeric',     scaleHint:'5.0-7.5',
+              toPct: v => v==null?null:Math.max(0,Math.min(100,(+v-5.0)/2.5*100)) },
 };
+// Weighted average across populated sources; missing sources drop and weights re-normalize.
 const filmAvgPct = (filmScores) => {
   if(!filmScores || typeof filmScores!=='object') return null;
-  const vals=[];
-  for(const k of Object.keys(filmScores)){
-    const src=FILM_SOURCES[k]; if(!src) continue;
+  let totalW=0, totalV=0;
+  for(const [k,src] of Object.entries(FILM_SOURCES)){
     const p = src.toPct(filmScores[k]);
-    if(p!=null && !isNaN(p)) vals.push(p);
+    if(p==null || isNaN(p)) continue;
+    totalW += src.weight;
+    totalV += src.weight * p;
   }
-  return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : null;
+  return totalW>0 ? Math.round(totalV/totalW*10)/10 : null;
 };
 // Film percentiles, baked seed values per source.
 // Zoltan: Dynasty Zoltan Premium screenshots, 2026-04-25 (0-100 scale, raw value used directly).
@@ -2565,11 +2576,13 @@ function RookieModelTab(){
 
   const updateField = (id,field,val) => setItems(prev=>prev.map(it=>{
     if(it.id!==id) return it;
-    // Film source field: 'film:<source>' e.g. 'film:zoltan', 'film:zierlein'
+    // Film source field: 'film:<source>' e.g. 'film:zoltan', 'film:evan', 'film:zierlein'
     if(field.startsWith('film:')){
       const source = field.slice(5);
+      const src = FILM_SOURCES[source];
       const fs = {...(it.filmScores||{})};
-      if(val===''||val===null){ delete fs[source]; }
+      if(val===''||val===null||val===undefined){ delete fs[source]; }
+      else if(src && src.kind==='categorical'){ fs[source] = String(val); }
       else { fs[source] = +val; }
       return {...it, filmScores: fs};
     }
@@ -2578,6 +2591,22 @@ function RookieModelTab(){
     if(field==='pick') return {...it, pick: val||null};
     return {...it, [field]: val};
   }));
+
+  // Cycle a categorical film source: unrated → option[0] → option[1] → ... → unrated.
+  const cycleCategorical = (id, sourceKey) => {
+    const src = FILM_SOURCES[sourceKey]; if(!src || src.kind!=='categorical') return;
+    setItems(prev=>prev.map(it=>{
+      if(it.id!==id) return it;
+      const cur = it.filmScores?.[sourceKey];
+      const opts = src.options;
+      const idx = cur==null ? -1 : opts.findIndex(o=>o.key===cur);
+      const nextIdx = idx + 1; // -1 → 0, last → opts.length (which becomes "unrated")
+      const fs = {...(it.filmScores||{})};
+      if(nextIdx >= opts.length){ delete fs[sourceKey]; }
+      else { fs[sourceKey] = opts[nextIdx].key; }
+      return {...it, filmScores: fs};
+    }));
+  };
 
   const removeRow = (id) => { if(!confirm('Remove this player from the model?')) return; setItems(prev=>prev.filter(it=>it.id!==id)); };
 
@@ -2686,7 +2715,7 @@ function RookieModelTab(){
               <th style={{...headStyle,width:75,textAlign:'right'}}>Stats%</th>
               <th style={{...headStyle,width:75,textAlign:'right'}}>DC</th>
               {Object.entries(FILM_SOURCES).map(([k,src])=>(
-                <th key={k} style={{...headStyle,width:75,textAlign:'right'}} title={`${src.label} (raw scale ${src.scaleHint})`}>{src.label}</th>
+                <th key={k} style={{...headStyle,width:75,textAlign: src.kind==='categorical'?'center':'right'}} title={`${src.label} (weight ${src.weight}%, raw scale ${src.scaleHint})`}>{src.label}<span style={{color:'#666',fontWeight:600,marginLeft:4}}>{src.weight}%</span></th>
               ))}
               <th style={{...headStyle,width:75,textAlign:'right',color:'#aaa'}} title="Average of all populated film sources, normalized to 0-100">Film%</th>
               <th style={{...headStyle,width:75,textAlign:'right',color:'#FFD700'}}>PFK</th>
@@ -2710,11 +2739,30 @@ function RookieModelTab(){
                     {renderNum(it,'dc', dcOverridden?it.dcOverride:dc)}
                     {dcOverridden && <button onClick={(e)=>{e.stopPropagation(); updateField(it.id,'dc','');}} style={{marginLeft:4,background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:11}} title="Clear override">×</button>}
                   </td>
-                  {Object.keys(FILM_SOURCES).map(srcKey=>(
-                    <td key={srcKey} style={numCellStyle} title={`Raw ${FILM_SOURCES[srcKey].label} grade (scale ${FILM_SOURCES[srcKey].scaleHint})`}>
-                      {renderNum(it,'film:'+srcKey, it.filmScores?.[srcKey])}
-                    </td>
-                  ))}
+                  {Object.keys(FILM_SOURCES).map(srcKey=>{
+                    const src = FILM_SOURCES[srcKey];
+                    const cur = it.filmScores?.[srcKey];
+                    const tooltip = `${src.label} · weight ${src.weight}% · scale ${src.scaleHint}`;
+                    if(src.kind==='categorical'){
+                      const opt = cur==null ? null : src.options.find(o=>o.key===cur);
+                      return (
+                        <td key={srcKey} style={{...numCellStyle, textAlign:'center'}} title={tooltip+' · click to cycle'}>
+                          <span onClick={()=>cycleCategorical(it.id, srcKey)} style={{
+                            display:'inline-block', minWidth:38, padding:'3px 8px', borderRadius:4, cursor:'pointer',
+                            fontSize:11, fontWeight:900, letterSpacing:0.5,
+                            background: opt ? opt.color+'33' : 'transparent',
+                            color: opt ? opt.color : '#444',
+                            border: '1px solid '+(opt ? opt.color : '#222'),
+                          }}>{opt ? opt.label : '—'}</span>
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={srcKey} style={numCellStyle} title={tooltip}>
+                        {renderNum(it,'film:'+srcKey, cur)}
+                      </td>
+                    );
+                  })}
                   <td style={{...cellStyle,textAlign:'right',color:filmPct==null?'#444':'#aaa',fontWeight:700}} title="Average of populated sources">{filmPct==null?'—':filmPct}</td>
                   <td style={{...cellStyle,textAlign:'right',fontWeight:900,color:'#FFD700',fontSize:14}}>{pfk}</td>
                   <td style={{...cellStyle,textAlign:'center'}}><button onClick={()=>removeRow(it.id)} style={{background:'transparent',border:'none',color:'#444',cursor:'pointer',fontSize:16}} title="Remove from model">×</button></td>
@@ -2725,7 +2773,7 @@ function RookieModelTab(){
         </table>
       </div>
       <div style={{marginTop:10,fontSize:11,color:'#555'}}>
-        PFK = 35% Stats + 50% Draft Capital + 15% Film. Film% = unweighted average of all film sources you have for that player (scales auto-normalized to 0-100). Click any number to edit. DC turns purple when manually overridden; × clears.
+        PFK = 35% Stats + 50% Draft Capital + 15% Film. Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize. Click any number to edit. Click the You chip to cycle —/IN/NTL/OUT. DC turns purple when manually overridden; × clears.
       </div>
     </div>
   );
