@@ -257,6 +257,24 @@ const DRAFT_2026 = {
   'kaelonblack':     {team:'SF',  pick:'3.26'},
   'chrisbell':       {team:'MIA', pick:'3.30'},
   'eliraridon':      {team:'NE',  pick:'3.31'},
+  // Round 4 (NFL.com 2026 draft tracker)
+  'brenenthompson':  {team:'LAC', pick:'4.05'},
+  'jonahcoleman':    {team:'DEN', pick:'4.08'},
+  'cadeklubnik':     {team:'NYJ', pick:'4.10'},
+  'elijahsarratt':   {team:'BAL', pick:'4.15'},
+  'kadenwetjen':     {team:'PIT', pick:'4.21'},
+  'mikewashington':  {team:'LV',  pick:'4.22'},
+  'skylerbell':      {team:'BUF', pick:'4.25'},
+  'matthewhibner':   {team:'BAL', pick:'4.33'},
+  'brycelance':      {team:'NO',  pick:'4.36'},
+  'colbieyoung':     {team:'CIN', pick:'4.40'},
+  // Round 5 (picks 1-28; rest pending)
+  'reggievirgil':    {team:'ARI', pick:'5.03'},
+  'justinjoly':      {team:'DEN', pick:'5.12'},
+  'emmettjohnson':   {team:'KC',  pick:'5.21'},
+  'tannerkoziol':    {team:'JAC', pick:'5.24'},
+  'nicholassingleton':{team:'TEN',pick:'5.25'},
+  'kendricklaw':     {team:'DET', pick:'5.28'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 
