@@ -1622,7 +1622,7 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects}){
+function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName}){
   const rowRefs = useRef({});
   const [draggingId,setDraggingId] = useState(null);
   const [insertBefore,setInsertBefore] = useState(null);
@@ -1633,15 +1633,25 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
   const normName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
   const hoverCapable = useMemo(()=>typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(hover:hover)').matches,[]);
   const [popover,setPopover] = useState(null);
-  const showProspect = (e,id,prospect)=>{
-    if(!prospect) return;
+  // Compute the PFK model breakdown for a player (or null if no model entry).
+  const modelBreakdown = (item) => {
+    const m = modelByName && modelByName[normName(item.name)];
+    if(!m) return null;
+    const dc = m.dcOverride!=null ? +m.dcOverride : dcScoreFromPick(m.pos||item.pos, m.pick);
+    const film = filmAvgPct(m.filmScores);
+    const base = pfkScore(m.stats, dc, film);
+    const pfk = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
+    return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk };
+  };
+  const showProspect = (e,id,prospect,model)=>{
+    if(!prospect && !model) return;
     const r=e.currentTarget.getBoundingClientRect();
     const vw=window.innerWidth, vh=window.innerHeight;
     const W=240;
     const x=Math.max(8,Math.min(r.left, vw-W-8));
     let y=r.bottom+6;
     if(y+300>vh) y=Math.max(8,r.top-306);
-    setPopover({id, prospect, x, y});
+    setPopover({id, prospect, model, x, y});
   };
   const hideProspect = ()=>setPopover(null);
 
@@ -1820,12 +1830,14 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:12,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
                 {(()=>{
                   const p=prospects&&prospects[normName(item.name)];
-                  const und=p?{textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#FFD70088',cursor:'help'}:{};
-                  const handlers=p?(hoverCapable?{
-                    onMouseEnter:e=>showProspect(e,item.id,p),
+                  const m=modelBreakdown(item);
+                  const triggerable = !!(p || m);
+                  const und=triggerable?{textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#FFD70088',cursor:'help'}:{};
+                  const handlers=triggerable?(hoverCapable?{
+                    onMouseEnter:e=>showProspect(e,item.id,p,m),
                     onMouseLeave:hideProspect
                   }:{
-                    onClick:e=>{e.stopPropagation();if(popover&&popover.id===item.id)setPopover(null);else showProspect(e,item.id,p);},
+                    onClick:e=>{e.stopPropagation();if(popover&&popover.id===item.id)setPopover(null);else showProspect(e,item.id,p,m);},
                     onPointerDown:e=>e.stopPropagation()
                   }):{};
                   return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
@@ -1838,6 +1850,9 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                   </span>
                 )}
                 <span style={{flex:1}}/>
+                {(()=>{ const m=modelBreakdown(item); return (
+                  <span title={m?`PFK: ${m.pfk}`:'No PFK score available'} style={{display:'inline-block',minWidth:44,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,textAlign:'right',flexShrink:0,marginRight:6}}>{m?m.pfk:'—'}</span>
+                ); })()}
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▼</button>
@@ -1855,14 +1870,36 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
       {popover&&(
         <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
           onClick={e=>e.stopPropagation()}>
-          <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
-          <div style={{fontWeight:900,fontSize:14,marginTop:8,color:'#FFD700'}}>{popover.prospect.name}</div>
-          <div style={{fontSize:13,color:'#888',marginTop:2}}>{popover.prospect.position} · {popover.prospect.college}</div>
-          <div style={{display:'flex',gap:14,marginTop:8,fontSize:14,flexWrap:'wrap'}}>
-            <div><span style={{color:'#555'}}>HT </span><span style={{fontWeight:700}}>{popover.prospect.height||'—'}</span></div>
-            <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
-            <div><span style={{color:'#555'}}>AGE </span><span style={{fontWeight:700}}>{popover.prospect.age!=null?popover.prospect.age:'—'}</span></div>
-          </div>
+          {popover.prospect&&(<>
+            <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
+            <div style={{fontWeight:900,fontSize:14,marginTop:8,color:'#FFD700'}}>{popover.prospect.name}</div>
+            <div style={{fontSize:13,color:'#888',marginTop:2}}>{popover.prospect.position} · {popover.prospect.college}</div>
+            <div style={{display:'flex',gap:14,marginTop:8,fontSize:14,flexWrap:'wrap'}}>
+              <div><span style={{color:'#555'}}>HT </span><span style={{fontWeight:700}}>{popover.prospect.height||'—'}</span></div>
+              <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
+              <div><span style={{color:'#555'}}>AGE </span><span style={{fontWeight:700}}>{popover.prospect.age!=null?popover.prospect.age:'—'}</span></div>
+            </div>
+          </>)}
+          {popover.model&&(()=>{
+            const m=popover.model;
+            const fmt=v=>v==null||isNaN(v)?'—':v;
+            const Row=({label,val,suffix=''})=>(
+              <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderTop:'1px solid #1a1a1a',fontSize:13}}>
+                <span style={{color:'#888',fontWeight:700,letterSpacing:0.5}}>{label}</span>
+                <span style={{color:'#ddd',fontWeight:800}}>{fmt(val)}{val!=null&&!isNaN(val)?suffix:''}</span>
+              </div>
+            );
+            return (
+              <div style={{marginTop:popover.prospect?12:0,paddingTop:popover.prospect?6:0}}>
+                {!popover.prospect&&<div style={{fontWeight:900,fontSize:14,color:'#FFD700',marginBottom:6}}>{popover.model.name||''}</div>}
+                <Row label="Stats" val={m.stats}/>
+                <Row label="Draft Capital" val={m.dc}/>
+                <Row label="Film" val={m.film}/>
+                <Row label="Landing" val={m.landing}/>
+                <Row label="PFK" val={m.pfk}/>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -2185,11 +2222,22 @@ function App(){
   const [pfkSettings,setPfkSettings]=useState(DEFAULT_SETTINGS);
   const [pfkMissing,setPfkMissing]=useState(false);
   const [prospects,setProspects]=useState({});
+  const [modelByName,setModelByName]=useState({});
 
   useEffect(()=>{
     fetch('js/prospects-2026.json').then(r=>r.json()).then(arr=>{
       const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
       const m={}; arr.forEach(p=>{m[norm(p.name)]=p;}); setProspects(m);
+    }).catch(()=>{});
+  },[]);
+
+  // Load PFK rookie model data once and index by normalized name for fast lookup.
+  useEffect(()=>{
+    fetchModelData().then(row=>{
+      if(!row?.data || !Array.isArray(row.data)) return;
+      const m={};
+      row.data.forEach(it=>{ if(it?.name) m[normDraftName(it.name)] = it; });
+      setModelByName(m);
     }).catch(()=>{});
   },[]);
   const [session,setSession]=useState(null);
@@ -2367,7 +2415,7 @@ function App(){
     </div>
   );
 
-  const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter};
+  const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter,modelByName};
 
   return(
     <div style={{background:"#080808",minHeight:"100vh",color:"#f0f0f0",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
