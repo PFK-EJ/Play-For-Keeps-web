@@ -318,6 +318,20 @@ const FILM_SOURCES = {
   zierlein: { label:'Zierlein', weight:20, kind:'numeric',     scaleHint:'5.0-7.5',
               toPct: v => v==null?null:Math.max(0,Math.min(100,(+v-5.0)/2.5*100)) },
 };
+// Landing-spot multiplier applied AFTER the weighted PFK score. Default unrated = 1.00 (no impact).
+// 1=worst → 0.92×, 5=best → 1.08×. Symmetric ±8% max swing.
+const LANDING_OPTIONS = [
+  {key:5, label:'5', mult:1.08, color:'#10b981'},
+  {key:4, label:'4', mult:1.04, color:'#84cc16'},
+  {key:3, label:'3', mult:1.00, color:'#94a3b8'},
+  {key:2, label:'2', mult:0.96, color:'#f59e0b'},
+  {key:1, label:'1', mult:0.92, color:'#ef4444'},
+];
+const landingMultiplier = (v) => {
+  if(v==null) return 1.00;
+  const opt = LANDING_OPTIONS.find(o=>o.key===+v);
+  return opt ? opt.mult : 1.00;
+};
 // Weighted average across populated sources; missing sources drop and weights re-normalize.
 const filmAvgPct = (filmScores) => {
   if(!filmScores || typeof filmScores!=='object') return null;
@@ -2569,7 +2583,10 @@ function RookieModelTab(){
 
   const computeDc = (it) => it.dcOverride!=null ? +it.dcOverride : dcScoreFromPick(it.pos, it.pick);
   const computeFilm = (it) => filmAvgPct(it.filmScores);
-  const computePfk = (it) => pfkScore(it.stats, computeDc(it), computeFilm(it));
+  const computePfk = (it) => {
+    const base = pfkScore(it.stats, computeDc(it), computeFilm(it));
+    return Math.round(base * landingMultiplier(it.landing) * 10) / 10;
+  };
 
   const filtered = (items||[]).filter(it=>posFilter==='ALL' || it.pos===posFilter);
   const sorted = [...filtered].sort((a,b)=>computePfk(b)-computePfk(a));
@@ -2588,6 +2605,7 @@ function RookieModelTab(){
     }
     if(field==='dc') return {...it, dcOverride: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
     if(field==='stats') return {...it, stats: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
+    if(field==='landing') return {...it, landing: val===''||val===null||val===undefined ? null : +val};
     if(field==='pick') return {...it, pick: val||null};
     return {...it, [field]: val};
   }));
@@ -2718,6 +2736,7 @@ function RookieModelTab(){
                 <th key={k} style={{...headStyle,width:75,textAlign: src.kind==='categorical'?'center':'right'}} title={`${src.label} (weight ${src.weight}%, raw scale ${src.scaleHint})`}>{src.label}<span style={{color:'#666',fontWeight:600,marginLeft:4}}>{src.weight}%</span></th>
               ))}
               <th style={{...headStyle,width:75,textAlign:'right',color:'#aaa'}} title="Average of all populated film sources, normalized to 0-100">Film%</th>
+              <th style={{...headStyle,width:75,textAlign:'center'}} title="Landing spot multiplier — 5=best (×1.08), 4 (×1.04), 3=neutral (×1.00), 2 (×0.96), 1=worst (×0.92). Default — = ×1.00 (no impact).">Landing</th>
               <th style={{...headStyle,width:75,textAlign:'right',color:'#FFD700'}}>PFK</th>
               <th style={{...headStyle,width:40}}></th>
             </tr>
@@ -2772,6 +2791,28 @@ function RookieModelTab(){
                     );
                   })}
                   <td style={{...cellStyle,textAlign:'right',color:filmPct==null?'#444':'#aaa',fontWeight:700}} title="Average of populated sources">{filmPct==null?'—':filmPct}</td>
+                  {(() => {
+                    const lopt = it.landing==null ? null : LANDING_OPTIONS.find(o=>o.key===+it.landing);
+                    return (
+                      <td style={{...cellStyle, textAlign:'center'}} title={`Landing multiplier ×${landingMultiplier(it.landing).toFixed(2)}`}>
+                        <select
+                          value={it.landing==null?'':String(it.landing)}
+                          onChange={e=>updateField(it.id,'landing',e.target.value||null)}
+                          style={{
+                            minWidth:50, padding:'3px 6px', borderRadius:4, cursor:'pointer',
+                            fontSize:11, fontWeight:900, letterSpacing:0.5, textAlign:'center',
+                            background: lopt ? lopt.color+'33' : '#0a0a0a',
+                            color: lopt ? lopt.color : '#666',
+                            border: '1px solid '+(lopt ? lopt.color : '#222'),
+                            appearance:'none', WebkitAppearance:'none', MozAppearance:'none',
+                          }}
+                        >
+                          <option value="">—</option>
+                          {LANDING_OPTIONS.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
+                        </select>
+                      </td>
+                    );
+                  })()}
                   <td style={{...cellStyle,textAlign:'right',fontWeight:900,color:'#FFD700',fontSize:14}}>{pfk}</td>
                   <td style={{...cellStyle,textAlign:'center'}}><button onClick={()=>removeRow(it.id)} style={{background:'transparent',border:'none',color:'#444',cursor:'pointer',fontSize:16}} title="Remove from model">×</button></td>
                 </tr>
@@ -2781,7 +2822,7 @@ function RookieModelTab(){
         </table>
       </div>
       <div style={{marginTop:10,fontSize:11,color:'#555'}}>
-        PFK = 35% Stats + 50% Draft Capital + 15% Film. Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize. Click any number to edit. Use the You dropdown to set —/IN/NTL/OUT. DC turns purple when manually overridden; × clears.
+        PFK = (35% Stats + 50% Draft Capital + 15% Film) × Landing multiplier. Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize. Landing: 5=best (×1.08) ... 1=worst (×0.92), — = ×1.00 (no impact). Click any number to edit. DC turns purple when manually overridden; × clears.
       </div>
     </div>
   );
