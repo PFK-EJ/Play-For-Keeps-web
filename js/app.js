@@ -82,8 +82,8 @@ const buildInitialList = () => {
     {id:"p17",name:"Eli Stowers",pos:"TE",age:23.3,college:"Vanderbilt",nflTeam:"ATL"},
     {id:"p18",name:"Max Klare",pos:"TE",age:23.2,college:"Ohio State",nflTeam:"PIT"},
     {id:"p19",name:"Emmett Johnson",pos:"RB",age:22.9,college:"Nebraska",nflTeam:"NO"},
-    {id:"p20",name:"Chris Bell",pos:"WR",age:22.3,college:"Louisville",nflTeam:"BUF"},
-    {id:"p21",name:"Chris Brazzell II",pos:"WR",age:22.3,college:"Tennessee",nflTeam:"ARI"},
+    {id:"p20",name:"Chris Bell",pos:"WR",age:22.3,college:"Louisville",nflTeam:"MIA"},
+    {id:"p21",name:"Chris Brazzell II",pos:"WR",age:22.3,college:"Tennessee",nflTeam:"CAR"},
     {id:"p22",name:"Nicholas Singleton",pos:"RB",age:22.7,college:"Penn State",nflTeam:"PHI"},
     {id:"p23",name:"Antonio Williams",pos:"WR",age:22.1,college:"Clemson",nflTeam:"WSH"},
     {id:"p24",name:"Germie Bernard",pos:"WR",age:22.8,college:"Alabama",nflTeam:"SEA"},
@@ -97,7 +97,7 @@ const buildInitialList = () => {
     {id:"p32",name:"Bryce Lance",pos:"WR",age:null,college:"N. Dakota St",nflTeam:"TBD"},
     {id:"p33",name:"CJ Daniels",pos:"WR",age:24.3,college:"Miami",nflTeam:"TBD"},
     {id:"p34",name:"Ja'Kobi Lane",pos:"WR",age:22.1,college:"USC",nflTeam:"BAL"},
-    {id:"p35",name:"Ted Hurst",pos:"WR",age:null,college:"Georgia State",nflTeam:"TBD"},
+    {id:"p35",name:"Ted Hurst",pos:"WR",age:null,college:"Georgia State",nflTeam:"TB"},
     {id:"p36",name:"Tanner Koziol",pos:"TE",age:null,college:"Houston",nflTeam:"TBD"},
     {id:"p37",name:"Kevin Coleman Jr.",pos:"WR",age:null,college:"Missouri",nflTeam:"TBD"},
     {id:"p38",name:"Seth McGowan",pos:"RB",age:null,college:"Kentucky",nflTeam:"TBD"},
@@ -183,6 +183,9 @@ const DRAFT_2026 = {
   'drewallar':       {team:'PIT', pick:'3.12'},
   'zachariahbranch': {team:'ATL', pick:'3.15'},
   'jakobilane':      {team:'BAL', pick:'3.16'},
+  'chrisbrazzellii': {team:'CAR', pick:'3.19'},
+  'tedhurst':        {team:'TB',  pick:'3.20'},
+  'chrisbell':       {team:'MIA', pick:'3.30'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 const POS_TIER_BANDS = [
