@@ -36,6 +36,30 @@ const publishOfficialRankings = async (items, settings) => {
   const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings });
   return { error };
 };
+// Rookie model storage — sentinel row in pfk_rankings keyed by settings.kind === 'rookie_model'.
+const MODEL_SETTINGS = { kind:'rookie_model' };
+const isModelSettings = s => s && s.kind === 'rookie_model';
+const fetchModelData = async () => {
+  if(!sb) return null;
+  try{
+    const { data } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
+    if(!data?.length) return null;
+    return data.find(r=>isModelSettings(r.settings)) || null;
+  }catch{ return null; }
+};
+const saveModelData = async (items) => {
+  if(!sb) return { error:'Supabase not loaded' };
+  const { data:userData } = await sb.auth.getUser();
+  const email = userData?.user?.email || 'PFK Staff';
+  const { data:existing } = await sb.from('pfk_rankings').select('id,settings').order('updated_at',{ascending:false});
+  const match = (existing||[]).find(r=>isModelSettings(r.settings));
+  if(match){
+    const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings:MODEL_SETTINGS }).eq('id',match.id);
+    return { error };
+  }
+  const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings:MODEL_SETTINGS });
+  return { error };
+};
 
 function SettingsToggleBar({value,onChange,compact}){
   const Group = ({label,choices,suffix,current,field})=>(
@@ -204,6 +228,91 @@ const DRAFT_2026 = {
   'eliraridon':      {team:'NE',  pick:'3.31'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+
+// PFK Rookie Model — admin-only, dev-page tab.
+// Composite score: 0.35*stats + 0.50*draftCapital + 0.15*film, all on 0-100 scale.
+const PFK_WEIGHTS = { stats:0.35, dc:0.50, film:0.15 };
+// Per-position draft capital tier anchors. abs = (round-1)*32 + slot (compensatory clamped to 32).
+// Linear interpolation between adjacent anchors. udfa = score for undrafted players.
+const DC_TIERS = {
+  QB: { udfa:2, anchors:[
+    {abs:1,score:100},{abs:6,score:85},{abs:16,score:70},
+    {abs:33,score:45},{abs:65,score:25},{abs:97,score:18},
+    {abs:129,score:12},{abs:161,score:8},{abs:193,score:5},
+  ]},
+  RB: { udfa:6, anchors:[
+    {abs:1,score:100},{abs:11,score:92},{abs:21,score:82},
+    {abs:33,score:70},{abs:49,score:60},{abs:65,score:52},
+    {abs:81,score:42},{abs:97,score:30},{abs:129,score:20},
+    {abs:161,score:14},{abs:193,score:9},
+  ]},
+  WR: { udfa:4, anchors:[
+    {abs:1,score:100},{abs:6,score:92},{abs:11,score:82},
+    {abs:21,score:72},{abs:33,score:60},{abs:49,score:52},
+    {abs:65,score:40},{abs:81,score:32},{abs:97,score:18},
+    {abs:129,score:13},{abs:161,score:9},{abs:193,score:6},
+  ]},
+  TE: { udfa:2, anchors:[
+    {abs:1,score:100},{abs:16,score:88},{abs:33,score:52},
+    {abs:49,score:42},{abs:65,score:35},{abs:81,score:27},
+    {abs:97,score:17},{abs:129,score:12},{abs:161,score:8},{abs:193,score:5},
+  ]},
+};
+const pickToAbs = pickStr => {
+  if(!pickStr || pickStr==='UDFA') return null;
+  const m = String(pickStr).match(/^(\d+)\.(\d+)/);
+  if(!m) return null;
+  const r = +m[1], s = Math.min(+m[2], 32);
+  return (r-1)*32 + s;
+};
+const dcScoreFromPick = (pos, pickStr) => {
+  const tier = DC_TIERS[pos]; if(!tier) return 0;
+  const abs = pickToAbs(pickStr);
+  if(abs===null) return tier.udfa;
+  const a = tier.anchors;
+  if(abs <= a[0].abs) return a[0].score;
+  for(let i=0; i<a.length-1; i++){
+    if(abs >= a[i].abs && abs < a[i+1].abs){
+      const t = (abs - a[i].abs) / (a[i+1].abs - a[i].abs);
+      return Math.round((a[i].score + t*(a[i+1].score - a[i].score))*10)/10;
+    }
+  }
+  return a[a.length-1].score;
+};
+const pfkScore = (stats, dc, film) => {
+  const s = +stats||0, d = +dc||0, f = +film||0;
+  return Math.round((PFK_WEIGHTS.stats*s + PFK_WEIGHTS.dc*d + PFK_WEIGHTS.film*f)*10)/10;
+};
+// Pre-Draft percentile × 100 from 2026 Data Models (QB/RB/WR/TE xlsx, 2026 only).
+const BAKED_STATS_PCT = {
+  // QB
+  fernandomendoza:70.0, carsonbeck:60.6, trinidadchambliss:64.3,
+  drewallar:39.0, garrettnussmeier:37.1, tysimpson:30.5,
+  // RB
+  jeremiyahlove:99.4, nicholassingleton:87.6, jonahcoleman:80.1,
+  kaytronallen:56.5, emmettjohnson:55.9, jadarianprice:39.8,
+  demondclaiborne:27.3, adamrandall:7.5, mikewashington:5.0, jamarionmiller:3.7,
+  // WR
+  jordyntyson:96.5, makailemon:89.0, carnelltate:88.0, kcconcepcion:87.0,
+  denzelboston:77.5, elijahsarratt:72.0, antoniowilliams:64.5, zachariahbranch:64.0,
+  chrisbrazzellii:58.5, chrisbell:59.0, omarcooperjr:57.5, germiebernard:51.0,
+  cjdaniels:46.5, malachifields:39.5, jakobilane:34.0, brenenthompson:22.0,
+  deionburks:15.5, skylerbell:15.0,
+  // TE
+  maxklare:76.2, kenyonsadiq:74.3, jackendries:70.5, elistowers:69.5,
+  joeroyer:47.6, dallenbentley:41.0, samroush:36.2, oscardelp:21.0,
+};
+// Film percentiles from Dynasty Zoltan Premium screenshots, 2026-04-25.
+const BAKED_FILM_PCT = {
+  jeremiyahlove:91, makailemon:91, kcconcepcion:93, carnelltate:88,
+  omarcooperjr:92, fernandomendoza:57, jordyntyson:77, denzelboston:85,
+  kenyonsadiq:91, emmettjohnson:88, chrisbrazzellii:75, elistowers:57,
+  zachariahbranch:81, jonahcoleman:45, jadarianprice:28, tysimpson:43,
+  kaytronallen:61, michaeltrigg:75, elijahsarratt:51, chrisbell:45,
+  antoniowilliams:49, jakobilane:53, nicholassingleton:35, germiebernard:47,
+  mikewashington:24, maxklare:40, brycelance:42, tedhurst:43,
+  demondclaiborne:13, roberthenryjr:19, skylerbell:19,
+};
 const POS_TIER_BANDS = [
   {max:5,   key:'Elite', color:'#FFD700'},
   {max:12,  key:'T1',    color:'#c084fc'},
@@ -2328,6 +2437,219 @@ function App(){
   );
 }
 
+// PFK Rookie Model — admin-only tab. One sortable table across all positions.
+// Each row: name, pos, stats% (editable), draft capital (auto from pick / overridable), film% (editable), PFK score (computed).
+function RookieModelTab(){
+  const [items,setItems]=useState(null); // null = loading
+  const [savedJson,setSavedJson]=useState('');
+  const [posFilter,setPosFilter]=useState('ALL');
+  const [showAdd,setShowAdd]=useState(false);
+  const [newP,setNewP]=useState({name:'',pos:'WR',pick:''});
+  const [msg,setMsg]=useState('');
+  const [editing,setEditing]=useState(null); // {id, field}
+  const [editVal,setEditVal]=useState('');
+
+  // Build initial model from current default-combo roster + DRAFT_2026 + baked maps.
+  const buildFromRoster = useCallback(async()=>{
+    const row = await fetchOfficialRankings(DEFAULT_SETTINGS);
+    const roster = (row?.data||[]).filter(it=>it.type==='player');
+    return roster.filter(p=>['QB','RB','WR','TE'].includes(p.pos)).map(p=>{
+      const k = normDraftName(p.name);
+      const draft = DRAFT_2026[k] || null;
+      return {
+        id: p.id || ('m_'+Date.now()+Math.random().toString(36).slice(2,6)),
+        name: p.name, pos: p.pos,
+        pick: draft?.pick || null,
+        team: draft?.team || null,
+        stats: BAKED_STATS_PCT[k] ?? null,
+        film: BAKED_FILM_PCT[k] ?? null,
+        dcOverride: null,
+      };
+    });
+  },[]);
+
+  useEffect(()=>{
+    (async()=>{
+      const row = await fetchModelData();
+      if(row && Array.isArray(row.data) && row.data.length){
+        setItems(row.data);
+        setSavedJson(JSON.stringify(row.data));
+      }else{
+        const seeded = await buildFromRoster();
+        setItems(seeded);
+        // auto-save initial seed so it persists
+        const { error } = await saveModelData(seeded);
+        if(!error) setSavedJson(JSON.stringify(seeded));
+      }
+    })();
+  },[buildFromRoster]);
+
+  // Debounced auto-save
+  useEffect(()=>{
+    if(items===null) return;
+    const cur = JSON.stringify(items);
+    if(cur===savedJson) return;
+    const t = setTimeout(async()=>{
+      setMsg('Saving...');
+      const { error } = await saveModelData(items);
+      if(error){ setMsg('Save error: '+(error.message||error)); }
+      else{ setSavedJson(cur); setMsg('Saved ✓'); setTimeout(()=>setMsg(''),1200); }
+    },800);
+    return ()=>clearTimeout(t);
+  },[items,savedJson]);
+
+  const computeDc = (it) => it.dcOverride!=null ? +it.dcOverride : dcScoreFromPick(it.pos, it.pick);
+  const computePfk = (it) => pfkScore(it.stats, computeDc(it), it.film);
+
+  const filtered = (items||[]).filter(it=>posFilter==='ALL' || it.pos===posFilter);
+  const sorted = [...filtered].sort((a,b)=>computePfk(b)-computePfk(a));
+
+  const updateField = (id,field,val) => setItems(prev=>prev.map(it=>{
+    if(it.id!==id) return it;
+    if(field==='dc') return {...it, dcOverride: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
+    if(field==='stats'||field==='film') return {...it, [field]: val===''||val===null ? null : Math.max(0,Math.min(100,+val))};
+    if(field==='pick') return {...it, pick: val||null};
+    return {...it, [field]: val};
+  }));
+
+  const removeRow = (id) => { if(!confirm('Remove this player from the model?')) return; setItems(prev=>prev.filter(it=>it.id!==id)); };
+
+  const addRow = () => {
+    if(!newP.name.trim()) return;
+    const k = normDraftName(newP.name);
+    const draft = newP.pick ? null : (DRAFT_2026[k]||null);
+    const it = {
+      id:'m_'+Date.now(),
+      name:newP.name.trim(), pos:newP.pos,
+      pick: newP.pick || draft?.pick || null,
+      team: draft?.team || null,
+      stats: BAKED_STATS_PCT[k] ?? null,
+      film: BAKED_FILM_PCT[k] ?? null,
+      dcOverride: null,
+    };
+    setItems(prev=>[...(prev||[]), it]);
+    setNewP({name:'',pos:'WR',pick:''});
+    setShowAdd(false);
+  };
+
+  const reseed = async() => {
+    if(!confirm('Rebuild the model from the current rookie roster? Edits to existing players will be kept; new players will be added with baked stats/film if available.')) return;
+    const seeded = await buildFromRoster();
+    setItems(prev=>{
+      const byKey = new Map((prev||[]).map(it=>[normDraftName(it.name), it]));
+      return seeded.map(s=>{
+        const existing = byKey.get(normDraftName(s.name));
+        return existing ? {...s, stats:existing.stats, film:existing.film, dcOverride:existing.dcOverride, id:existing.id} : s;
+      });
+    });
+  };
+
+  if(items===null) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading model...</div>;
+
+  const cellStyle = {padding:'8px 10px', borderBottom:'1px solid #1a1a1a', fontSize:13, color:'#ddd'};
+  const headStyle = {padding:'10px 10px', background:'#0c0c0c', borderBottom:'2px solid #FFD700', fontSize:11, color:'#FFD700', fontWeight:800, letterSpacing:1, textAlign:'left', position:'sticky', top:0};
+  const numCellStyle = {...cellStyle, textAlign:'right', cursor:'pointer'};
+  const editInputStyle = {width:60, padding:'4px 6px', background:'#000', border:'1px solid #FFD700', borderRadius:4, color:'#fff', fontSize:13, textAlign:'right'};
+  const POS_COLOR = {QB:'#ef4444', RB:'#10b981', WR:'#3b82f6', TE:'#f59e0b'};
+
+  const startEdit = (id,field,cur) => { setEditing({id,field}); setEditVal(cur==null?'':String(cur)); };
+  const commitEdit = () => {
+    if(!editing) return;
+    updateField(editing.id, editing.field, editVal);
+    setEditing(null); setEditVal('');
+  };
+  const cancelEdit = () => { setEditing(null); setEditVal(''); };
+
+  const renderNum = (it,field,val,suffix='') => {
+    const isEdit = editing && editing.id===it.id && editing.field===field;
+    if(isEdit) return (
+      <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+        onKeyDown={e=>{if(e.key==='Enter')commitEdit(); else if(e.key==='Escape')cancelEdit();}}
+        onBlur={commitEdit} style={editInputStyle}/>
+    );
+    return <span onClick={()=>startEdit(it.id,field,val)} style={{display:'inline-block',minWidth:36,padding:'2px 4px',borderRadius:3}} title="Click to edit">{val==null?'—':val+suffix}</span>;
+  };
+
+  return (
+    <div style={{padding:'12px 16px'}}>
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
+        <span style={{fontSize:12,color:'#888',marginRight:6}}>FILTER</span>
+        {['ALL','QB','RB','WR','TE'].map(p=>(
+          <button key={p} onClick={()=>setPosFilter(p)} style={{
+            padding:'5px 12px', borderRadius:14, fontSize:12, fontWeight:800, cursor:'pointer',
+            background: posFilter===p ? '#FFD700' : 'transparent',
+            color: posFilter===p ? '#000' : '#888',
+            border: '1px solid '+(posFilter===p ? '#FFD700' : '#333'),
+          }}>{p}</button>
+        ))}
+        <span style={{flex:1}}/>
+        <button onClick={()=>setShowAdd(s=>!s)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Player</button>
+        <button onClick={reseed} style={{padding:'6px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13,fontWeight:700}} title="Pull any new rookies from the roster into the model">↻ Sync roster</button>
+        {msg && <span style={{fontSize:12,color: msg.startsWith('Save error')?'#ef4444':'#10b981',marginLeft:8}}>{msg}</span>}
+      </div>
+      {showAdd && (
+        <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #222',borderRadius:8,marginBottom:12,display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:3,minWidth:160}}>
+            <label style={{fontSize:11,color:'#888'}}>NAME</label>
+            <input autoFocus value={newP.name} onChange={e=>setNewP({...newP,name:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addRow()} placeholder="Player name" style={{padding:'7px 9px',background:'#000',border:'1px solid #333',borderRadius:5,color:'#fff',fontSize:13}}/>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:3}}>
+            <label style={{fontSize:11,color:'#888'}}>POS</label>
+            <select value={newP.pos} onChange={e=>setNewP({...newP,pos:e.target.value})} style={{padding:'7px 9px',background:'#000',border:'1px solid #333',borderRadius:5,color:'#fff',fontSize:13}}>{['QB','RB','WR','TE'].map(o=><option key={o}>{o}</option>)}</select>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:3}}>
+            <label style={{fontSize:11,color:'#888'}}>PICK (optional, e.g. 3.05)</label>
+            <input value={newP.pick} onChange={e=>setNewP({...newP,pick:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addRow()} placeholder="leave blank for UDFA" style={{padding:'7px 9px',background:'#000',border:'1px solid #333',borderRadius:5,color:'#fff',fontSize:13,width:160}}/>
+          </div>
+          <button onClick={addRow} style={{padding:'8px 14px',background:'#FFD700',color:'#000',border:'none',borderRadius:5,fontWeight:900,cursor:'pointer',fontSize:13}}>Add</button>
+          <button onClick={()=>setShowAdd(false)} style={{padding:'8px 10px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:13}}>Cancel</button>
+        </div>
+      )}
+      <div style={{overflowX:'auto',border:'1px solid #1a1a1a',borderRadius:8}}>
+        <table style={{width:'100%',borderCollapse:'collapse',background:'#0a0a0a'}}>
+          <thead>
+            <tr>
+              <th style={{...headStyle,width:50,textAlign:'center'}}>#</th>
+              <th style={headStyle}>Player</th>
+              <th style={{...headStyle,width:50,textAlign:'center'}}>Pos</th>
+              <th style={{...headStyle,width:80}}>Pick</th>
+              <th style={{...headStyle,width:80,textAlign:'right'}}>Stats%</th>
+              <th style={{...headStyle,width:80,textAlign:'right'}}>DC</th>
+              <th style={{...headStyle,width:80,textAlign:'right'}}>Film%</th>
+              <th style={{...headStyle,width:80,textAlign:'right',color:'#FFD700'}}>PFK</th>
+              <th style={{...headStyle,width:40}}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((it,i)=>{
+              const dc = computeDc(it);
+              const pfk = computePfk(it);
+              const dcOverridden = it.dcOverride!=null;
+              return (
+                <tr key={it.id} style={{background:i%2?'#0d0d0d':'#0a0a0a'}}>
+                  <td style={{...cellStyle,textAlign:'center',color:'#666',fontWeight:700}}>{i+1}</td>
+                  <td style={cellStyle}>{it.name}{it.team?<span style={{color:'#666',fontWeight:600,marginLeft:6,fontSize:11}}>{it.team}</span>:null}</td>
+                  <td style={{...cellStyle,textAlign:'center'}}><span style={{display:'inline-block',padding:'2px 6px',borderRadius:4,background:POS_COLOR[it.pos]+'33',color:POS_COLOR[it.pos],fontWeight:800,fontSize:11}}>{it.pos}</span></td>
+                  <td style={cellStyle}>{it.pick||'UDFA'}</td>
+                  <td style={numCellStyle}>{renderNum(it,'stats',it.stats)}</td>
+                  <td style={{...numCellStyle,color: dcOverridden?'#c084fc':'#ddd'}} title={dcOverridden?'Manual override (click to edit / clear)':'Auto from pick (click to override)'}>
+                    {renderNum(it,'dc', dcOverridden?it.dcOverride:dc)}
+                    {dcOverridden && <button onClick={(e)=>{e.stopPropagation(); updateField(it.id,'dc','');}} style={{marginLeft:4,background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:11}} title="Clear override">×</button>}
+                  </td>
+                  <td style={numCellStyle}>{renderNum(it,'film',it.film)}</td>
+                  <td style={{...cellStyle,textAlign:'right',fontWeight:900,color:'#FFD700',fontSize:14}}>{pfk}</td>
+                  <td style={{...cellStyle,textAlign:'center'}}><button onClick={()=>removeRow(it.id)} style={{background:'transparent',border:'none',color:'#444',cursor:'pointer',fontSize:16}} title="Remove from model">×</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{marginTop:10,fontSize:11,color:'#555'}}>PFK = 35% Stats + 50% Draft Capital + 15% Film. Click any number to edit. DC is auto-computed from pick + position tier; click to override (purple), × to clear.</div>
+    </div>
+  );
+}
+
 function AdminApp(){
   const [session,setSession]=useState(null);
   const [email,setEmail]=useState('');
@@ -2344,6 +2666,7 @@ function AdminApp(){
   const [adminSettings,setAdminSettings]=useState(DEFAULT_SETTINGS);
   const [showAddPlayer,setShowAddPlayer]=useState(false);
   const [newP,setNewP]=useState({name:'',pos:'WR',college:''});
+  const [adminTab,setAdminTab]=useState('rankings'); // 'rankings' | 'model'
 
   const sigOf=s=>`${s.format||'Superflex'}|${s.tep}|${s.ppr}|${s.passTd}|${s.ppc}`;
   const currentSig=sigOf(adminSettings);
@@ -2520,15 +2843,27 @@ function AdminApp(){
           <div style={{fontSize:12,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
         </div>
         <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
-          <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
-          <button onClick={copyToAllCombos} style={{padding:'8px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:14,fontWeight:700}} title="Overwrite this list into every settings combo">⇢ Copy to all combos</button>
-          <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
-          <button onClick={publish} disabled={!dirtyCount} style={{padding:'8px 16px',background:dirtyCount?'#FFD700':'#333',color:dirtyCount?'#000':'#888',border:'none',borderRadius:6,fontWeight:900,cursor:dirtyCount?'pointer':'not-allowed',fontSize:14,letterSpacing:1}}>{`PUBLISH${dirtyCount?` (${dirtyCount})`:''}`}</button>
+          {adminTab==='rankings' && <>
+            <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
+            <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
+            <button onClick={copyToAllCombos} style={{padding:'8px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:14,fontWeight:700}} title="Overwrite this list into every settings combo">⇢ Copy to all combos</button>
+            <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
+            <button onClick={publish} disabled={!dirtyCount} style={{padding:'8px 16px',background:dirtyCount?'#FFD700':'#333',color:dirtyCount?'#000':'#888',border:'none',borderRadius:6,fontWeight:900,cursor:dirtyCount?'pointer':'not-allowed',fontSize:14,letterSpacing:1}}>{`PUBLISH${dirtyCount?` (${dirtyCount})`:''}`}</button>
+          </>}
           <button onClick={logout} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:14}}>Sign out</button>
         </div>
       </div>
       {publishMsg&&<div style={{padding:'8px 16px',background:publishMsg.startsWith('Error')?'#3a1010':'#103a10',color:publishMsg.startsWith('Error')?'#ef4444':'#10b981',fontSize:14,fontWeight:700}}>{publishMsg}</div>}
+      <div style={{display:'flex',gap:0,background:'#080808',borderBottom:'1px solid #222',padding:'0 16px'}}>
+        {[['rankings','RANKINGS'],['model','ROOKIE MODEL']].map(([k,label])=>(
+          <button key={k} onClick={()=>setAdminTab(k)} style={{
+            padding:'10px 18px', background:'transparent', border:'none',
+            borderBottom: adminTab===k ? '2px solid #FFD700' : '2px solid transparent',
+            color: adminTab===k ? '#FFD700' : '#666', fontWeight:800, fontSize:13, letterSpacing:1.5, cursor:'pointer',
+          }}>{label}</button>
+        ))}
+      </div>
+      {adminTab==='model' ? <RookieModelTab/> : (<>
       <div style={{padding:'12px 16px',background:'#0a0a0a',borderBottom:'1px solid #222'}}>
         <div style={{fontSize:12,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
         <SettingsToggleBar value={adminSettings} onChange={setAdminSettings}/>
@@ -2555,6 +2890,7 @@ function AdminApp(){
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
         <RenderList src={list} allowEdit={true} {...commonProps}/>
       </div>
+      </>)}
     </div>
   );
 }
