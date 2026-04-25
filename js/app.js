@@ -1628,8 +1628,6 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
   const [insertBefore,setInsertBefore] = useState(null);
   const [ghostPos,setGhostPos] = useState({x:0,y:0});
   const [ghostOff,setGhostOff] = useState({x:0,y:0});
-  const fl = posFilter.size>=4?src:src.filter(x=>x.type==="tier"||posFilter.has(x.pos));
-
   const normName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
   const hoverCapable = useMemo(()=>typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(hover:hover)').matches,[]);
   const [popover,setPopover] = useState(null);
@@ -1643,6 +1641,28 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
     const pfk = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
     return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk };
   };
+  // Read-only views (public rankings) sort players by PFK desc within each tier.
+  // Editable views keep the user's manual ordering.
+  const sortedSrc = useMemo(()=>{
+    if(allowEdit) return src;
+    const out=[]; let bucket=[];
+    const flush = () => {
+      bucket.sort((a,b)=>{
+        const ma=modelBreakdown(a), mb=modelBreakdown(b);
+        const pa = ma && ma.pfk!=null ? ma.pfk : -1;
+        const pb = mb && mb.pfk!=null ? mb.pfk : -1;
+        return pb - pa;
+      });
+      out.push(...bucket); bucket=[];
+    };
+    for(const x of src){
+      if(x.type==='tier'){ flush(); out.push(x); }
+      else bucket.push(x);
+    }
+    flush();
+    return out;
+  },[src,allowEdit,modelByName]);
+  const fl = posFilter.size>=4?sortedSrc:sortedSrc.filter(x=>x.type==="tier"||posFilter.has(x.pos));
   const showProspect = (e,id,prospect,model)=>{
     if(!prospect && !model) return;
     const r=e.currentTarget.getBoundingClientRect();
@@ -1786,7 +1806,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
             </React.Fragment>
           );
         }
-        const pidx=getPlayerIndex(item.id,src),slot=slotLabel(pidx),tname=getPlayerTier(item.id,src),col=getTierColor(tname,src),isEd=editingPlayer===item.id;
+        const pidx=getPlayerIndex(item.id,sortedSrc),slot=slotLabel(pidx),tname=getPlayerTier(item.id,sortedSrc),col=getTierColor(tname,sortedSrc),isEd=editingPlayer===item.id;
         const draftInfo = DRAFT_2026[normDraftName(item.name)] || null;
         if(isEd)return(
           <React.Fragment key={item.id}>
@@ -1851,7 +1871,10 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                 )}
                 <span style={{flex:1}}/>
                 {(()=>{ const m=modelBreakdown(item); return (
-                  <span title={m?`PFK: ${m.pfk}`:'No PFK score available'} style={{display:'inline-block',minWidth:44,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,textAlign:'right',flexShrink:0,marginRight:6}}>{m?m.pfk:'—'}</span>
+                  <span title={m?`PFK score: ${m.pfk}`:'No PFK score available'} style={{display:'inline-flex',alignItems:'baseline',gap:4,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),flexShrink:0,marginRight:6}}>
+                    <span style={{fontSize:10,fontWeight:800,color:'#888',letterSpacing:1}}>PFK</span>
+                    <span style={{color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
+                  </span>
                 ); })()}
                 {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
@@ -1892,11 +1915,11 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
             return (
               <div style={{marginTop:popover.prospect?12:0,paddingTop:popover.prospect?6:0}}>
                 {!popover.prospect&&<div style={{fontWeight:900,fontSize:14,color:'#FFD700',marginBottom:6}}>{popover.model.name||''}</div>}
-                <Row label="Stats" val={m.stats}/>
-                <Row label="Draft Capital" val={m.dc}/>
-                <Row label="Film" val={m.film}/>
-                <Row label="Landing" val={m.landing}/>
-                <Row label="PFK" val={m.pfk}/>
+                <Row label="Stats Score" val={m.stats}/>
+                <Row label="DC Score" val={m.dc}/>
+                <Row label="Film Score" val={m.film}/>
+                <Row label="Landing Spot Score" val={m.landing}/>
+                <Row label="PFK Score" val={m.pfk}/>
               </div>
             );
           })()}
