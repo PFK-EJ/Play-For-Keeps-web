@@ -117,6 +117,7 @@ const buildInitialList = () => {
     {id:"p52",name:"Le'Veon Moss",pos:"RB",age:null,college:"Texas A&M",nflTeam:"TBD"},
     {id:"p53",name:"Mike Washington",pos:"RB",age:24.5,college:"Arkansas",nflTeam:"TBD"},
     {id:"p54",name:"Jamarion Miller",pos:"RB",age:22.4,college:"Alabama",nflTeam:"TBD"},
+    {id:"p55",name:"De'Zhaun Stribling",pos:"WR",age:null,college:"Mississippi",nflTeam:"SF"},
   ];
   const tierBreaks = {0:0,1:1,2:2,3:3,5:4,9:5,11:6,15:7,22:8,36:9};
   const list = [];
@@ -170,6 +171,7 @@ const DRAFT_2026 = {
   'kcconcepcion':    {team:'CLE', pick:'1.24'},
   'omarcooperjr':    {team:'NYJ', pick:'1.30'},
   'jadarianprice':   {team:'SEA', pick:'1.32'},
+  'dezhaunstribling':{team:'SF',  pick:'2.01'},
   'denzelboston':    {team:'CLE', pick:'2.07'},
   'germiebernard':   {team:'PIT', pick:'2.15'},
   'elistowers':      {team:'PHI', pick:'2.22'},
