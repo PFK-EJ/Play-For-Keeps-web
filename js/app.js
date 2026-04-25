@@ -357,20 +357,39 @@ const BAKED_FILM_ZOLTAN = {
   mikewashington:24, maxklare:40, brycelance:42, tedhurst:43,
   demondclaiborne:13, roberthenryjr:19, skylerbell:19,
 };
+// All Zierlein grades from nfl.com/draft/tracker/2026/prospects/{pos}_all (2026-04-25).
+// Aliases included for known PFK-board name variants (e.g. "Jam Miller" → "Jamarion Miller").
 const BAKED_FILM_ZIERLEIN = {
   // QB
-  fernandomendoza:6.73, tysimpson:6.30, carsonbeck:6.14, garrettnussmeier:6.00, drewallar:5.98,
+  fernandomendoza:6.73, tysimpson:6.30, carsonbeck:6.14, garrettnussmeier:6.00,
+  taylengreen:6.00, drewallar:5.98, cadeklubnik:5.96, diegopavia:5.95,
+  joeyaguilar:5.95, colepayton:5.91, sawyerrobertson:5.85, haynesking:5.80,
+  behrenmorton:5.68, lukealtmyer:5.68, jalondaniels:5.66, joefagnano:5.66,
   // RB
-  jeremiyahlove:6.73, jadarianprice:6.38, mikewashington:6.24, adamrandall:6.13,
-  demondclaiborne:6.10, leveonmoss:6.10, emmettjohnson:6.00, nicholassingleton:6.00,
-  rahsulfaison:6.00, jmaritaylor:5.99, kaytronallen:5.97, sethmcgowan:5.97,
-  jonahcoleman:5.94, desmondreid:5.92, eliheidenreich:5.86,
-  jamarionmiller:5.69, jaydnott:5.69, kaelonblack:5.69, roberthenryjr:5.69,
+  jeremiyahlove:6.73, jadarianprice:6.38, mikewashington:6.24, mikewashingtonjr:6.24,
+  adamrandall:6.13, demondclaiborne:6.10, leveonmoss:6.10, emmettjohnson:6.00,
+  nicholassingleton:6.00, rahsulfaison:6.00, jmaritaylor:5.99, romanhemby:5.98,
+  kaytronallen:5.97, sethmcgowan:5.97, jonahcoleman:5.94, desmondreid:5.92,
+  eliheidenreich:5.86, chiptrayanum:5.85, deamontetrayanum:5.85, cjdonaldson:5.82,
+  aljayhenderson:5.69, davonbooth:5.69, jammiller:5.69, jamarionmiller:5.69,
+  jaydnott:5.69, jadynott:5.69, kaelonblack:5.69, noahwhittington:5.69, roberthenryjr:5.69,
+  barikakpeenu:5.68, deanconnors:5.67, kentrelbullock:5.67, jamalhaynes:5.65, samscott:5.65,
   // WR
   carnelltate:6.71, makailemon:6.47, jordyntyson:6.43, kcconcepcion:6.42,
   denzelboston:6.40, omarcooperjr:6.39, chrisbrazzellii:6.36, zachariahbranch:6.32,
-  skylerbell:6.31, germiebernard:6.29,
-  // TE (NFL.com /draft/tracker/2026/prospects/te_all)
+  skylerbell:6.31, germiebernard:6.29, dezhaunstribling:6.28, malachifields:6.27,
+  antoniowilliams:6.26, chrisbell:6.24, jakobilane:6.20, elijahsarratt:6.19,
+  tedhurst:6.19, cyrusallen:6.18, deionburks:6.18, brycelance:6.17,
+  jmichaelsturdivant:6.10, jeffcaldwell:6.00, joshcameron:6.00, malikbenson:6.00,
+  kevincolemanjr:5.99, reggievirgil:5.99, kadenwetjen:5.98,
+  ericmcalister:5.97, ericmccalister:5.97,
+  colbieyoung:5.96, calebdouglas:5.95, kendricklaw:5.95, dillonbell:5.94,
+  brenenthompson:5.89, emmanuelhendersonjr:5.88, zavionthomas:5.87, barionbrown:5.86,
+  ericrivers:5.86, harrisonwallaceiii:5.85, cjdaniels:5.84, jalenwalthall:5.83,
+  jordanhudson:5.81, camdenbrown:5.80, chaseroberts:5.80, danielsobkowicz:5.80,
+  dtsheffield:5.69, tyrenmontgomery:5.69, vinnyanthonyii:5.69,
+  bradyboyd:5.68, caullinlacy:5.68, chrishiltonjr:5.68, aaronanderson:5.67,
+  // TE
   kenyonsadiq:6.46, maxklare:6.30, samroush:6.26, elistowers:6.24,
   nateboerkircher:6.17, justinjoly:6.16, eliraridon:6.14, jackendries:6.13,
   oscardelp:6.13, joeroyer:6.12, willkacmarek:6.12, marlinklein:6.10,
