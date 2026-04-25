@@ -1729,7 +1729,12 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings}){
+function RenderList({src,allowEdit,autoTier,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings}){
+  // autoTier defaults to !allowEdit. Pass autoTier={true} explicitly with allowEdit={true}
+  // to get edit-capable rows that still group by PFK tiers (admin rankings preview).
+  if(autoTier===undefined) autoTier = !allowEdit;
+  // Drag-drop reorder is only meaningful when not auto-tiering.
+  const allowDrag = allowEdit && !autoTier;
   const rowRefs = useRef({});
   const [draggingId,setDraggingId] = useState(null);
   const [insertBefore,setInsertBefore] = useState(null);
@@ -1757,11 +1762,11 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
       : Math.round(baseline * comboMultiplier(pos, pfkSettings) * 10) / 10;
     return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk, baseline, isOverride: override!=null };
   };
-  // Read-only views: dynamic per-class auto-tiering by PFK gaps + position targets.
+  // Auto-tier views: dynamic per-class auto-tiering by PFK gaps + position targets.
   // Tier names come from src in order; players bucket by autoTierBoundaries; empty tiers hidden.
-  // Editable views keep the user's manual ordering & tiers.
+  // Manual views (autoTier=false) keep the user's manual ordering & tiers.
   const sortedSrc = useMemo(()=>{
-    if(allowEdit) return src;
+    if(!autoTier) return src;
     const tierItems = src.filter(x=>x.type==='tier').slice(0, PFK_TIER_TARGETS.length + 1);
     if(!tierItems.length) return src;
     const players = src.filter(x=>x.type!=='tier').slice();
@@ -1790,7 +1795,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
       }
     }
     return out;
-  },[src,allowEdit,modelByName]);
+  },[src,autoTier,modelByName]);
   // Position filter, then drop tier headers that have no players following (per filter).
   const flRaw = posFilter.size>=4 ? sortedSrc : sortedSrc.filter(x=>x.type==="tier"||posFilter.has(x.pos));
   const fl = (()=>{
@@ -1925,10 +1930,10 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
             <React.Fragment key={item.id}>
               {showLine&&<DropLine/>}
               <div ref={el=>rowRefs.current[item.id]=el}
-                onPointerDown={allowEdit?e=>onPD(e,item.id):undefined}
-                onPointerMove={allowEdit?onPM:undefined} onPointerUp={allowEdit?onPU:undefined} onPointerCancel={allowEdit?onPU:undefined}
-                style={{display:"flex",alignItems:"center",gap:10,borderLeft:"5px solid "+col,marginTop:vi===0?0:14,marginBottom:4,cursor:allowEdit?"grab":"default",opacity:isDrag?0.25:1,background:"transparent",borderRadius:4,padding:"4px 4px 4px 12px"}}>
-                {allowEdit&&<span style={{color:"#555",fontSize:16,touchAction:"none",flexShrink:0}}>⠿</span>}
+                onPointerDown={allowDrag?e=>onPD(e,item.id):undefined}
+                onPointerMove={allowDrag?onPM:undefined} onPointerUp={allowDrag?onPU:undefined} onPointerCancel={allowDrag?onPU:undefined}
+                style={{display:"flex",alignItems:"center",gap:10,borderLeft:"5px solid "+col,marginTop:vi===0?0:14,marginBottom:4,cursor:allowDrag?"grab":"default",opacity:isDrag?0.25:1,background:"transparent",borderRadius:4,padding:"4px 4px 4px 12px"}}>
+                {allowDrag&&<span style={{color:"#555",fontSize:16,touchAction:"none",flexShrink:0}}>⠿</span>}
                 {isRen?(
                   <><input value={tierNameDraft} onChange={e=>setTierNameDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onRenameSave()} autoFocus
                     style={{fontSize:16,fontWeight:900,background:"#0f0f0f",border:"1px solid "+col,borderRadius:6,color:col,padding:"4px 10px",width:180}}/>
@@ -1939,10 +1944,10 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                   {allowEdit&&<>
                     <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onRenameStart(item.id,item.name)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:5,color:"#666",cursor:"pointer",fontSize:13,padding:"2px 8px"}}>✏️</button>
                     <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onDeleteTier(item.id)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:5,color:"#444",cursor:"pointer",fontSize:13,padding:"2px 8px"}}>🗑️</button>
-                    <div style={{display:"flex",flexDirection:"column",gap:1}}>
+                    {allowDrag&&<div style={{display:"flex",flexDirection:"column",gap:1}}>
                       <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:3,color:"#555",cursor:"pointer",fontSize:12,padding:"1px 5px"}}>▲</button>
                       <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:3,color:"#555",cursor:"pointer",fontSize:12,padding:"1px 5px"}}>▼</button>
-                    </div>
+                    </div>}
                   </>}</>
                 )}
               </div>
@@ -1984,11 +1989,11 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
           <React.Fragment key={item.id}>
             {showLine&&<DropLine/>}
             <div ref={el=>rowRefs.current[item.id]=el} className="pfk-rookie-row"
-              onPointerDown={allowEdit?e=>onPD(e,item.id):undefined}
-              onPointerMove={allowEdit?onPM:undefined} onPointerUp={allowEdit?onPU:undefined} onPointerCancel={allowEdit?onPU:undefined}
-              style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowEdit?"grab":"default",opacity:isDrag?0.25:1,transition:"none"}}>
+              onPointerDown={allowDrag?e=>onPD(e,item.id):undefined}
+              onPointerMove={allowDrag?onPM:undefined} onPointerUp={allowDrag?onPU:undefined} onPointerCancel={allowDrag?onPU:undefined}
+              style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowDrag?"grab":"default",opacity:isDrag?0.25:1,transition:"none"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                {allowEdit&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
+                {allowDrag&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
                 <span className="pfk-rook-slot" style={{width:44,textAlign:"center",fontSize:13,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:12,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
                 {(()=>{
@@ -2019,7 +2024,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                     <span style={{color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
                   </span>
                 ); })()}
-                {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                {allowDrag&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▼</button>
                 </div>}
@@ -3377,7 +3382,7 @@ function AdminApp(){
         </div>
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
-        <RenderList src={list} allowEdit={true} {...commonProps}/>
+        <RenderList src={list} allowEdit={true} autoTier={true} {...commonProps}/>
       </div>
       </>)}
     </div>
