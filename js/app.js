@@ -2651,7 +2651,7 @@ function App(){
             </div>
             <FilterBar/>
             <div className="pfk-rookie-list">
-              <RenderList src={officialList||PFK_LIST} allowEdit={false} prospects={prospects} {...commonProps}/>
+              <RenderList src={officialList||PFK_LIST} allowEdit={false} autoTier={false} prospects={prospects} {...commonProps}/>
             </div>
           </div>
         )}
@@ -3257,6 +3257,62 @@ function AdminApp(){
   const onRenameSave=()=>{ mutate(prev=>prev.map(x=>x.id===renamingTier?{...x,name:tierNameDraft}:x)); setRenamingTier(null); };
   const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; mutate(prev=>prev.filter(x=>x.id!==id)); };
   const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; mutate(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
+  // 🌱 Seed from Model — replaces the current combo's list with the model's auto-tier output
+  // for the currently-selected adminSettings. Tier names from the existing list are preserved
+  // (or fall back to INITIAL_TIERS if the combo is empty). Player attributes (college, age) are
+  // preserved from the existing list when names match; new players come in with what the model has.
+  const seedFromModel=()=>{
+    const modelEntries=Object.values(modelByName).filter(p=>['QB','RB','WR','TE'].includes(p.pos));
+    if(!modelEntries.length){ alert('Model data not loaded yet — try again in a moment.'); return; }
+    if(!confirm(`Replace the current combo's rankings with the model's auto-tier output (${modelEntries.length} players)? Your manual edits to this combo will be lost. Other combos are unaffected.`)) return;
+    // Compute combo-adjusted PFK per player
+    const sig=settingsSig(adminSettings);
+    const scored=modelEntries.map(p=>{
+      const pos=p.pos;
+      const dc=p.dcOverride!=null?+p.dcOverride:dcScoreFromPick(pos,p.pick);
+      const film=filmAvgPct(p.filmScores);
+      const base=pfkScore(p.stats,dc,film);
+      const baseline=Math.round(base*landingMultiplier(p.landing)*10)/10;
+      const ov=p.comboOverrides?.[sig];
+      const pfk=(ov!=null&&!isNaN(+ov))?Math.round(+ov*10)/10:Math.round(baseline*comboMultiplier(pos,adminSettings)*10)/10;
+      return {p,pfk};
+    });
+    scored.sort((a,b)=>b.pfk-a.pfk);
+    // Tier names from current list (preserve user's customizations); fallback to INITIAL_TIERS
+    const existingTiers=list.filter(it=>it.type==='tier');
+    const tierNames=existingTiers.length?existingTiers.map(t=>t.name):INITIAL_TIERS.slice();
+    const usableNames=tierNames.slice(0,PFK_TIER_TARGETS.length+1);
+    // Existing player attribute lookup (by normalized name) so we don't lose college/age
+    const existingByName=new Map(list.filter(it=>it.type==='player').map(it=>[normDraftName(it.name),it]));
+    // Apply auto-tier algorithm
+    const scores=scored.map(x=>x.pfk);
+    const boundaries=autoTierBoundaries(scores,usableNames.length);
+    const out=[]; let cur=0;
+    for(let i=0;i<usableNames.length;i++){
+      const end=(i<boundaries.length)?boundaries[i]:scored.length;
+      const slice=scored.slice(cur,end);
+      if(slice.length){
+        out.push({type:'tier',id:'tier_seed_'+i+'_'+Date.now(),name:usableNames[i]});
+        for(const {p} of slice){
+          const ex=existingByName.get(normDraftName(p.name));
+          out.push({
+            type:'player',
+            id:p.id||('p_'+Date.now()+Math.random().toString(36).slice(2,6)),
+            name:p.name,
+            pos:p.pos,
+            pick:p.pick||null,
+            nflTeam:p.team||(ex?.nflTeam)||'TBD',
+            college:ex?.college||'',
+            age:ex?.age??null,
+          });
+        }
+      }
+      cur=end;
+    }
+    mutate(prev=>out);
+    setPublishMsg(`Seeded from model — ${out.filter(x=>x.type==='player').length} players in ${out.filter(x=>x.type==='tier').length} tiers. Hit PUBLISH to push live.`);
+    setTimeout(()=>setPublishMsg(''),5000);
+  };
   const copyToAllCombos=()=>{
     if(!list.length){ alert('Current list is empty — nothing to copy.'); return; }
     const total=FORMAT_CHOICES.length*TEP_CHOICES.length*PPR_CHOICES.length*PTD_CHOICES.length*PPC_CHOICES.length;
@@ -3353,7 +3409,9 @@ function AdminApp(){
         </div>
         <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           {adminTab==='rankings' && <>
+            <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
             <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
+            <button onClick={seedFromModel} style={{padding:'8px 12px',background:'transparent',border:'1px solid #10b981',borderRadius:6,color:'#10b981',cursor:'pointer',fontSize:14,fontWeight:700}} title="Replace this combo's list with the model's auto-tier output">🌱 Seed from Model</button>
             <button onClick={copyToAllCombos} style={{padding:'8px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:14,fontWeight:700}} title="Overwrite this list into every settings combo">⇢ Copy to all combos</button>
             <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
             <button onClick={publish} disabled={!dirtyCount} style={{padding:'8px 16px',background:dirtyCount?'#FFD700':'#333',color:dirtyCount?'#000':'#888',border:'none',borderRadius:6,fontWeight:900,cursor:dirtyCount?'pointer':'not-allowed',fontSize:14,letterSpacing:1}}>{`PUBLISH${dirtyCount?` (${dirtyCount})`:''}`}</button>
@@ -3397,19 +3455,16 @@ function AdminApp(){
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
         <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.6}}>
-          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>RANKINGS = MODEL OUTPUT</span>
-          This view shows the auto-tier output of your Rookie Model — exactly what users see on the public site.
+          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>EDITABLE RANKINGS</span>
+          Drag, move, edit, add, remove anything. This is what publishes to the public site (dev + prod).
           <div style={{marginTop:6}}>
-            <span style={{color:'#aaa',fontWeight:700}}>You can edit:</span> tier names (drag ⠿, ▲▼, ✏️ rename, 🗑️ delete, + Tier).
+            <span style={{color:'#aaa',fontWeight:700}}>🌱 Seed from Model</span> — pulls the current model's auto-tier output into this list as a starting point. Use it whenever you want to refresh from the model. Your existing edits to this combo will be replaced.
           </div>
           <div style={{marginTop:4}}>
-            <span style={{color:'#aaa',fontWeight:700}}>To add / remove / change a player:</span> use the <span style={{color:'#FFD700',fontWeight:800}}>ROOKIE MODEL</span> tab. Player position here is driven by PFK score from the model.
-          </div>
-          <div style={{marginTop:4}}>
-            <span style={{color:'#aaa',fontWeight:700}}>PUBLISH</span> writes this view to the per-combo Supabase row — pushes to BOTH dev and prod public sites.
+            <span style={{color:'#aaa',fontWeight:700}}>PUBLISH</span> writes the current order + tiers to Supabase — both dev and prod public sites display exactly this list.
           </div>
         </div>
-        <RenderList src={list} allowEdit={true} autoTier={true} lockPlayers={true} {...commonProps}/>
+        <RenderList src={list} allowEdit={true} {...commonProps}/>
       </div>
       </>)}
     </div>
