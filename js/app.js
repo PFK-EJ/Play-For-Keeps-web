@@ -345,9 +345,10 @@ const TEP_MULT = {
   1:    {QB:0.99, RB:0.97, WR:0.97, TE:1.12}, // alias for tep stored as integer 1
 };
 const PTD_MULT = {
-  4: {QB:0.91, RB:1.00, WR:1.00, TE:1.00},
-  5: {QB:0.95, RB:1.00, WR:1.00, TE:1.00},
-  6: {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
+  // Baseline 5 PTD = 1.00. 6 PTD bumps QBs by 5% (Evan-tuned 2026-04-25).
+  4: {QB:0.95, RB:1.00, WR:1.00, TE:1.00},
+  5: {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
+  6: {QB:1.05, RB:1.00, WR:1.00, TE:1.00},
 };
 const comboMultiplier = (pos, settings) => {
   if(!pos || !settings) return 1.00;
