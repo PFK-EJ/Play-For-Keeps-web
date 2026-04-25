@@ -2588,18 +2588,20 @@ function App(){
   const doLogout=async()=>{ if(sb) await sb.auth.signOut(); };
 
   useEffect(()=>{
-    // Dev URL reads the dev-draft for the current combo (with fallback to model auto-tier).
-    // Prod URL reads the published row (with fallback to model auto-tier).
+    // DEV URL: dev draft (Evan's last edit) → fallback to MODEL auto-tier → fallback to published.
+    // PROD URL: published row → fallback to MODEL auto-tier → fallback to nothing.
+    const seedFromModel = () => {
+      const seeded = buildSeedFromModel(modelByName, pfkSettings, null);
+      return seeded ? { data: seeded, settings: pfkSettings, updated_at: null, _isModelSeed: true } : null;
+    };
     const fetchPromise = isDevHost()
-      ? fetchDevDraftRankings(pfkSettings).then(d => d || fetchOfficialRankings(pfkSettings))
-      : fetchOfficialRankings(pfkSettings);
+      ? fetchDevDraftRankings(pfkSettings).then(d => d || seedFromModel() || fetchOfficialRankings(pfkSettings))
+      : fetchOfficialRankings(pfkSettings).then(p => p || seedFromModel());
     fetchPromise.then(row=>{
       if(!row?.data||!Array.isArray(row.data)){
-        // No published or draft → seed from model on render (handled by RenderList auto-tier when src empty)
-        // For now, fall back to PFK_LIST so the page isn't empty.
         setPfkMissing(true); setOfficialList(null); setOfficialUpdated(null); return;
       }
-      setPfkMissing(!sameSettings(row.settings,pfkSettings));
+      setPfkMissing(!sameSettings(row.settings,pfkSettings) && !row._isModelSeed);
       setOfficialUpdated(row.updated_at);
       setOfficialList(row.data);
       const hadSaved=loadStorage('pfk_saved_lists',null);
@@ -2607,7 +2609,7 @@ function App(){
         setSavedLists([{id:'list_1',name:'My Rankings',items:row.data}]);
       }
     });
-  },[pfkSettings]);
+  },[pfkSettings,modelByName]);
 
   const list=useMemo(()=>savedLists.find(l=>l.id===activeListId)?.items||buildInitialList(),[savedLists,activeListId]);
   const setList=useCallback(updater=>{
