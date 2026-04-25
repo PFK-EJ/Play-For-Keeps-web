@@ -1729,12 +1729,17 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,autoTier,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings}){
+function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings}){
   // autoTier defaults to !allowEdit. Pass autoTier={true} explicitly with allowEdit={true}
   // to get edit-capable rows that still group by PFK tiers (admin rankings preview).
   if(autoTier===undefined) autoTier = !allowEdit;
   // Drag-drop reorder is only meaningful when not auto-tiering.
   const allowDrag = allowEdit && !autoTier;
+  // lockPlayers: hide ALL player-level edit affordances (✏️, ✕, ▲▼, drag handle).
+  // Used in admin rankings (Option A): player roster comes from model tab.
+  // Tier-level controls stay live.
+  const allowPlayerEdit = allowEdit && !lockPlayers;
+  const allowPlayerDrag = allowDrag && !lockPlayers;
   const rowRefs = useRef({});
   const [draggingId,setDraggingId] = useState(null);
   const [insertBefore,setInsertBefore] = useState(null);
@@ -1989,11 +1994,11 @@ function RenderList({src,allowEdit,autoTier,onReorder,onMove,onEdit,onRemove,onR
           <React.Fragment key={item.id}>
             {showLine&&<DropLine/>}
             <div ref={el=>rowRefs.current[item.id]=el} className="pfk-rookie-row"
-              onPointerDown={allowDrag?e=>onPD(e,item.id):undefined}
-              onPointerMove={allowDrag?onPM:undefined} onPointerUp={allowDrag?onPU:undefined} onPointerCancel={allowDrag?onPU:undefined}
-              style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowDrag?"grab":"default",opacity:isDrag?0.25:1,transition:"none"}}>
+              onPointerDown={allowPlayerDrag?e=>onPD(e,item.id):undefined}
+              onPointerMove={allowPlayerDrag?onPM:undefined} onPointerUp={allowPlayerDrag?onPU:undefined} onPointerCancel={allowPlayerDrag?onPU:undefined}
+              style={{background:"#0f0f0f",border:"2px solid #1e1e1e",borderRadius:10,padding:"10px 14px",cursor:allowPlayerDrag?"grab":"default",opacity:isDrag?0.25:1,transition:"none"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                {allowDrag&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
+                {allowPlayerDrag&&<span style={{color:"#555",fontSize:18,flexShrink:0,touchAction:"none"}}>⠿</span>}
                 <span className="pfk-rook-slot" style={{width:44,textAlign:"center",fontSize:13,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:12,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
                 {(()=>{
@@ -2024,11 +2029,11 @@ function RenderList({src,allowEdit,autoTier,onReorder,onMove,onEdit,onRemove,onR
                     <span style={{color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
                   </span>
                 ); })()}
-                {allowDrag&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                {allowPlayerDrag&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▲</button>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:4,color:"#666",cursor:"pointer",fontSize:12,padding:"1px 6px"}}>▼</button>
                 </div>}
-                {allowEdit&&<>
+                {allowPlayerEdit&&<>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onEdit(item)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:6,color:"#666",cursor:"pointer",fontSize:14,padding:"4px 8px"}}>✏️</button>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onRemove(item.id)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:6,color:"#444",cursor:"pointer",fontSize:14,padding:"4px 8px"}}>✕</button>
                 </>}
@@ -3348,7 +3353,6 @@ function AdminApp(){
         </div>
         <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           {adminTab==='rankings' && <>
-            <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
             <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
             <button onClick={copyToAllCombos} style={{padding:'8px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:14,fontWeight:700}} title="Overwrite this list into every settings combo">⇢ Copy to all combos</button>
             <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
@@ -3392,11 +3396,20 @@ function AdminApp(){
         </div>
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
-        <div style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:8,marginBottom:12,fontSize:12,color:'#666',lineHeight:1.5}}>
-          <span style={{color:'#888',fontWeight:800,letterSpacing:1,marginRight:6}}>MANUAL EDIT</span>
-          Drag tiers and players freely; click ▲▼ to nudge; ✏️ to rename / edit; 🗑️ to delete. The public dev/prod pages auto-tier by PFK score on render — your manual order in admin doesn't carry to public sites, but PUBLISH still pushes the player roster + tier names so the public auto-tier has data to work with.
+        <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.6}}>
+          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>RANKINGS = MODEL OUTPUT</span>
+          This view shows the auto-tier output of your Rookie Model — exactly what users see on the public site.
+          <div style={{marginTop:6}}>
+            <span style={{color:'#aaa',fontWeight:700}}>You can edit:</span> tier names (drag ⠿, ▲▼, ✏️ rename, 🗑️ delete, + Tier).
+          </div>
+          <div style={{marginTop:4}}>
+            <span style={{color:'#aaa',fontWeight:700}}>To add / remove / change a player:</span> use the <span style={{color:'#FFD700',fontWeight:800}}>ROOKIE MODEL</span> tab. Player position here is driven by PFK score from the model.
+          </div>
+          <div style={{marginTop:4}}>
+            <span style={{color:'#aaa',fontWeight:700}}>PUBLISH</span> writes this view to the per-combo Supabase row — pushes to BOTH dev and prod public sites.
+          </div>
         </div>
-        <RenderList src={list} allowEdit={true} {...commonProps}/>
+        <RenderList src={list} allowEdit={true} autoTier={true} lockPlayers={true} {...commonProps}/>
       </div>
       </>)}
     </div>
