@@ -2746,14 +2746,22 @@ function RookieModelTab(){
                     if(src.kind==='categorical'){
                       const opt = cur==null ? null : src.options.find(o=>o.key===cur);
                       return (
-                        <td key={srcKey} style={{...numCellStyle, textAlign:'center'}} title={tooltip+' · click to cycle'}>
-                          <span onClick={()=>cycleCategorical(it.id, srcKey)} style={{
-                            display:'inline-block', minWidth:38, padding:'3px 8px', borderRadius:4, cursor:'pointer',
-                            fontSize:11, fontWeight:900, letterSpacing:0.5,
-                            background: opt ? opt.color+'33' : 'transparent',
-                            color: opt ? opt.color : '#444',
-                            border: '1px solid '+(opt ? opt.color : '#222'),
-                          }}>{opt ? opt.label : '—'}</span>
+                        <td key={srcKey} style={{...cellStyle, textAlign:'center'}} title={tooltip}>
+                          <select
+                            value={cur||''}
+                            onChange={e=>updateField(it.id,'film:'+srcKey, e.target.value||null)}
+                            style={{
+                              minWidth:60, padding:'3px 6px', borderRadius:4, cursor:'pointer',
+                              fontSize:11, fontWeight:900, letterSpacing:0.5, textAlign:'center',
+                              background: opt ? opt.color+'33' : '#0a0a0a',
+                              color: opt ? opt.color : '#666',
+                              border: '1px solid '+(opt ? opt.color : '#222'),
+                              appearance:'none', WebkitAppearance:'none', MozAppearance:'none',
+                            }}
+                          >
+                            <option value="">—</option>
+                            {src.options.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
+                          </select>
                         </td>
                       );
                     }
@@ -2773,7 +2781,7 @@ function RookieModelTab(){
         </table>
       </div>
       <div style={{marginTop:10,fontSize:11,color:'#555'}}>
-        PFK = 35% Stats + 50% Draft Capital + 15% Film. Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize. Click any number to edit. Click the You chip to cycle —/IN/NTL/OUT. DC turns purple when manually overridden; × clears.
+        PFK = 35% Stats + 50% Draft Capital + 15% Film. Film% = weighted average of populated sources (Zoltan 50% · You 30% · Zierlein 20%); missing sources drop and weights re-normalize. Click any number to edit. Use the You dropdown to set —/IN/NTL/OUT. DC turns purple when manually overridden; × clears.
       </div>
     </div>
   );
