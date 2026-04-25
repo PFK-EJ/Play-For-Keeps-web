@@ -3392,11 +3392,11 @@ function AdminApp(){
         </div>
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
-        <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.5}}>
-          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>AUTO-TIER VIEW</span>
-          Players are automatically sorted by PFK score (matches dev page). Drag the ⠿ on a tier header (or use ▲▼) to reorder tier names — top tier name labels the highest-PFK bucket. Add/remove/rename tiers and players still work. Player drag is hidden because PFK score determines player position.
+        <div style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:8,marginBottom:12,fontSize:12,color:'#666',lineHeight:1.5}}>
+          <span style={{color:'#888',fontWeight:800,letterSpacing:1,marginRight:6}}>MANUAL EDIT</span>
+          Drag tiers and players freely; click ▲▼ to nudge; ✏️ to rename / edit; 🗑️ to delete. The public dev/prod pages auto-tier by PFK score on render — your manual order in admin doesn't carry to public sites, but PUBLISH still pushes the player roster + tier names so the public auto-tier has data to work with.
         </div>
-        <RenderList src={list} allowEdit={true} autoTier={true} {...commonProps}/>
+        <RenderList src={list} allowEdit={true} {...commonProps}/>
       </div>
       </>)}
     </div>
