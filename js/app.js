@@ -1930,10 +1930,10 @@ function RenderList({src,allowEdit,autoTier,onReorder,onMove,onEdit,onRemove,onR
             <React.Fragment key={item.id}>
               {showLine&&<DropLine/>}
               <div ref={el=>rowRefs.current[item.id]=el}
-                onPointerDown={allowDrag?e=>onPD(e,item.id):undefined}
-                onPointerMove={allowDrag?onPM:undefined} onPointerUp={allowDrag?onPU:undefined} onPointerCancel={allowDrag?onPU:undefined}
-                style={{display:"flex",alignItems:"center",gap:10,borderLeft:"5px solid "+col,marginTop:vi===0?0:14,marginBottom:4,cursor:allowDrag?"grab":"default",opacity:isDrag?0.25:1,background:"transparent",borderRadius:4,padding:"4px 4px 4px 12px"}}>
-                {allowDrag&&<span style={{color:"#555",fontSize:16,touchAction:"none",flexShrink:0}}>⠿</span>}
+                onPointerDown={allowEdit?e=>onPD(e,item.id):undefined}
+                onPointerMove={allowEdit?onPM:undefined} onPointerUp={allowEdit?onPU:undefined} onPointerCancel={allowEdit?onPU:undefined}
+                style={{display:"flex",alignItems:"center",gap:10,borderLeft:"5px solid "+col,marginTop:vi===0?0:14,marginBottom:4,cursor:allowEdit?"grab":"default",opacity:isDrag?0.25:1,background:"transparent",borderRadius:4,padding:"4px 4px 4px 12px"}}>
+                {allowEdit&&<span style={{color:"#555",fontSize:16,touchAction:"none",flexShrink:0}}>⠿</span>}
                 {isRen?(
                   <><input value={tierNameDraft} onChange={e=>setTierNameDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onRenameSave()} autoFocus
                     style={{fontSize:16,fontWeight:900,background:"#0f0f0f",border:"1px solid "+col,borderRadius:6,color:col,padding:"4px 10px",width:180}}/>
@@ -3394,7 +3394,7 @@ function AdminApp(){
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
         <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.5}}>
           <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>AUTO-TIER VIEW</span>
-          Players are automatically sorted by PFK score (matches dev page). Tier ▲▼ arrows let you reorder tier names — top tier name labels the highest-PFK bucket. Add/remove/rename tiers and players still work; only manual player drag is disabled (PFK score drives player position).
+          Players are automatically sorted by PFK score (matches dev page). Drag the ⠿ on a tier header (or use ▲▼) to reorder tier names — top tier name labels the highest-PFK bucket. Add/remove/rename tiers and players still work. Player drag is hidden because PFK score determines player position.
         </div>
         <RenderList src={list} allowEdit={true} autoTier={true} {...commonProps}/>
       </div>
