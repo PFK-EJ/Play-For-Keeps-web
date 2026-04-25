@@ -170,6 +170,10 @@ const DRAFT_2026 = {
   'kcconcepcion':    {team:'CLE', pick:'1.24'},
   'omarcooperjr':    {team:'NYJ', pick:'1.30'},
   'jadarianprice':   {team:'SEA', pick:'1.32'},
+  'denzelboston':    {team:'CLE', pick:'2.07'},
+  'germiebernard':   {team:'PIT', pick:'2.15'},
+  'elistowers':      {team:'PHI', pick:'2.22'},
+  'maxklare':        {team:'LAR', pick:'2.29'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 const POS_TIER_BANDS = [
