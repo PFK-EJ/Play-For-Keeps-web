@@ -84,6 +84,9 @@ function SettingsToggleBar({value,onChange,compact}){
 const TIER_COLORS = ["#FFD700","#FFC107","#FFAA00","#E09000","#d97706","#c2840a","#a37820","#8B6914","#a3a3a3","#7c8896"];
 const POS_COLORS = { WR:"#3b82f6", RB:"#10b981", TE:"#f59e0b", QB:"#ef4444" };
 const INITIAL_TIERS = ["Untouchable","X-Factor","Super-Star","Star","Starter","Good Depth","Bench Player","Roster Clogger","Taxi Squad","Waivers"];
+// Auto-tier cutoffs: 1st tier in src order = top cutoff. Used on read-only public ranks
+// to bucket players by PFK score regardless of the saved manual ordering.
+const PFK_TIER_CUTOFFS = [100, 92.5, 85, 77.5, 70, 60, 50, 40, 30, 0];
 
 const buildInitialList = () => {
   const players = [
@@ -1641,28 +1644,54 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
     const pfk = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
     return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk };
   };
-  // Read-only views (public rankings) sort players by PFK desc within each tier.
-  // Editable views keep the user's manual ordering.
+  // Read-only views: full auto-tiering by PFK score against PFK_TIER_CUTOFFS.
+  // Tier names come from src in order; players bucket into them by PFK; empty tiers hidden.
+  // Editable views keep the user's manual ordering & tiers.
   const sortedSrc = useMemo(()=>{
     if(allowEdit) return src;
-    const out=[]; let bucket=[];
-    const flush = () => {
-      bucket.sort((a,b)=>{
-        const ma=modelBreakdown(a), mb=modelBreakdown(b);
-        const pa = ma && ma.pfk!=null ? ma.pfk : -1;
-        const pb = mb && mb.pfk!=null ? mb.pfk : -1;
-        return pb - pa;
-      });
-      out.push(...bucket); bucket=[];
-    };
-    for(const x of src){
-      if(x.type==='tier'){ flush(); out.push(x); }
-      else bucket.push(x);
+    const tierItems = src.filter(x=>x.type==='tier').slice(0, PFK_TIER_CUTOFFS.length);
+    if(!tierItems.length) return src;
+    const players = src.filter(x=>x.type!=='tier');
+    players.sort((a,b)=>{
+      const ma=modelBreakdown(a), mb=modelBreakdown(b);
+      const pa = ma && ma.pfk!=null ? ma.pfk : -1;
+      const pb = mb && mb.pfk!=null ? mb.pfk : -1;
+      return pb - pa;
+    });
+    const buckets = tierItems.map(()=>[]);
+    for(const p of players){
+      const m = modelBreakdown(p);
+      const pfk = m && m.pfk!=null ? m.pfk : -1;
+      let idx = tierItems.length - 1; // default to bottom tier
+      for(let i = 0; i < tierItems.length; i++){
+        if(pfk >= PFK_TIER_CUTOFFS[i]){ idx = i; break; }
+      }
+      buckets[idx].push(p);
     }
-    flush();
+    const out = [];
+    for(let i = 0; i < tierItems.length; i++){
+      if(buckets[i].length){
+        out.push(tierItems[i]);
+        out.push(...buckets[i]);
+      }
+    }
     return out;
   },[src,allowEdit,modelByName]);
-  const fl = posFilter.size>=4?sortedSrc:sortedSrc.filter(x=>x.type==="tier"||posFilter.has(x.pos));
+  // Position filter, then drop tier headers that have no players following (per filter).
+  const flRaw = posFilter.size>=4 ? sortedSrc : sortedSrc.filter(x=>x.type==="tier"||posFilter.has(x.pos));
+  const fl = (()=>{
+    const out=[];
+    for(let i=0; i<flRaw.length; i++){
+      const x = flRaw[i];
+      if(x.type==='tier'){
+        const next = flRaw[i+1];
+        if(next && next.type!=='tier') out.push(x);
+      } else {
+        out.push(x);
+      }
+    }
+    return out;
+  })();
   const showProspect = (e,id,prospect,model)=>{
     if(!prospect && !model) return;
     const r=e.currentTarget.getBoundingClientRect();
@@ -1806,7 +1835,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
             </React.Fragment>
           );
         }
-        const pidx=getPlayerIndex(item.id,sortedSrc),slot=slotLabel(pidx),tname=getPlayerTier(item.id,sortedSrc),col=getTierColor(tname,sortedSrc),isEd=editingPlayer===item.id;
+        const pidx=getPlayerIndex(item.id,sortedSrc),slot=slotLabel(pidx),tname=getPlayerTier(item.id,sortedSrc),col=getTierColor(tname,src),isEd=editingPlayer===item.id;
         const draftInfo = DRAFT_2026[normDraftName(item.name)] || null;
         if(isEd)return(
           <React.Fragment key={item.id}>
@@ -1871,8 +1900,8 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
                 )}
                 <span style={{flex:1}}/>
                 {(()=>{ const m=modelBreakdown(item); return (
-                  <span title={m?`PFK score: ${m.pfk}`:'No PFK score available'} style={{display:'inline-flex',alignItems:'baseline',gap:4,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),flexShrink:0,marginRight:6}}>
-                    <span style={{fontSize:10,fontWeight:800,color:'#888',letterSpacing:1}}>PFK</span>
+                  <span title={m?`PFK Score: ${m.pfk}`:'No PFK Score available'} style={{display:'inline-flex',alignItems:'baseline',gap:5,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),flexShrink:0,marginRight:6}}>
+                    <span style={{fontSize:10,fontWeight:800,color:'#888',letterSpacing:1}}>PFK SCORE</span>
                     <span style={{color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
                   </span>
                 ); })()}
