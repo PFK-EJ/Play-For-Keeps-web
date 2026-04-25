@@ -2429,7 +2429,40 @@ function AdminApp(){
     setPublishMsg(`Staged list into ${total} combos — hit PUBLISH to commit.`);
     setTimeout(()=>setPublishMsg(''),4000);
   };
-  const addPlayer=()=>{ if(!newP.name.trim()) return; mutate(prev=>[...prev,{type:'player',id:'p_'+Date.now(),name:newP.name.trim(),pos:newP.pos,college:newP.college.trim()}]); setNewP({name:'',pos:'WR',college:''}); setShowAddPlayer(false); };
+  const addPlayer=async()=>{
+    if(!newP.name.trim()) return;
+    const player={type:'player',id:'p_'+Date.now(),name:newP.name.trim(),pos:newP.pos,college:newP.college.trim()};
+    setNewP({name:'',pos:'WR',college:''}); setShowAddPlayer(false);
+    const allCombos=[];
+    for(const format of FORMAT_CHOICES)
+    for(const tep of TEP_CHOICES)
+    for(const ppr of PPR_CHOICES)
+    for(const passTd of PTD_CHOICES)
+    for(const ppc of PPC_CHOICES) allCombos.push({format,tep,ppr,passTd,ppc});
+    setPublishMsg(`Adding ${player.name} to all ${allCombos.length} combos...`);
+    const missing=allCombos.filter(s=>!sets[sigOf(s)]);
+    const fetched=await Promise.all(missing.map(async s=>{
+      const row=await fetchOfficialRankings(s);
+      const hasMatch=row&&row.data&&Array.isArray(row.data)&&sameSettings(row.settings,s);
+      const items=(row?.data&&Array.isArray(row.data))?row.data:buildInitialList();
+      return {s,items,saved:hasMatch?JSON.stringify(items):null,updatedAt:hasMatch?row.updated_at:null,missing:!hasMatch};
+    }));
+    setSets(prev=>{
+      const next={...prev};
+      for(const f of fetched){
+        const sig=sigOf(f.s);
+        if(!next[sig]) next[sig]={items:f.items,saved:f.saved,updatedAt:f.updatedAt,missing:f.missing,history:[],settings:f.s};
+      }
+      for(const s of allCombos){
+        const sig=sigOf(s);
+        const cur=next[sig];
+        if(cur) next[sig]={...cur,items:[...cur.items,player],history:[...(cur.history||[]).slice(-20),cur.items]};
+      }
+      return next;
+    });
+    setPublishMsg(`Added ${player.name} to all ${allCombos.length} combos — hit PUBLISH to commit.`);
+    setTimeout(()=>setPublishMsg(''),4000);
+  };
 
   if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
 
