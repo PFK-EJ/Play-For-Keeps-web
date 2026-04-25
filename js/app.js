@@ -390,6 +390,58 @@ const comboMultiplier = (pos, settings) => {
 };
 // Stable signature for a settings combo, matches sigOf() inside AdminApp for cross-component lookup.
 const settingsSig = s => `${s?.format||'Superflex'}|${s?.tep}|${s?.ppr}|${s?.passTd}|${s?.ppc}`;
+// Build a per-combo PFK score for a model entry (with override + landing + combo multiplier).
+const computeComboPfk = (m, settings) => {
+  const pos = m.pos;
+  const dc = m.dcOverride!=null ? +m.dcOverride : dcScoreFromPick(pos, m.pick);
+  const film = filmAvgPct(m.filmScores);
+  const base = pfkScore(m.stats, dc, film);
+  const baseline = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
+  const sig = settingsSig(settings);
+  const ov = m.comboOverrides?.[sig];
+  if(ov!=null && !isNaN(+ov)) return Math.round(+ov*10)/10;
+  return Math.round(baseline * comboMultiplier(pos, settings) * 10) / 10;
+};
+// Build a fully-seeded items array from the rookie model + settings + (optional) existing list.
+// Returns null if model is empty. Used by both the admin RANKINGS auto-seed-on-first-load and the
+// 🌱 Seed from Model button. Players sorted by combo-adjusted PFK desc, bucketed via the dynamic
+// per-class auto-tier algorithm using tier names from the existing list (or INITIAL_TIERS).
+// College/age preserved from existing list when names match.
+const buildSeedFromModel = (modelByName, settings, existingList) => {
+  const modelEntries = Object.values(modelByName||{}).filter(p=>['QB','RB','WR','TE'].includes(p.pos));
+  if(!modelEntries.length) return null;
+  const scored = modelEntries.map(p=>({p, pfk: computeComboPfk(p, settings)}));
+  scored.sort((a,b)=>b.pfk - a.pfk);
+  const existingTiers = (existingList||[]).filter(it=>it.type==='tier');
+  const tierNames = existingTiers.length ? existingTiers.map(t=>t.name) : INITIAL_TIERS.slice();
+  const usableNames = tierNames.slice(0, PFK_TIER_TARGETS.length+1);
+  const existingByName = new Map((existingList||[]).filter(it=>it.type==='player').map(it=>[normDraftName(it.name), it]));
+  const scores = scored.map(x=>x.pfk);
+  const boundaries = autoTierBoundaries(scores, usableNames.length);
+  const out = []; let cur = 0;
+  const ts = Date.now();
+  for(let i=0; i<usableNames.length; i++){
+    const end = (i<boundaries.length) ? boundaries[i] : scored.length;
+    const slice = scored.slice(cur, end);
+    if(slice.length){
+      out.push({type:'tier', id:'tier_seed_'+i+'_'+ts, name:usableNames[i]});
+      for(const {p} of slice){
+        const ex = existingByName.get(normDraftName(p.name));
+        out.push({
+          type:'player',
+          id: p.id || ('p_'+ts+'_'+Math.random().toString(36).slice(2,6)),
+          name: p.name, pos: p.pos,
+          pick: p.pick || null,
+          nflTeam: p.team || (ex?.nflTeam) || 'TBD',
+          college: ex?.college || '',
+          age: ex?.age ?? null,
+        });
+      }
+    }
+    cur = end;
+  }
+  return out;
+};
 // Pre-Draft percentile × 100 from 2026 Data Models (QB/RB/WR/TE xlsx, 2026 only).
 const BAKED_STATS_PCT = {
   // QB
@@ -3197,17 +3249,26 @@ function AdminApp(){
   useEffect(()=>{
     if(!session) return;
     if(sets[currentSig]) return;
+    // Wait for the model so first-time combos can auto-seed from PFK order
+    // (with the agreed-upon dynamic per-class tiers and the per-combo position multiplier).
+    if(!Object.keys(modelByName).length) return;
     const snapshotSettings={...adminSettings};
     fetchOfficialRankings(snapshotSettings).then(row=>{
       const hasMatch=row&&row.data&&Array.isArray(row.data)&&sameSettings(row.settings,snapshotSettings);
-      const items=(row?.data&&Array.isArray(row.data))?row.data:buildInitialList();
+      let items;
+      if(hasMatch){
+        items = row.data;
+      } else {
+        // No published row for this combo → seed from current model in this combo's order
+        items = buildSeedFromModel(modelByName, snapshotSettings, row?.data || null) || buildInitialList();
+      }
       setSets(prev=>prev[currentSig]?prev:{...prev,[currentSig]:{
         items, saved: hasMatch?JSON.stringify(items):null,
         updatedAt: hasMatch?row.updated_at:null,
         missing: !hasMatch, history:[], settings:snapshotSettings
       }});
     });
-  },[session,currentSig]);
+  },[session,currentSig,modelByName]);
 
   const login=async()=>{
     setLoginErr('');
@@ -3258,59 +3319,14 @@ function AdminApp(){
   const onDeleteTier=(id)=>{ if(!confirm('Delete this tier? Players inside will fall into the tier above.')) return; mutate(prev=>prev.filter(x=>x.id!==id)); };
   const addTier=()=>{ const name=prompt('Tier name:'); if(!name) return; mutate(prev=>[...prev,{id:'tier_'+Date.now(),type:'tier',name}]); };
   // 🌱 Seed from Model — replaces the current combo's list with the model's auto-tier output
-  // for the currently-selected adminSettings. Tier names from the existing list are preserved
-  // (or fall back to INITIAL_TIERS if the combo is empty). Player attributes (college, age) are
-  // preserved from the existing list when names match; new players come in with what the model has.
+  // for the currently-selected adminSettings. Wraps the shared buildSeedFromModel helper.
   const seedFromModel=()=>{
-    const modelEntries=Object.values(modelByName).filter(p=>['QB','RB','WR','TE'].includes(p.pos));
-    if(!modelEntries.length){ alert('Model data not loaded yet — try again in a moment.'); return; }
-    if(!confirm(`Replace the current combo's rankings with the model's auto-tier output (${modelEntries.length} players)? Your manual edits to this combo will be lost. Other combos are unaffected.`)) return;
-    // Compute combo-adjusted PFK per player
-    const sig=settingsSig(adminSettings);
-    const scored=modelEntries.map(p=>{
-      const pos=p.pos;
-      const dc=p.dcOverride!=null?+p.dcOverride:dcScoreFromPick(pos,p.pick);
-      const film=filmAvgPct(p.filmScores);
-      const base=pfkScore(p.stats,dc,film);
-      const baseline=Math.round(base*landingMultiplier(p.landing)*10)/10;
-      const ov=p.comboOverrides?.[sig];
-      const pfk=(ov!=null&&!isNaN(+ov))?Math.round(+ov*10)/10:Math.round(baseline*comboMultiplier(pos,adminSettings)*10)/10;
-      return {p,pfk};
-    });
-    scored.sort((a,b)=>b.pfk-a.pfk);
-    // Tier names from current list (preserve user's customizations); fallback to INITIAL_TIERS
-    const existingTiers=list.filter(it=>it.type==='tier');
-    const tierNames=existingTiers.length?existingTiers.map(t=>t.name):INITIAL_TIERS.slice();
-    const usableNames=tierNames.slice(0,PFK_TIER_TARGETS.length+1);
-    // Existing player attribute lookup (by normalized name) so we don't lose college/age
-    const existingByName=new Map(list.filter(it=>it.type==='player').map(it=>[normDraftName(it.name),it]));
-    // Apply auto-tier algorithm
-    const scores=scored.map(x=>x.pfk);
-    const boundaries=autoTierBoundaries(scores,usableNames.length);
-    const out=[]; let cur=0;
-    for(let i=0;i<usableNames.length;i++){
-      const end=(i<boundaries.length)?boundaries[i]:scored.length;
-      const slice=scored.slice(cur,end);
-      if(slice.length){
-        out.push({type:'tier',id:'tier_seed_'+i+'_'+Date.now(),name:usableNames[i]});
-        for(const {p} of slice){
-          const ex=existingByName.get(normDraftName(p.name));
-          out.push({
-            type:'player',
-            id:p.id||('p_'+Date.now()+Math.random().toString(36).slice(2,6)),
-            name:p.name,
-            pos:p.pos,
-            pick:p.pick||null,
-            nflTeam:p.team||(ex?.nflTeam)||'TBD',
-            college:ex?.college||'',
-            age:ex?.age??null,
-          });
-        }
-      }
-      cur=end;
-    }
-    mutate(prev=>out);
-    setPublishMsg(`Seeded from model — ${out.filter(x=>x.type==='player').length} players in ${out.filter(x=>x.type==='tier').length} tiers. Hit PUBLISH to push live.`);
+    if(!Object.keys(modelByName).length){ alert('Model data not loaded yet — try again in a moment.'); return; }
+    const seeded = buildSeedFromModel(modelByName, adminSettings, list);
+    if(!seeded){ alert('Could not build from model.'); return; }
+    if(!confirm(`Replace the current combo's rankings with the model's auto-tier output (${seeded.filter(x=>x.type==='player').length} players)? Your manual edits to this combo will be lost. Other combos are unaffected.`)) return;
+    mutate(prev=>seeded);
+    setPublishMsg(`Seeded from model — ${seeded.filter(x=>x.type==='player').length} players in ${seeded.filter(x=>x.type==='tier').length} tiers. Hit PUBLISH to push live.`);
     setTimeout(()=>setPublishMsg(''),5000);
   };
   const copyToAllCombos=()=>{
