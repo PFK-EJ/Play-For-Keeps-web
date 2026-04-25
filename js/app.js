@@ -10,18 +10,55 @@ const TEP_CHOICES=[0.5,0.75,1.0], PPR_CHOICES=[1.0], PTD_CHOICES=[4,5,6], PPC_CH
 
 const sameSettings = (a,b)=> a && b && (a.format||'Superflex')===(b.format||'Superflex') && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
 
+// Per-combo rankings rows in pfk_rankings:
+//   - settings = {format, tep, ppr, passTd, ppc}                                   → PUBLISHED (prod)
+//   - settings = {format, tep, ppr, passTd, ppc, kind: 'rankings_dev_draft'}       → DEV DRAFT (dev URL only)
+//   - settings = {kind: 'rookie_model'} | {kind: 'rookie_model_draft'}             → model rows (separate)
+const RANKINGS_DEV_KIND = 'rankings_dev_draft';
 const fetchOfficialRankings = async (wanted) => {
   if(!sb) return null;
   try{
     const { data, error } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
     if(error||!data?.length) return null;
+    // Only return PUBLISHED rows (no kind sentinel) — never model rows or dev drafts.
     if(wanted){
-      const exact = data.find(r=>sameSettings(r.settings,wanted));
+      const exact = data.find(r=>!r.settings?.kind && sameSettings(r.settings,wanted));
       if(exact) return exact;
     }
-    return data[0];
+    return data.find(r=>!r.settings?.kind) || null;
   }catch{ return null; }
 };
+// Fetch the dev-draft rankings row for a given combo (used on dev URL only).
+const fetchDevDraftRankings = async (wanted) => {
+  if(!sb) return null;
+  try{
+    const { data } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
+    if(!data?.length) return null;
+    return data.find(r=>r.settings?.kind===RANKINGS_DEV_KIND && sameSettings(r.settings,wanted)) || null;
+  }catch{ return null; }
+};
+// Save the dev-draft rankings row for a combo (overwrites the existing draft for that combo).
+const saveDevDraftRankings = async (items, settings) => {
+  if(!sb) return { error:'Supabase not loaded' };
+  const { data:userData } = await sb.auth.getUser();
+  const email = userData?.user?.email || 'PFK Staff';
+  const sigSettings = { ...settings, kind: RANKINGS_DEV_KIND };
+  const { data:existing } = await sb.from('pfk_rankings').select('id,settings').order('updated_at',{ascending:false});
+  const match = (existing||[]).find(r=>r.settings?.kind===RANKINGS_DEV_KIND && sameSettings(r.settings,settings));
+  if(match){
+    const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings:sigSettings }).eq('id',match.id);
+    return { error };
+  }
+  const { error } = await sb.from('pfk_rankings').insert({ data:items, updated_by:email, settings:sigSettings });
+  return { error };
+};
+// Publish current items to PROD for the given combo (writes the no-kind row that prod reads).
+const publishToProdRankings = async (items, settings) => {
+  // settings already passed without 'kind'; reuse publishOfficialRankings which writes the no-kind row
+  return publishOfficialRankings(items, settings);
+};
+// Dev URL gate: only Evan's email can access dev preview.
+const EVAN_EMAIL = 'ejohnson2621@gmail.com';
 
 const publishOfficialRankings = async (items, settings) => {
   if(!sb) return { error: 'Supabase not loaded' };
@@ -2412,6 +2449,36 @@ function OutlookTab() {
   );
 }
 
+// Dev URL access gate: shown when isDevHost() and the visitor isn't Evan.
+function DevAuthGate({mode, doAuth, authEmail, setAuthEmail, authPassword, setAuthPassword, authMsg, doLogout, signedInAs}){
+  return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:20,background:'#080808',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      <div style={{width:'100%',maxWidth:380,background:'#111',border:'1px solid #FFD700',borderRadius:12,padding:28}}>
+        <div style={{textAlign:'center',marginBottom:20}}>
+          <div style={{fontWeight:900,fontSize:22,letterSpacing:3,color:'#FFD700'}}>PFK DEV</div>
+          <div style={{fontSize:13,color:'#888',marginTop:6}}>This is a private preview. Only the site owner can access it.</div>
+        </div>
+        {mode==='signin' && (
+          <>
+            <input placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} style={{width:'100%',padding:10,marginBottom:10,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
+            <input type="password" placeholder="Password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doAuth()} style={{width:'100%',padding:10,marginBottom:14,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
+            <button onClick={doAuth} style={{width:'100%',padding:12,background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN IN</button>
+            {authMsg&&<div style={{color:'#ef4444',fontSize:14,marginTop:10,textAlign:'center'}}>{authMsg}</div>}
+          </>
+        )}
+        {mode==='denied' && (
+          <>
+            <div style={{padding:14,background:'#3a1010',border:'1px solid #ef4444',borderRadius:8,color:'#ef4444',fontSize:14,textAlign:'center',marginBottom:14}}>
+              Access denied. Signed in as <strong>{signedInAs}</strong>.
+            </div>
+            <button onClick={doLogout} style={{width:'100%',padding:12,background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN OUT</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const [tab,setTab]=useState("pfk");
   const [savedLists,setSavedLists]=useState(()=>{
@@ -2476,6 +2543,10 @@ function App(){
   const [authPassword,setAuthPassword]=useState('');
   const [authSleeper,setAuthSleeper]=useState('');
   const [authMsg,setAuthMsg]=useState('');
+  // Dev-only edit mode for the PFK Rookies tab. Becomes available when Evan signs in on dev URL.
+  const [editMode,setEditMode]=useState(false);
+  const [draftMsg,setDraftMsg]=useState('');
+  const isEvanOnDev = isDevHost() && session?.user?.email === EVAN_EMAIL;
 
   useEffect(()=>{
     if(!sb) return;
@@ -2517,8 +2588,17 @@ function App(){
   const doLogout=async()=>{ if(sb) await sb.auth.signOut(); };
 
   useEffect(()=>{
-    fetchOfficialRankings(pfkSettings).then(row=>{
-      if(!row?.data||!Array.isArray(row.data)){ setPfkMissing(true); setOfficialList(null); setOfficialUpdated(null); return; }
+    // Dev URL reads the dev-draft for the current combo (with fallback to model auto-tier).
+    // Prod URL reads the published row (with fallback to model auto-tier).
+    const fetchPromise = isDevHost()
+      ? fetchDevDraftRankings(pfkSettings).then(d => d || fetchOfficialRankings(pfkSettings))
+      : fetchOfficialRankings(pfkSettings);
+    fetchPromise.then(row=>{
+      if(!row?.data||!Array.isArray(row.data)){
+        // No published or draft → seed from model on render (handled by RenderList auto-tier when src empty)
+        // For now, fall back to PFK_LIST so the page isn't empty.
+        setPfkMissing(true); setOfficialList(null); setOfficialUpdated(null); return;
+      }
       setPfkMissing(!sameSettings(row.settings,pfkSettings));
       setOfficialUpdated(row.updated_at);
       setOfficialList(row.data);
@@ -2593,6 +2673,58 @@ function App(){
   const reorder=(fromId,beforeId)=>{push(list);setList(prev=>{const l=[...prev],fi=l.findIndex(x=>x.id===fromId);const[item]=l.splice(fi,1);if(beforeId===null){l.push(item);}else{const ti=l.findIndex(x=>x.id===beforeId);l.splice(ti!==-1?ti:l.length,0,item);}return l;});};
   const moveItem=(id,dir)=>{push(list);setList(prev=>{const l=[...prev],i=l.findIndex(x=>x.id===id),sw=i+dir;if(sw<0||sw>=l.length)return l;[l[i],l[sw]]=[l[sw],l[i]];return l;});};
   const undo=()=>{if(!history.length)return;setList(history[history.length-1]);setHistory(h=>h.slice(0,-1));};
+
+  // ----- Edit Mode handlers for the OFFICIAL rankings (dev-only Edit Mode on PFK Rookies tab) -----
+  // These mutate officialList directly so dev-page edits write to the dev draft Supabase row on Save.
+  const officialOps = {
+    onReorder: (fromId,beforeId) => setOfficialList(prev => {
+      const l=[...(prev||[])]; const fi=l.findIndex(x=>x.id===fromId);
+      if(fi<0) return prev; const [item]=l.splice(fi,1);
+      if(beforeId===null) l.push(item);
+      else { const ti=l.findIndex(x=>x.id===beforeId); l.splice(ti!==-1?ti:l.length,0,item); }
+      return l;
+    }),
+    onMove: (id,dir) => setOfficialList(prev => {
+      const l=[...(prev||[])]; const i=l.findIndex(x=>x.id===id); const sw=i+dir;
+      if(sw<0||sw>=l.length) return l; [l[i],l[sw]]=[l[sw],l[i]]; return l;
+    }),
+    onEdit: (p) => { setEditingPlayer(p.id); setPlayerDraft({...p}); },
+    onRemove: (id) => setOfficialList(prev => (prev||[]).filter(x=>x.id!==id)),
+    onSavePlayer: () => {
+      setOfficialList(prev => (prev||[]).map(x => x.id===editingPlayer ? {...x,...playerDraft} : x));
+      setEditingPlayer(null);
+    },
+    onCancelEdit: () => setEditingPlayer(null),
+    onRenameStart: (id,name) => { setRenamingTier(id); setTierNameDraft(name); },
+    onRenameCancel: () => setRenamingTier(null),
+    onRenameSave: () => {
+      setOfficialList(prev => (prev||[]).map(x => x.id===renamingTier ? {...x, name:tierNameDraft} : x));
+      setRenamingTier(null);
+    },
+    onDeleteTier: (id) => {
+      if(!confirm('Delete this tier?')) return;
+      setOfficialList(prev => (prev||[]).filter(x=>x.id!==id));
+    },
+  };
+  const officialAddTier = () => {
+    const name = prompt('Tier name:'); if(!name) return;
+    setOfficialList(prev => [...(prev||[]), {id:'tier_'+Date.now(), type:'tier', name}]);
+  };
+  const saveDraft = async () => {
+    if(!officialList?.length){ setDraftMsg('Nothing to save.'); setTimeout(()=>setDraftMsg(''),2000); return; }
+    setDraftMsg('Saving...');
+    const { error } = await saveDevDraftRankings(officialList, pfkSettings);
+    if(error){ setDraftMsg('Save error: '+(error.message||error)); }
+    else { setDraftMsg('Draft saved ✓ (dev URL only)'); setTimeout(()=>setDraftMsg(''),3000); }
+  };
+  const publishToProd = async () => {
+    if(!officialList?.length){ setDraftMsg('Nothing to publish.'); setTimeout(()=>setDraftMsg(''),2000); return; }
+    if(!confirm('Publish current rankings to PRODUCTION? This pushes the live public site (playforkeeps-web.pages.dev) to match what you see on dev.')) return;
+    setDraftMsg('Publishing to prod...');
+    const { error } = await publishToProdRankings(officialList, pfkSettings);
+    if(error){ setDraftMsg('Publish error: '+(error.message||error)); }
+    else { setDraftMsg('🚀 Published to prod ✓'); setTimeout(()=>setDraftMsg(''),3500); }
+  };
   const buildShareText=()=>{
     const out=[]; let count=0, pendingTier=false;
     for(const it of list){
@@ -2645,6 +2777,12 @@ function App(){
 
   const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter,modelByName,pfkSettings};
 
+  // Dev URL gate: only Evan can access dev preview. Anyone else sees a login or access denied screen.
+  if(isDevHost()){
+    if(!session) return <DevAuthGate doAuth={doAuth} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authMsg={authMsg} mode="signin"/>;
+    if(session?.user?.email !== EVAN_EMAIL) return <DevAuthGate doLogout={doLogout} signedInAs={session.user.email} mode="denied"/>;
+  }
+
   return(
     <div style={{background:"#080808",minHeight:"100vh",color:"#f0f0f0",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       {authOpen&&(
@@ -2694,16 +2832,28 @@ function App(){
       <div className="pfk-content" style={{maxWidth:1140,margin:"0 auto",padding:"20px 14px"}}>
         {tab==="pfk"&&(
           <div>
-            <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
-              <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL ROOKIE RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
+            <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:240}}><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL ROOKIE RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
+              {isEvanOnDev && (
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+                  {!editMode && <button onClick={()=>setEditMode(true)} style={{padding:'8px 14px',background:'transparent',border:'2px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>✏️ EDIT MODE</button>}
+                  {editMode && <>
+                    <button onClick={officialAddTier} style={{padding:'7px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Tier</button>
+                    <button onClick={saveDraft} style={{padding:'7px 14px',background:'#10b981',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>💾 SAVE DRAFT</button>
+                    <button onClick={publishToProd} style={{padding:'7px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🚀 PUBLISH TO PROD</button>
+                    <button onClick={()=>setEditMode(false)} style={{padding:'7px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13}}>Exit</button>
+                  </>}
+                </div>
+              )}
             </div>
+            {isEvanOnDev && draftMsg && <div style={{marginBottom:12,padding:'8px 12px',background:draftMsg.startsWith('Save error')||draftMsg.startsWith('Publish error')?'#3a1010':'#0a2a1a',border:'1px solid '+(draftMsg.startsWith('Save error')||draftMsg.startsWith('Publish error')?'#ef4444':'#10b981'),borderRadius:8,color:draftMsg.startsWith('Save error')||draftMsg.startsWith('Publish error')?'#ef4444':'#10b981',fontSize:13,fontWeight:700}}>{draftMsg}</div>}
             <div style={{marginBottom:14,padding:'10px 12px',background:'#0a0a0a',border:'1px solid #222',borderRadius:10}}>
               <SettingsToggleBar value={pfkSettings} onChange={setPfkSettings}/>
               {pfkMissing&&<div style={{fontSize:12,color:'#d97706',marginTop:8}}>No ranking published yet for this combo — showing most recent.</div>}
             </div>
             <FilterBar/>
             <div className="pfk-rookie-list">
-              <RenderList src={officialList||PFK_LIST} allowEdit={false} autoTier={false} prospects={prospects} {...commonProps}/>
+              <RenderList src={officialList||PFK_LIST} allowEdit={editMode} autoTier={false} prospects={prospects} {...commonProps} {...(editMode ? officialOps : {})}/>
             </div>
           </div>
         )}
@@ -3424,14 +3574,7 @@ function AdminApp(){
           <div style={{fontSize:12,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
         </div>
         <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          {adminTab==='rankings' && <>
-            <button onClick={()=>setShowAddPlayer(s=>!s)} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Player</button>
-            <button onClick={addTier} style={{padding:'8px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:14,fontWeight:700}}>+ Tier</button>
-            <button onClick={seedFromModel} style={{padding:'8px 12px',background:'transparent',border:'1px solid #10b981',borderRadius:6,color:'#10b981',cursor:'pointer',fontSize:14,fontWeight:700}} title="Replace this combo's list with the model's auto-tier output">🌱 Seed from Model</button>
-            <button onClick={copyToAllCombos} style={{padding:'8px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:14,fontWeight:700}} title="Overwrite this list into every settings combo">⇢ Copy to all combos</button>
-            <button onClick={undo} disabled={!history.length} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',cursor:history.length?'pointer':'not-allowed',fontSize:14}}>↶ Undo</button>
-            <button onClick={publish} disabled={!dirtyCount} style={{padding:'8px 16px',background:dirtyCount?'#FFD700':'#333',color:dirtyCount?'#000':'#888',border:'none',borderRadius:6,fontWeight:900,cursor:dirtyCount?'pointer':'not-allowed',fontSize:14,letterSpacing:1}}>{`PUBLISH${dirtyCount?` (${dirtyCount})`:''}`}</button>
-          </>}
+          {adminTab==='rankings' && <a href={(window.location.hostname.includes('dev.')?'':'https://dev.playforkeeps-web.pages.dev')+'/'} target={window.location.hostname.includes('dev.')?'_self':'_blank'} rel="noopener" style={{padding:'8px 14px',background:'transparent',border:'2px solid #10b981',borderRadius:6,color:'#10b981',cursor:'pointer',fontSize:13,fontWeight:900,textDecoration:'none',letterSpacing:1}}>✏️ EDIT ON DEV</a>}
           <button onClick={logout} style={{padding:'8px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:14}}>Sign out</button>
         </div>
       </div>
@@ -3471,16 +3614,16 @@ function AdminApp(){
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
         <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.6}}>
-          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>EDITABLE RANKINGS</span>
-          Drag, move, edit, add, remove anything. This is what publishes to the public site (dev + prod).
+          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>READ-ONLY PREVIEW</span>
+          This shows the model's auto-tier output for the selected combo — what the dev URL displays before any of your edits.
           <div style={{marginTop:6}}>
-            <span style={{color:'#aaa',fontWeight:700}}>🌱 Seed from Model</span> — pulls the current model's auto-tier output into this list as a starting point. Use it whenever you want to refresh from the model. Your existing edits to this combo will be replaced.
+            <span style={{color:'#aaa',fontWeight:700}}>To edit & publish:</span> click <span style={{color:'#10b981',fontWeight:800}}>✏️ EDIT ON DEV</span> above. You'll go to the dev URL where you can drag/move/edit and then push to prod.
           </div>
           <div style={{marginTop:4}}>
-            <span style={{color:'#aaa',fontWeight:700}}>PUBLISH</span> writes the current order + tiers to Supabase — both dev and prod public sites display exactly this list.
+            <span style={{color:'#aaa',fontWeight:700}}>To change a player's PFK score:</span> use the <span style={{color:'#FFD700',fontWeight:800}}>ROOKIE MODEL</span> tab.
           </div>
         </div>
-        <RenderList src={list} allowEdit={true} {...commonProps}/>
+        <RenderList src={list} allowEdit={false} autoTier={true} {...commonProps}/>
       </div>
       </>)}
     </div>
