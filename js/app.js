@@ -84,9 +84,37 @@ function SettingsToggleBar({value,onChange,compact}){
 const TIER_COLORS = ["#FFD700","#FFC107","#FFAA00","#E09000","#d97706","#c2840a","#a37820","#8B6914","#a3a3a3","#7c8896"];
 const POS_COLORS = { WR:"#3b82f6", RB:"#10b981", TE:"#f59e0b", QB:"#ef4444" };
 const INITIAL_TIERS = ["Untouchable","X-Factor","Super-Star","Star","Starter","Good Depth","Bench Player","Roster Clogger","Taxi Squad","Waivers"];
-// Auto-tier cutoffs: 1st tier in src order = top cutoff. Used on read-only public ranks
-// to bucket players by PFK score regardless of the saved manual ordering.
-const PFK_TIER_CUTOFFS = [100, 92.5, 85, 77.5, 70, 60, 50, 40, 30, 0];
+// Dynamic per-class auto-tier algorithm.
+// PFK_TIER_TARGETS[i] = the 0-indexed position where tier (i+2) begins in a sorted-desc PFK list.
+// PFK_TIER_WINDOWS[i] = how far to look around that target for the largest natural PFK gap to snap to.
+// Top tiers are precise (small windows, small target sizes). Bottom tiers are broader.
+// At call time: scoresDesc is the array of PFK scores sorted desc, returns 9 boundary positions
+// for 10 tiers. Tier names come from src in order.
+const PFK_TIER_TARGETS = [1, 2, 4, 7, 14, 22, 33, 47, 62];
+const PFK_TIER_WINDOWS = [0, 1, 1, 1, 2, 2, 2, 2, 2];
+const autoTierBoundaries = (scoresDesc, tierCount = 10) => {
+  const n = scoresDesc.length;
+  if(n === 0) return [];
+  const numBoundaries = Math.min(tierCount - 1, PFK_TIER_TARGETS.length);
+  const out = [];
+  let prev = 0;
+  for(let i = 0; i < numBoundaries; i++){
+    const target = Math.min(PFK_TIER_TARGETS[i], n);
+    const w = PFK_TIER_WINDOWS[i];
+    if(w === 0){ out.push(target); prev = target; continue; }
+    const lo = Math.max(prev + 1, target - w);
+    const hi = Math.min(target + w, n - 1);
+    if(hi < lo){ out.push(target); prev = target; continue; }
+    let bestPos = lo, bestGap = -Infinity;
+    for(let pos = lo; pos <= hi; pos++){
+      const gap = (scoresDesc[pos - 1] ?? 0) - (scoresDesc[pos] ?? 0);
+      if(gap > bestGap){ bestGap = gap; bestPos = pos; }
+    }
+    out.push(bestPos);
+    prev = bestPos;
+  }
+  return out;
+};
 
 const buildInitialList = () => {
   const players = [
@@ -1644,29 +1672,30 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
     const pfk = Math.round(base * landingMultiplier(m.landing) * 10) / 10;
     return { name:item.name, stats:m.stats, dc, film, landing:m.landing, pfk };
   };
-  // Read-only views: full auto-tiering by PFK score against PFK_TIER_CUTOFFS.
-  // Tier names come from src in order; players bucket into them by PFK; empty tiers hidden.
+  // Read-only views: dynamic per-class auto-tiering by PFK gaps + position targets.
+  // Tier names come from src in order; players bucket by autoTierBoundaries; empty tiers hidden.
   // Editable views keep the user's manual ordering & tiers.
   const sortedSrc = useMemo(()=>{
     if(allowEdit) return src;
-    const tierItems = src.filter(x=>x.type==='tier').slice(0, PFK_TIER_CUTOFFS.length);
+    const tierItems = src.filter(x=>x.type==='tier').slice(0, PFK_TIER_TARGETS.length + 1);
     if(!tierItems.length) return src;
-    const players = src.filter(x=>x.type!=='tier');
+    const players = src.filter(x=>x.type!=='tier').slice();
     players.sort((a,b)=>{
       const ma=modelBreakdown(a), mb=modelBreakdown(b);
       const pa = ma && ma.pfk!=null ? ma.pfk : -1;
       const pb = mb && mb.pfk!=null ? mb.pfk : -1;
       return pb - pa;
     });
+    const scores = players.map(p=>{ const m=modelBreakdown(p); return m && m.pfk!=null ? m.pfk : 0; });
+    const boundaries = autoTierBoundaries(scores, tierItems.length);
     const buckets = tierItems.map(()=>[]);
-    for(const p of players){
-      const m = modelBreakdown(p);
-      const pfk = m && m.pfk!=null ? m.pfk : -1;
-      let idx = tierItems.length - 1; // default to bottom tier
-      for(let i = 0; i < tierItems.length; i++){
-        if(pfk >= PFK_TIER_CUTOFFS[i]){ idx = i; break; }
+    let cur = 0;
+    for(let i = 0; i < tierItems.length; i++){
+      const end = (i < boundaries.length) ? boundaries[i] : players.length;
+      for(let j = cur; j < end && j < players.length; j++){
+        buckets[i].push(players[j]);
       }
-      buckets[idx].push(p);
+      cur = end;
     }
     const out = [];
     for(let i = 0; i < tierItems.length; i++){
