@@ -118,6 +118,14 @@ const buildInitialList = () => {
     {id:"p53",name:"Mike Washington",pos:"RB",age:24.5,college:"Arkansas",nflTeam:"TBD"},
     {id:"p54",name:"Jamarion Miller",pos:"RB",age:22.4,college:"Alabama",nflTeam:"TBD"},
     {id:"p55",name:"De'Zhaun Stribling",pos:"WR",age:null,college:"Mississippi",nflTeam:"SF"},
+    {id:"p56",name:"Nate Boerkircher",pos:"TE",age:null,college:"Texas A&M",nflTeam:"JAC"},
+    {id:"p57",name:"Marlin Klein",pos:"TE",age:null,college:"Michigan",nflTeam:"HOU"},
+    {id:"p58",name:"Sam Roush",pos:"TE",age:null,college:"Stanford",nflTeam:"CHI"},
+    {id:"p59",name:"Caleb Douglas",pos:"WR",age:null,college:"Texas Tech",nflTeam:"MIA"},
+    {id:"p60",name:"Will Kacmarek",pos:"TE",age:null,college:"Ohio State",nflTeam:"MIA"},
+    {id:"p61",name:"Zavion Thomas",pos:"WR",age:null,college:"LSU",nflTeam:"CHI"},
+    {id:"p62",name:"Kaelon Black",pos:"RB",age:null,college:"Indiana",nflTeam:"SF"},
+    {id:"p63",name:"Eli Raridon",pos:"TE",age:null,college:"Notre Dame",nflTeam:"NE"},
   ];
   const tierBreaks = {0:0,1:1,2:2,3:3,5:4,9:5,11:6,15:7,22:8,36:9};
   const list = [];
@@ -175,17 +183,25 @@ const DRAFT_2026 = {
   'denzelboston':    {team:'CLE', pick:'2.07'},
   'germiebernard':   {team:'PIT', pick:'2.15'},
   'elistowers':      {team:'PHI', pick:'2.22'},
+  'nateboerkircher': {team:'JAC', pick:'2.24'},
+  'marlinklein':     {team:'HOU', pick:'2.27'},
   'maxklare':        {team:'LAR', pick:'2.29'},
   'carsonbeck':      {team:'ARI', pick:'3.01'},
+  'samroush':        {team:'CHI', pick:'3.05'},
   'antoniowilliams': {team:'WSH', pick:'3.07'},
   'oscardelp':       {team:'NO',  pick:'3.09'},
   'malachifields':   {team:'NYG', pick:'3.10'},
+  'calebdouglas':    {team:'MIA', pick:'3.11'},
   'drewallar':       {team:'PIT', pick:'3.12'},
   'zachariahbranch': {team:'ATL', pick:'3.15'},
   'jakobilane':      {team:'BAL', pick:'3.16'},
   'chrisbrazzellii': {team:'CAR', pick:'3.19'},
   'tedhurst':        {team:'TB',  pick:'3.20'},
+  'willkacmarek':    {team:'MIA', pick:'3.23'},
+  'zavionthomas':    {team:'CHI', pick:'3.25'},
+  'kaelonblack':     {team:'SF',  pick:'3.26'},
   'chrisbell':       {team:'MIA', pick:'3.30'},
+  'eliraridon':      {team:'NE',  pick:'3.31'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 const POS_TIER_BANDS = [
