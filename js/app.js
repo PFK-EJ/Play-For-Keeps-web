@@ -345,6 +345,11 @@ const BAKED_FILM_ZIERLEIN = {
   carnelltate:6.71, makailemon:6.47, jordyntyson:6.43, kcconcepcion:6.42,
   denzelboston:6.40, omarcooperjr:6.39, chrisbrazzellii:6.36, zachariahbranch:6.32,
   skylerbell:6.31, germiebernard:6.29,
+  // TE (NFL.com /draft/tracker/2026/prospects/te_all)
+  kenyonsadiq:6.46, maxklare:6.30, samroush:6.26, elistowers:6.24,
+  nateboerkircher:6.17, justinjoly:6.16, eliraridon:6.14, jackendries:6.13,
+  oscardelp:6.13, willkacmarek:6.12, marlinklein:6.10, michaeltrigg:6.00,
+  tannerkoziol:5.95,
 };
 const POS_TIER_BANDS = [
   {max:5,   key:'Elite', color:'#FFD700'},
