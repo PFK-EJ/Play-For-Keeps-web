@@ -3392,7 +3392,7 @@ function AdminApp(){
         </div>
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
-        <RenderList src={list} allowEdit={true} autoTier={true} {...commonProps}/>
+        <RenderList src={list} allowEdit={true} {...commonProps}/>
       </div>
       </>)}
     </div>
