@@ -1944,7 +1944,7 @@ function RenderList({src,allowEdit,autoTier,onReorder,onMove,onEdit,onRemove,onR
                   {allowEdit&&<>
                     <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onRenameStart(item.id,item.name)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:5,color:"#666",cursor:"pointer",fontSize:13,padding:"2px 8px"}}>✏️</button>
                     <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onDeleteTier(item.id)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:5,color:"#444",cursor:"pointer",fontSize:13,padding:"2px 8px"}}>🗑️</button>
-                    {allowDrag&&<div style={{display:"flex",flexDirection:"column",gap:1}}>
+                    {allowEdit&&<div style={{display:"flex",flexDirection:"column",gap:1}} title="Move tier up/down — controls which auto-tier bucket this name labels">
                       <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,-1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:3,color:"#555",cursor:"pointer",fontSize:12,padding:"1px 5px"}}>▲</button>
                       <button onPointerDown={e=>e.stopPropagation()} onClick={()=>onMove(item.id,1)} style={{background:"none",border:"1px solid #2a2a2a",borderRadius:3,color:"#555",cursor:"pointer",fontSize:12,padding:"1px 5px"}}>▼</button>
                     </div>}
@@ -3161,6 +3161,16 @@ function AdminApp(){
   const [showAddPlayer,setShowAddPlayer]=useState(false);
   const [newP,setNewP]=useState({name:'',pos:'WR',college:''});
   const [adminTab,setAdminTab]=useState('rankings'); // 'rankings' | 'model'
+  // Mirror the public site's modelByName so admin rankings auto-tier from the same data.
+  // Pulls the DRAFT row (so admin previews match dev URL).
+  const [modelByName,setModelByName]=useState({});
+  useEffect(()=>{
+    fetchModelDraft().then(row=>{
+      if(!row?.data || !Array.isArray(row.data)) return;
+      const m={}; row.data.forEach(it=>{ if(it?.name) m[normDraftName(it.name)] = it; });
+      setModelByName(m);
+    }).catch(()=>{});
+  },[]);
 
   const sigOf=s=>`${s.format||'Superflex'}|${s.tep}|${s.ppr}|${s.passTd}|${s.ppc}`;
   const currentSig=sigOf(adminSettings);
@@ -3327,7 +3337,7 @@ function AdminApp(){
     );
   }
 
-  const commonProps={ onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter };
+  const commonProps={ onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter, modelByName, pfkSettings: adminSettings };
 
   return (
     <div style={{minHeight:'100vh',paddingBottom:40}}>
