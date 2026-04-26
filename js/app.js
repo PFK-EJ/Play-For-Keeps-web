@@ -2096,8 +2096,11 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
     const vw=window.innerWidth, vh=window.innerHeight;
     const W=240;
     const x=Math.max(8,Math.min(r.left, vw-W-8));
+    // Estimated popover height: 180 photo + 240 text/sections + 24 padding ≈ 440.
+    // Old 300 estimate was too low — flip-above wasn't triggering and the box got cut off.
+    const H = 440;
     let y=r.bottom+6;
-    if(y+300>vh) y=Math.max(8,r.top-306);
+    if(y+H>vh) y=Math.max(8,r.top-H-6);
     setPopover({id:item.id, item, prospect, x, y});
   };
   const hideProspect = ()=>setPopover(null);
