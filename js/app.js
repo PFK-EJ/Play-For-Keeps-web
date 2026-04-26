@@ -1954,7 +1954,7 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings,setRankingScoreOverride,showRankingScore,masterListForRS}){
+function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings,setRankingScoreOverride,showRankingScore,masterListForRS}){
   // autoTier defaults to !allowEdit. Pass autoTier={true} explicitly with allowEdit={true}
   // to get edit-capable rows that still group by PFK tiers (admin rankings preview).
   if(autoTier===undefined) autoTier = !allowEdit;
@@ -1964,7 +1964,9 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,
   // Used in admin rankings (Option A): player roster comes from model tab.
   // Tier-level controls stay live.
   const allowPlayerEdit = allowEdit && !lockPlayers;
-  const allowPlayerDrag = allowDrag && !lockPlayers;
+  // lockReorder: hide drag handles + ▲▼ but keep edit/remove. Used by the custom-tab
+  // sort dropdown so users can still add/remove players while a sort is active.
+  const allowPlayerDrag = allowDrag && !lockPlayers && !lockReorder;
   // Hide PFK Score on prod (main) — visible only on dev URL. Keeps the score private during
   // editing/preview but doesn't expose it to public prod visitors.
   const hidePfk = !isDevHost();
@@ -2793,6 +2795,84 @@ function App(){
   const setList=useCallback(updater=>{
     setSavedLists(prev=>prev.map(l=>l.id===activeListId?{...l,items:typeof updater==='function'?updater(l.items):updater}:l));
   },[activeListId]);
+  // Custom-tab sort: PFK official order (default), NFL draft capital, or PFK rookie model score.
+  // Reorders the user's list of players for display only — additions/removals to the underlying
+  // list still persist. Drag-and-drop is disabled in this view since the sort would override it.
+  const [customSort,setCustomSort]=useState('pfk');
+  const customSortedList=useMemo(()=>{
+    if(!list) return list;
+    const players=list.filter(it=>it?.type==='player');
+    if(!players.length) return list;
+    const officialIdx=new Map();
+    if(officialList){
+      let idx=0;
+      for(const it of officialList){ if(it?.type==='player'){ officialIdx.set(normDraftName(it.name),idx++); } }
+    }
+    const officialRank=(it)=>officialIdx.get(normDraftName(it.name)) ?? Number.POSITIVE_INFINITY;
+    // 'pfk' mode: walk officialList, preserve tier markers, keep only players that are in
+    // the user's list; append custom-only players at the end.
+    if(customSort==='pfk'){
+      if(!officialList) return players;
+      const userByKey=new Map();
+      for(const p of players){ userByKey.set(normDraftName(p.name), p); }
+      const out=[]; const seenKeys=new Set();
+      for(const it of officialList){
+        if(it?.type==='tier'){ out.push(it); continue; }
+        if(it?.type==='player'){
+          const k=normDraftName(it.name);
+          if(userByKey.has(k)){ out.push(userByKey.get(k)); seenKeys.add(k); }
+        }
+      }
+      // Drop empty tier markers
+      const cleaned=[];
+      for(let i=0;i<out.length;i++){
+        const it=out[i];
+        if(it?.type==='tier'){
+          let hasPlayer=false;
+          for(let j=i+1;j<out.length;j++){
+            if(out[j]?.type==='tier') break;
+            if(out[j]?.type==='player'){ hasPlayer=true; break; }
+          }
+          if(hasPlayer) cleaned.push(it);
+        } else cleaned.push(it);
+      }
+      // Append players in user list but not in PFK official
+      const extras=players.filter(p=>!seenKeys.has(normDraftName(p.name)));
+      if(extras.length){
+        cleaned.push({type:'tier',id:'tier_custom_extras',name:'Other'});
+        for(const p of extras) cleaned.push(p);
+      }
+      return cleaned;
+    }
+    // Flat sort modes — drop tier markers, sort players by selected criterion.
+    const draftAbs=(it)=>{
+      const d=DRAFT_2026[normDraftName(it.name)];
+      if(!d || !d.pick || d.pick==='UDFA') return Number.POSITIVE_INFINITY;
+      const abs=pickToAbs(d.pick);
+      return abs==null ? Number.POSITIVE_INFINITY : abs;
+    };
+    const modelPfk=(it)=>{
+      const m=modelByName?.[normDraftName(it.name)];
+      if(!m) return Number.NEGATIVE_INFINITY;
+      const pos=m.pos || it.pos;
+      const dc=m.dcOverride!=null ? +m.dcOverride : dcScoreFromPick(pos, m.pick);
+      const film=filmAvgPct(m.filmScores);
+      const base=pfkScore(m.stats, dc, film);
+      const baseline=base * landingMultiplier(m.landing);
+      return baseline * comboMultiplier(pos, pfkSettings);
+    };
+    return players.slice().sort((a,b)=>{
+      if(customSort==='draftcapital'){
+        const da=draftAbs(a), db=draftAbs(b);
+        if(da!==db) return da-db;
+        return officialRank(a)-officialRank(b);
+      }
+      // 'pfkmodel'
+      const ma=modelPfk(a), mb=modelPfk(b);
+      if(mb!==ma) return mb-ma;
+      return officialRank(a)-officialRank(b);
+    });
+  },[list,officialList,modelByName,pfkSettings,customSort]);
 
   useEffect(()=>{ localStorage.setItem("pfk_saved_lists",JSON.stringify(savedLists)); },[savedLists]);
 
@@ -3117,7 +3197,15 @@ function App(){
             {/* Toolbar */}
             <div style={{background:"#111",border:"1px solid #FFD700",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:800,color:"#FFD700"}}>✏️ {savedLists.find(l=>l.id===activeListId)?.name||"My Rankings"}</span>
-              <span style={{fontSize:13,color:"#666",flex:1}}>Hold ⠿ to drag · ▲▼ nudge · saves automatically</span>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:11,fontWeight:800,color:"#888",letterSpacing:1}}>SORT</span>
+                <select value={customSort} onChange={e=>setCustomSort(e.target.value)} style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#FFD700",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  <option value="pfk">PFK Official Rankings</option>
+                  <option value="draftcapital">NFL Draft Capital</option>
+                  <option value="pfkmodel">PFK Rookie Model</option>
+                </select>
+              </div>
+              <span style={{fontSize:13,color:"#666",flex:1}}>Saves automatically</span>
               <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Tier</button>
               <button onClick={()=>setShowAdd(v=>!v)} style={{padding:"6px 12px",background:"#222",border:"1px solid #444",borderRadius:7,color:"#ccc",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Player</button>
               <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#FFD700":"#333"),borderRadius:7,color:history.length?"#FFD700":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:14}}>↩ Undo</button>
@@ -3138,7 +3226,7 @@ function App(){
             </div>)}
             <FilterBar/>
             <div className="pfk-rookie-list">
-              <RenderList src={list} allowEdit={true} {...commonProps}/>
+              <RenderList src={customSortedList} allowEdit={true} lockReorder={true} {...commonProps}/>
             </div>
           </div>
         )}
