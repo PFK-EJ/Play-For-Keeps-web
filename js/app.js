@@ -448,8 +448,9 @@ const FF_HIT_RATE = {
   ]},
   QB: { metric:'Career Top-12 QB (QB1) season', udfa:1, anchors:[
     {abs:1,rate:88}, {abs:5,rate:82}, {abs:10,rate:72}, {abs:20,rate:62}, {abs:32,rate:52},
-    {abs:64,rate:25}, {abs:96,rate:12},
-    {abs:128,rate:6}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:1},
+    {abs:48,rate:28}, {abs:64,rate:18},     // R2 — Hurts/Kaepernick/Geno/Carr tier
+    {abs:80,rate:13}, {abs:96,rate:8},      // R3 — Wilson/Schaub/Foles outliers, mostly busts
+    {abs:128,rate:5}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:1},
   ]},
 };
 const ffHitRate = (pos, pickStr) => {
