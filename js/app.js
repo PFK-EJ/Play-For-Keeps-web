@@ -1829,6 +1829,9 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,
   // Tier-level controls stay live.
   const allowPlayerEdit = allowEdit && !lockPlayers;
   const allowPlayerDrag = allowDrag && !lockPlayers;
+  // Hide PFK Score on prod (main) — visible only on dev URL. Keeps the score private during
+  // editing/preview but doesn't expose it to public prod visitors.
+  const hidePfk = !isDevHost();
   const rowRefs = useRef({});
   const [draggingId,setDraggingId] = useState(null);
   const [insertBefore,setInsertBefore] = useState(null);
@@ -2112,7 +2115,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,
                   </span>
                 )}
                 <span style={{flex:1}}/>
-                {(()=>{ const m=modelBreakdown(item); return (
+                {!hidePfk && (()=>{ const m=modelBreakdown(item); return (
                   <span title={m?`PFK Score: ${m.pfk}`:'No PFK Score available'} style={{display:'inline-flex',alignItems:'baseline',gap:5,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),flexShrink:0,marginRight:6}}>
                     <span style={{fontSize:10,fontWeight:800,color:'#888',letterSpacing:1}}>PFK SCORE</span>
                     <span style={{color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
@@ -2161,7 +2164,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,
                 <Row label="DC Score" val={m.dc}/>
                 <Row label="Film Score" val={m.film}/>
                 <Row label="Landing Spot Score" val={m.landing}/>
-                <Row label="PFK Score" val={m.pfk}/>
+                {!hidePfk && <Row label="PFK Score" val={m.pfk}/>}
               </div>
             );
           })()}
