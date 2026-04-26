@@ -4,7 +4,7 @@ const SUPABASE_URL = 'https://ymwoabgesjqrojurdxmv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8z6jTCr6BPKmltRnNvEVzA_do7BmXKe';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-const DEFAULT_SETTINGS = { format:'Superflex', tep:0.5, ppr:1.0, passTd:6, ppc:0 };
+const DEFAULT_SETTINGS = { format:'Superflex', tep:0.5, ppr:1.0, passTd:5, ppc:0 };
 const FORMAT_CHOICES=['1QB','Superflex'];
 const TEP_CHOICES=[0.5,0.75,1.0], PPR_CHOICES=[1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0];
 
@@ -453,6 +453,41 @@ const comboMultiplier = (pos, settings) => {
 };
 // Stable signature for a settings combo, matches sigOf() inside AdminApp for cross-component lookup.
 const settingsSig = s => `${s?.format||'Superflex'}|${s?.tep}|${s?.ppr}|${s?.passTd}|${s?.ppc}`;
+// Ranking Score system. Each tier gets a 10-point base score (tier 0 = top = 100, tier 1 = 90, ...).
+// Within a tier, each rank decays by RANKING_SCORE_DECAY[tierIdx]. Top tiers have a steeper within-tier
+// drop (rank matters more); bottom tiers nearly flat (decay 0.2). Doubled from the original spec
+// per Evan's preference for stronger top-tier separation.
+const RANKING_SCORE_DECAY = [2.0, 1.5, 1.0, 0.5, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2];
+// Walk the master list (with tier markers in order) and find the player's tier index + rank within tier.
+// Returns { tierIdx, rankInTier } or null if not found.
+const findPlayerInMaster = (masterList, id) => {
+  let tierIdx = -1; let rankInTier = 0;
+  for(const it of (masterList||[])){
+    if(it?.type === 'tier'){ tierIdx++; rankInTier = 0; }
+    else if(it?.type === 'player'){
+      rankInTier++;
+      if(it.id === id) return { tierIdx: Math.max(0, tierIdx), rankInTier };
+    }
+  }
+  return null;
+};
+// Auto ranking score from rank+tier per Evan's spec.
+const getAutoRankingScore = (item, masterList) => {
+  if(!item?.id) return null;
+  const pos = findPlayerInMaster(masterList, item.id);
+  if(!pos) return null;
+  const { tierIdx, rankInTier } = pos;
+  const tierBase = 100 - tierIdx * 10;
+  const decay = RANKING_SCORE_DECAY[Math.min(tierIdx, RANKING_SCORE_DECAY.length-1)];
+  return Math.round((tierBase - (rankInTier - 1) * decay) * 100) / 100; // 2 decimal precision
+};
+// Effective = override if set, else auto.
+const getEffectiveRankingScore = (item, masterList) => {
+  if(item?.rankingScoreOverride != null && !isNaN(+item.rankingScoreOverride)){
+    return Math.round(+item.rankingScoreOverride * 100) / 100;
+  }
+  return getAutoRankingScore(item, masterList);
+};
 // Build a per-combo PFK score for a model entry (with override + landing + combo multiplier).
 const computeComboPfk = (m, settings) => {
   const pos = m.pos;
@@ -1844,7 +1879,7 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings}){
+function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings,setRankingScoreOverride,showRankingScore}){
   // autoTier defaults to !allowEdit. Pass autoTier={true} explicitly with allowEdit={true}
   // to get edit-capable rows that still group by PFK tiers (admin rankings preview).
   if(autoTier===undefined) autoTier = !allowEdit;
@@ -2141,6 +2176,26 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,
                   </span>
                 )}
                 <span style={{flex:1}}/>
+                {showRankingScore && (()=>{
+                  const auto = getAutoRankingScore(item, src);
+                  const eff = getEffectiveRankingScore(item, src);
+                  const isOverride = item.rankingScoreOverride != null && !isNaN(+item.rankingScoreOverride);
+                  const onClick = () => {
+                    const cur = isOverride ? item.rankingScoreOverride : (auto ?? '');
+                    const v = prompt(`Ranking Score for ${item.name}\n(Auto: ${auto ?? '—'}, blank to clear override)`, cur);
+                    if(v === null) return;
+                    setRankingScoreOverride && setRankingScoreOverride(item.id, v.trim());
+                  };
+                  const labelColor = isOverride ? '#c084fc' : '#888';
+                  const valColor   = isOverride ? '#c084fc' : (eff != null ? '#aaa' : '#444');
+                  return (
+                    <span onClick={onClick} title={`Ranking Score · click to edit · ${isOverride ? 'MANUALLY OVERRIDDEN — auto would be '+(auto ?? '—') : 'auto-derived from tier+rank'}`} style={{display:'inline-flex',alignItems:'baseline',gap:5,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(isOverride ? '#c084fc' : '#222'),flexShrink:0,marginRight:6,cursor:'pointer'}}>
+                      <span style={{fontSize:10,fontWeight:800,color:labelColor,letterSpacing:1}}>RS</span>
+                      <span style={{color:valColor,fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{eff != null ? eff : '—'}</span>
+                      {isOverride && <button onClick={e=>{e.stopPropagation(); setRankingScoreOverride && setRankingScoreOverride(item.id,'');}} style={{marginLeft:2,background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:11,padding:0}} title="Clear override">×</button>}
+                    </span>
+                  );
+                })()}
                 {!hidePfk && (()=>{ const m=modelBreakdown(item); return (
                   <span title={m?`PFK Score: ${m.pfk}`:'No PFK Score available'} style={{display:'inline-flex',alignItems:'baseline',gap:5,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),flexShrink:0,marginRight:6}}>
                     <span style={{fontSize:10,fontWeight:800,color:'#888',letterSpacing:1}}>PFK SCORE</span>
@@ -2722,6 +2777,11 @@ function App(){
       setOfficialList(prev => (prev||[]).map(x => x.id===editingPlayer ? {...x,...playerDraft} : x));
       setEditingPlayer(null);
     },
+    setRankingScoreOverride: (id, val) => setOfficialList(prev => (prev||[]).map(x => {
+      if(x.id !== id) return x;
+      if(val === '' || val == null) { const {rankingScoreOverride, ...rest} = x; return rest; }
+      return { ...x, rankingScoreOverride: Math.round(+val * 100) / 100 };
+    })),
     onCancelEdit: () => setEditingPlayer(null),
     onRenameStart: (id,name) => { setRenamingTier(id); setTierNameDraft(name); },
     onRenameCancel: () => setRenamingTier(null),
@@ -2893,7 +2953,7 @@ function App(){
             </div>
             <FilterBar/>
             <div className="pfk-rookie-list">
-              <RenderList src={officialList||PFK_LIST} allowEdit={editMode} autoTier={false} prospects={prospects} {...commonProps} {...(editMode ? officialOps : {})}/>
+              <RenderList src={officialList||PFK_LIST} allowEdit={editMode} autoTier={false} prospects={prospects} {...commonProps} {...(editMode ? officialOps : {})} showRankingScore={editMode && isEvanOnDev}/>
             </div>
           </div>
         )}
