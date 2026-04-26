@@ -2975,9 +2975,10 @@ function App(){
   useEffect(()=>{
     if(!session||!sb) return;
     if(!localStorage.getItem('pfk_lists_seeded_v5')) return; // wait for migration
-    // Order by created_at so the lists appear in the order they were inserted
-    // (Custom1, Custom2, Custom3...) instead of arbitrary Supabase row order.
-    sb.from('user_rankings').select('*').eq('user_id',session.user.id).order('created_at',{ascending:true}).then(({data})=>{
+    // Order by id so the lists appear in the order they were inserted (Custom1, Custom2,
+    // Custom3...) instead of arbitrary Supabase row order. The schema has no created_at
+    // column — id is auto-increment so it preserves insertion order.
+    sb.from('user_rankings').select('*').eq('user_id',session.user.id).order('id',{ascending:true}).then(({data})=>{
       if(data&&data.length){
         setSavedLists(data.map(r=>({id:'cloud_'+r.id,cloudId:r.id,name:r.name,items:r.items})));
         setActiveListId('cloud_'+data[0].id);
