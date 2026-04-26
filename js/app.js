@@ -336,13 +336,39 @@ const DRAFT_2026 = {
   'matthewhibner':   {team:'BAL', pick:'4.33'},
   'brycelance':      {team:'NO',  pick:'4.36'},
   'colbieyoung':     {team:'CIN', pick:'4.40'},
-  // Round 5 (picks 1-28; rest pending)
+  // Round 5 (final results — note Joly went to CLE not DEN per live correction)
   'reggievirgil':    {team:'ARI', pick:'5.03'},
-  'justinjoly':      {team:'DEN', pick:'5.12'},
+  'justinjoly':      {team:'CLE', pick:'5.12'},
   'emmettjohnson':   {team:'KC',  pick:'5.21'},
   'tannerkoziol':    {team:'JAC', pick:'5.24'},
   'nicholassingleton':{team:'TEN',pick:'5.25'},
   'kendricklaw':     {team:'DET', pick:'5.28'},
+  'joeroyer':        {team:'CLE', pick:'5.30'},
+  'adamrandall':     {team:'BAL', pick:'5.34'},
+  'cyrusallen':      {team:'KC',  pick:'5.36'},
+  'kevincolemanjr':  {team:'MIA', pick:'5.37'},
+  'colepayton':      {team:'PHI', pick:'5.38'},
+  // Round 6
+  'taylengreen':     {team:'CLE', pick:'6.01'},
+  'kaytronallen':    {team:'WSH', pick:'6.06'},
+  'barionbrown':     {team:'NO',  pick:'6.09'},
+  'joshcameron':     {team:'JAC', pick:'6.10'},
+  'malikbenson':     {team:'LV',  pick:'6.14'},
+  'cjdaniels':       {team:'LAR', pick:'6.16'},
+  'demondclaiborne': {team:'MIN', pick:'6.17'},
+  'emmanuelhendersonjr':{team:'SEA',pick:'6.18'},
+  // Round 7
+  'jackendries':     {team:'CIN', pick:'7.05'},
+  'athankaliakmanis':{team:'WSH', pick:'7.07'},
+  'eliheidenreich':  {team:'PIT', pick:'7.14'},
+  'behrenmorton':    {team:'NE',  pick:'7.18'},
+  'sethmcgowan':     {team:'IND', pick:'7.21'},
+  'jammiller':       {team:'NE',  pick:'7.29'},
+  'jamarionmiller':  {team:'NE',  pick:'7.29'},
+  'carsenryan':      {team:'CLE', pick:'7.32'},
+  'garrettnussmeier':{team:'KC',  pick:'7.33'},
+  'deionburks':      {team:'IND', pick:'7.38'},
+  'dallenbentley':   {team:'DEN', pick:'7.40'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 
