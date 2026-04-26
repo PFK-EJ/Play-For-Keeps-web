@@ -1918,7 +1918,7 @@ function TeamTab() {
   );
 }
 
-function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings,setRankingScoreOverride,showRankingScore}){
+function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,onRemove,onRenameStart,onRenameCancel,onRenameSave,onDeleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer,onCancelEdit,posFilter,prospects,modelByName,pfkSettings,setRankingScoreOverride,showRankingScore,masterListForRS}){
   // autoTier defaults to !allowEdit. Pass autoTier={true} explicitly with allowEdit={true}
   // to get edit-capable rows that still group by PFK tiers (admin rankings preview).
   if(autoTier===undefined) autoTier = !allowEdit;
@@ -2216,8 +2216,11 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,onReorder,onMove,onEdit,
                 )}
                 <span style={{flex:1}}/>
                 {showRankingScore && (()=>{
-                  const auto = getAutoRankingScore(item, src);
-                  const eff = getEffectiveRankingScore(item, src);
+                  // RS reflects the player's place in the MASTER list, not the derived view.
+                  // This keeps WR/RB scores stable when TEP/PTD reshuffle TE/QB positions.
+                  const rsRef = masterListForRS || src;
+                  const auto = getAutoRankingScore(item, rsRef);
+                  const eff = getEffectiveRankingScore(item, rsRef);
                   const isOverride = item.rankingScoreOverride != null && !isNaN(+item.rankingScoreOverride);
                   const onClick = () => {
                     const cur = isOverride ? item.rankingScoreOverride : (auto ?? '');
@@ -2641,6 +2644,7 @@ function App(){
   const [pfkMissing,setPfkMissing]=useState(false);
   const [prospects,setProspects]=useState({});
   const [modelByName,setModelByName]=useState({});
+  const [masterList,setMasterList]=useState(null);
 
   useEffect(()=>{
     fetch('js/prospects-2026.json').then(r=>r.json()).then(arr=>{
@@ -2658,6 +2662,15 @@ function App(){
       setModelByName(m);
     }).catch(()=>{});
   },[]);
+  // Keep masterList in sync. On default combo it mirrors officialList (no extra fetch).
+  // On non-default combo, fetch the master separately so RS lookups have a stable reference.
+  useEffect(()=>{
+    if(sameSettings(pfkSettings, DEFAULT_SETTINGS)){
+      setMasterList(null); // unused; effectiveMaster falls back to officialList
+      return;
+    }
+    fetchMasterListForDerivation().then(m => setMasterList(m));
+  },[pfkSettings]);
   const [session,setSession]=useState(null);
   const [userRow,setUserRow]=useState(null);
   const [authOpen,setAuthOpen]=useState(false);
@@ -2937,7 +2950,10 @@ function App(){
     </div>
   );
 
-  const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter,modelByName,pfkSettings};
+  // For RS calculation: when on default combo, master === officialList. When on derived combo,
+  // use the separately-fetched masterList so RS stays constant per player regardless of combo.
+  const effectiveMasterList = sameSettings(pfkSettings, DEFAULT_SETTINGS) ? officialList : masterList;
+  const commonProps={onReorder:reorder,onMove:moveItem,onEdit:r=>{setEditingPlayer(r.id);setPlayerDraft({...r});},onRemove:removePlayer,onRenameStart:(id,name)=>{setRenamingTier(id);setTierNameDraft(name);},onRenameCancel:()=>setRenamingTier(null),onRenameSave:saveRename,onDeleteTier:deleteTier,renamingTier,tierNameDraft,setTierNameDraft,editingPlayer,playerDraft,setPlayerDraft,onSavePlayer:savePlayer,onCancelEdit:()=>setEditingPlayer(null),posFilter,modelByName,pfkSettings,masterListForRS:effectiveMasterList};
 
   // Dev URL gate: only Evan can access dev preview. Anyone else sees a login or access denied screen.
   if(isDevHost()){
