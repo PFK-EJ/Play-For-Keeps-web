@@ -5,7 +5,7 @@ const SUPABASE_KEY = 'sb_publishable_8z6jTCr6BPKmltRnNvEVzA_do7BmXKe';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const DEFAULT_SETTINGS = { format:'Superflex', tep:0.5, ppr:1.0, passTd:5, ppc:0 };
-const FORMAT_CHOICES=['1QB','Superflex'];
+const FORMAT_CHOICES=['Superflex'];
 const TEP_CHOICES=[0.5,0.75,1.0], PPR_CHOICES=[1.0], PTD_CHOICES=[4,5,6], PPC_CHOICES=[0];
 
 const sameSettings = (a,b)=> a && b && (a.format||'Superflex')===(b.format||'Superflex') && a.tep===b.tep && a.ppr===b.ppr && a.passTd===b.passTd && a.ppc===b.ppc;
@@ -141,7 +141,7 @@ function SettingsToggleBar({value,onChange,compact}){
   );
   return (
     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-      <Group label="FORMAT" choices={FORMAT_CHOICES} suffix="" current={value.format||'Superflex'} field="format"/>
+      {FORMAT_CHOICES.length>1 && <Group label="FORMAT" choices={FORMAT_CHOICES} suffix="" current={value.format||'Superflex'} field="format"/>}
       <Group label="TEP" choices={TEP_CHOICES} suffix="" current={value.tep} field="tep"/>
       <Group label="PASS TD" choices={PTD_CHOICES} suffix="pt" current={value.passTd} field="passTd"/>
     </div>
@@ -431,11 +431,12 @@ const FORMAT_MULT = {
   'Superflex': {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
   '1QB':       {QB:0.54, RB:1.10, WR:1.01, TE:0.93},
 };
+// TEP only affects TE per Evan's preference (cross-position effects ignored despite research showing slight squeeze on RB/WR).
 const TEP_MULT = {
   0.5:  {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
-  0.75: {QB:1.00, RB:0.99, WR:0.99, TE:1.05},
-  1.0:  {QB:0.99, RB:0.97, WR:0.97, TE:1.12},
-  1:    {QB:0.99, RB:0.97, WR:0.97, TE:1.12}, // alias for tep stored as integer 1
+  0.75: {QB:1.00, RB:1.00, WR:1.00, TE:1.05},
+  1.0:  {QB:1.00, RB:1.00, WR:1.00, TE:1.12},
+  1:    {QB:1.00, RB:1.00, WR:1.00, TE:1.12}, // alias for tep stored as integer 1
 };
 const PTD_MULT = {
   // Baseline 5 PTD = 1.00. 6 PTD bumps QBs by 5% (Evan-tuned 2026-04-25).
