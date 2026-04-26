@@ -2947,18 +2947,21 @@ function App(){
   // One-time migration: replace any pre-existing local OR cloud lists with three
   // fresh Custom1/2/3. Gated by a localStorage flag so it only runs once per browser.
   // Triggers when officialList is loaded so the seed reflects current PFK rankings.
+  // Each list gets a DEEP-CLONED copy of officialList so they're fully independent.
   useEffect(()=>{
     if(!officialList) return;
-    if(localStorage.getItem('pfk_lists_seeded_v3')) return;
+    if(localStorage.getItem('pfk_lists_seeded_v4')) return;
     const seedFresh=()=>{
+      const clone=()=>JSON.parse(JSON.stringify(officialList));
       setSavedLists([
-        {id:'list_1',name:'Custom1',items:officialList},
-        {id:'list_2',name:'Custom2',items:officialList},
-        {id:'list_3',name:'Custom3',items:officialList},
+        {id:'list_1',name:'Custom1',items:clone()},
+        {id:'list_2',name:'Custom2',items:clone()},
+        {id:'list_3',name:'Custom3',items:clone()},
       ]);
       setActiveListId('list_1');
       setIsDirty(false);
-      localStorage.setItem('pfk_lists_seeded_v3','1');
+      localStorage.removeItem('pfk_lists_seeded_v3'); // clear any prior flag
+      localStorage.setItem('pfk_lists_seeded_v4','1');
     };
     if(session && sb){
       sb.from('user_rankings').delete().eq('user_id',session.user.id).then(seedFresh);
@@ -2969,7 +2972,7 @@ function App(){
 
   useEffect(()=>{
     if(!session||!sb) return;
-    if(!localStorage.getItem('pfk_lists_seeded_v3')) return; // wait for migration
+    if(!localStorage.getItem('pfk_lists_seeded_v4')) return; // wait for migration
     sb.from('user_rankings').select('*').eq('user_id',session.user.id).then(({data})=>{
       if(data&&data.length){
         setSavedLists(data.map(r=>({id:'cloud_'+r.id,cloudId:r.id,name:r.name,items:r.items})));
