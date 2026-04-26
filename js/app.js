@@ -3159,12 +3159,17 @@ function App(){
             ))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
+               title="Follow @PlayForKeepsFF on X"
+               style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 11px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:20,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:13,letterSpacing:0.3,transition:"all .15s"}}
+               onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
+               onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+              <span>@PlayForKeepsFF</span>
+            </a>
             {session?(
               <>
-                <div style={{fontSize:13,color:"#FFD700",fontWeight:700,textAlign:"right"}}>
-                  <div style={{fontSize:12}}><a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{color:"#FFD700",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:5}}><svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>@PlayForKeepsFF</a></div>
-                  {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
-                </div>
+                {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
                 <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:13}}>Sign out</button>
               </>
             ):(
