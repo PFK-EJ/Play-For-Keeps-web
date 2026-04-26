@@ -2990,7 +2990,11 @@ function App(){
           sb.from('user_rankings').update({name:l.name,items:l.items,updated_at:new Date().toISOString()}).eq('id',l.cloudId);
         }else{
           sb.from('user_rankings').insert({user_id:session.user.id,name:l.name,items:l.items}).select().single().then(({data})=>{
-            if(data) setSavedLists(prev=>prev.map(x=>x.id===l.id?{...x,id:'cloud_'+data.id,cloudId:data.id}:x));
+            if(data){
+              setSavedLists(prev=>prev.map(x=>x.id===l.id?{...x,id:'cloud_'+data.id,cloudId:data.id}:x));
+              // Keep activeListId in sync — otherwise the list lookup goes stale and renders an empty fallback.
+              setActiveListId(prev=>prev===l.id?'cloud_'+data.id:prev);
+            }
           });
         }
       });
@@ -2998,6 +3002,16 @@ function App(){
     return ()=>clearTimeout(t);
   },[savedLists,session]);
   useEffect(()=>{ localStorage.setItem("pfk_active_list_id",activeListId); },[activeListId]);
+  // Safety net: if activeListId points at a list that doesn't exist (e.g. after migration
+  // replaces savedLists or after cloud-save changes a list's id), fall back to the first list.
+  // Without this, list useMemo returns the empty buildInitialList() fallback and the page
+  // renders blank until the user clicks a tab.
+  useEffect(()=>{
+    if(!savedLists.length) return;
+    if(!savedLists.find(l=>l.id===activeListId)){
+      setActiveListId(savedLists[0].id);
+    }
+  },[savedLists,activeListId]);
   useEffect(()=>{ localStorage.setItem("pfk_roster",JSON.stringify(teamRoster)); },[teamRoster]);
   useEffect(()=>{ localStorage.setItem("pfk_picks",JSON.stringify(picks)); },[picks]);
 
