@@ -420,35 +420,36 @@ const pickToAbs = pickStr => {
   const r = +m[1], s = Math.min(+m[2], 32);
   return (r-1)*32 + s;
 };
-// FF "hit rate" = % chance of a fantasy-startable season in a player's first 3 NFL years.
+// FF "hit rate" = % chance of a fantasy-startable season at SOME POINT in a player's career.
+// Career-based, not first-3-years — aligns with the popular "only 6 WR busts in top-10 over
+// 20 years" framing where "hit" means "ever became a fantasy starter," not "starter as a rookie."
 // Pick-bracket anchors with linear interpolation between them — mirrors dcScoreFromPick.
-// Sources: Fantasy Footballers (2000-2018 study, n=1349), fantasyclassroom.org (QB R1/R2),
-// ESPN/Yahoo/PFF top-10-pick analyses (modern early-R1 RB/WR/QB hit rates trend higher
-// than the 20-year average because volume gets force-fed to top picks).
-//   RB metric: any Top-24 RB (RB2) season
-//   WR metric: any Top-24 WR (WR2) season
-//   TE metric: any Top-12 TE season
-//   QB metric: any Top-12 QB (QB1) season  ← Top-24 was too easy per Evan
+// Sources: Fantasy Footballers (2000-2018 study, n=1349), fantasyclassroom.org (QB tiers),
+// Yahoo/ESPN/PFF top-10-pick analyses, and a 20-year manual review of top-5 picks per position.
+//   RB metric: any Top-24 RB (RB2) season — career
+//   WR metric: any Top-24 WR (WR2) season — career
+//   TE metric: any Top-12 TE season — career
+//   QB metric: any Top-12 QB (QB1) season — career
 const FF_HIT_RATE = {
-  RB: { metric:'Top-24 RB season (first 3 yrs)', udfa:1, anchors:[
-    {abs:1,rate:80}, {abs:10,rate:75}, {abs:20,rate:60}, {abs:32,rate:50},
-    {abs:48,rate:38}, {abs:64,rate:32}, {abs:96,rate:15},
-    {abs:128,rate:6}, {abs:160,rate:4}, {abs:192,rate:2}, {abs:224,rate:2},
+  RB: { metric:'Career Top-24 RB (RB2) season', udfa:2, anchors:[
+    {abs:1,rate:92}, {abs:5,rate:90}, {abs:10,rate:85}, {abs:20,rate:70}, {abs:32,rate:58},
+    {abs:48,rate:45}, {abs:64,rate:38}, {abs:96,rate:20},
+    {abs:128,rate:10}, {abs:160,rate:6}, {abs:192,rate:4}, {abs:224,rate:3},
   ]},
-  WR: { metric:'Top-24 WR season (first 3 yrs)', udfa:1, anchors:[
-    {abs:1,rate:50}, {abs:10,rate:45}, {abs:20,rate:35}, {abs:32,rate:25},
-    {abs:48,rate:15}, {abs:64,rate:11}, {abs:96,rate:4},
-    {abs:128,rate:2}, {abs:160,rate:1}, {abs:192,rate:1}, {abs:224,rate:1},
+  WR: { metric:'Career Top-24 WR (WR2) season', udfa:1, anchors:[
+    {abs:1,rate:92}, {abs:5,rate:88}, {abs:10,rate:80}, {abs:20,rate:60}, {abs:32,rate:45},
+    {abs:48,rate:28}, {abs:64,rate:20}, {abs:96,rate:10},
+    {abs:128,rate:5}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:1},
   ]},
-  TE: { metric:'Top-12 TE season (first 3 yrs)', udfa:1, anchors:[
-    {abs:1,rate:40}, {abs:16,rate:32}, {abs:32,rate:22},
-    {abs:64,rate:8},  {abs:96,rate:6},
-    {abs:128,rate:4}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:2},
+  TE: { metric:'Career Top-12 TE season', udfa:1, anchors:[
+    {abs:1,rate:65}, {abs:10,rate:55}, {abs:20,rate:42}, {abs:32,rate:32},
+    {abs:64,rate:14}, {abs:96,rate:12},
+    {abs:128,rate:6}, {abs:160,rate:4}, {abs:192,rate:3}, {abs:224,rate:2},
   ]},
-  QB: { metric:'Top-12 QB season (first 3 yrs)', udfa:1, anchors:[
-    {abs:1,rate:75}, {abs:5,rate:70}, {abs:10,rate:60}, {abs:32,rate:50},
-    {abs:64,rate:18}, {abs:96,rate:8},
-    {abs:128,rate:5}, {abs:160,rate:2}, {abs:192,rate:1}, {abs:224,rate:1},
+  QB: { metric:'Career Top-12 QB (QB1) season', udfa:1, anchors:[
+    {abs:1,rate:88}, {abs:5,rate:82}, {abs:10,rate:72}, {abs:20,rate:62}, {abs:32,rate:52},
+    {abs:64,rate:25}, {abs:96,rate:12},
+    {abs:128,rate:6}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:1},
   ]},
 };
 const ffHitRate = (pos, pickStr) => {
