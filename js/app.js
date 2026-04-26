@@ -2079,6 +2079,8 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
     return out;
   },[src,autoTier,modelByName]);
   // Position filter, then drop tier headers that have no players following (per filter).
+  // EXCEPT in edit mode — there we keep empty tiers visible so users can drop players into
+  // them (otherwise clicking "+ Tier" looks broken because the new empty tier disappears).
   const flRaw = posFilter.size>=4 ? sortedSrc : sortedSrc.filter(x=>x.type==="tier"||posFilter.has(x.pos));
   const fl = (()=>{
     const out=[];
@@ -2086,7 +2088,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
       const x = flRaw[i];
       if(x.type==='tier'){
         const next = flRaw[i+1];
-        if(next && next.type!=='tier') out.push(x);
+        if(allowEdit || (next && next.type!=='tier')) out.push(x);
       } else {
         out.push(x);
       }
