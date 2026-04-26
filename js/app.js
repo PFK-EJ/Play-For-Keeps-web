@@ -2844,8 +2844,9 @@ function App(){
   },[activeListId]);
   // Custom-tab sort: 'custom' = the user's manual order (drag/drop enabled),
   // 'pfk' = PFK official order, 'draftcapital' = NFL pick, 'pfkmodel' = PFK score.
-  // Drag-and-drop is enabled only in 'custom' mode (other sorts would override drags).
-  const [customSort,setCustomSort]=useState('pfk');
+  // Default is 'custom' so drag-and-drop works out of the box; the initial list
+  // loads from officialList so the starting view is identical to PFK Official anyway.
+  const [customSort,setCustomSort]=useState('custom');
   const customSortedList=useMemo(()=>{
     if(!list) return list;
     if(customSort==='custom') return list; // raw list — drag/drop targets this directly
