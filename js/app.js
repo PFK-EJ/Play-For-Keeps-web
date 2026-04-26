@@ -336,9 +336,9 @@ const DRAFT_2026 = {
   'matthewhibner':   {team:'BAL', pick:'4.33'},
   'brycelance':      {team:'NO',  pick:'4.36'},
   'colbieyoung':     {team:'CIN', pick:'4.40'},
-  // Round 5 (final results — note Joly went to CLE not DEN per live correction)
+  // Round 5 (final results — Denver traded up to 152 for Joly, sending picks 170 and 182 to Cleveland)
   'reggievirgil':    {team:'ARI', pick:'5.03'},
-  'justinjoly':      {team:'CLE', pick:'5.12'},
+  'justinjoly':      {team:'DEN', pick:'5.12'},
   'emmettjohnson':   {team:'KC',  pick:'5.21'},
   'tannerkoziol':    {team:'JAC', pick:'5.24'},
   'nicholassingleton':{team:'TEN',pick:'5.25'},
