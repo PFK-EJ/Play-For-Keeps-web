@@ -2842,12 +2842,13 @@ function App(){
   const setList=useCallback(updater=>{
     setSavedLists(prev=>prev.map(l=>l.id===activeListId?{...l,items:typeof updater==='function'?updater(l.items):updater}:l));
   },[activeListId]);
-  // Custom-tab sort: PFK official order (default), NFL draft capital, or PFK rookie model score.
-  // Reorders the user's list of players for display only — additions/removals to the underlying
-  // list still persist. Drag-and-drop is disabled in this view since the sort would override it.
+  // Custom-tab sort: 'custom' = the user's manual order (drag/drop enabled),
+  // 'pfk' = PFK official order, 'draftcapital' = NFL pick, 'pfkmodel' = PFK score.
+  // Drag-and-drop is enabled only in 'custom' mode (other sorts would override drags).
   const [customSort,setCustomSort]=useState('pfk');
   const customSortedList=useMemo(()=>{
     if(!list) return list;
+    if(customSort==='custom') return list; // raw list — drag/drop targets this directly
     const players=list.filter(it=>it?.type==='player');
     if(!players.length) return list;
     const officialIdx=new Map();
@@ -3123,7 +3124,7 @@ function App(){
           </div>
           {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
           <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
-            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ My 2026 Rookies"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
+            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ Customize My Rankings"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
           </div>
@@ -3225,6 +3226,7 @@ function App(){
                 <span style={{fontSize:11,fontWeight:800,color:"#888",letterSpacing:1}}>SORT</span>
                 <select value={customSort} onChange={e=>setCustomSort(e.target.value)} style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#FFD700",fontSize:13,fontWeight:700,cursor:"pointer"}}>
                   <option value="pfk">PFK Official Rankings</option>
+                  <option value="custom">My Custom Order</option>
                   <option value="draftcapital">NFL Draft Capital</option>
                   <option value="pfkmodel">PFK Rookie Model</option>
                 </select>
@@ -3249,7 +3251,7 @@ function App(){
             </div>)}
             <FilterBar/>
             <div className="pfk-rookie-list">
-              <RenderList src={customSortedList} allowEdit={true} lockReorder={true} {...commonProps}/>
+              <RenderList src={customSortedList} allowEdit={true} lockReorder={customSort!=='custom'} {...commonProps}/>
             </div>
           </div>
         )}
