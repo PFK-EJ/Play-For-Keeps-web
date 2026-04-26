@@ -420,6 +420,26 @@ const pickToAbs = pickStr => {
   const r = +m[1], s = Math.min(+m[2], 32);
   return (r-1)*32 + s;
 };
+// FF "hit rate" = chance of a fantasy-startable season in a player's first 3 NFL years,
+// by NFL draft round. Sources: Fantasy Footballers (2000-2018, n=1349) for RB/WR/TE/QB
+// + fantasyclassroom.org for QB Round-1/Round-2 detail. Numbers rounded to whole %.
+//   RB metric: any RB2-or-better season (top-24)
+//   WR metric: any WR2-or-better season (top-24)
+//   TE metric: any Top-12 TE season
+//   QB metric: any QB1+QB2 (top-24) season
+const FF_HIT_RATE = {
+  RB: { 1:55, 2:28, 3:12, 4:4,  5:4,  6:2,  7:2,  UDFA:1 },
+  WR: { 1:18, 2:11, 3:4,  4:1,  5:1,  6:1,  7:1,  UDFA:1 },
+  TE: { 1:26, 2:3,  3:14, 4:5,  5:3,  6:3,  7:3,  UDFA:1 },
+  QB: { 1:75, 2:56, 3:9,  4:5,  5:2,  6:4,  7:1,  UDFA:1 },
+};
+const ffHitRate = (pos, pickStr) => {
+  const tbl = FF_HIT_RATE[pos]; if(!tbl) return null;
+  if(!pickStr || pickStr==='UDFA') return tbl.UDFA;
+  const m = String(pickStr).match(/^(\d+)\./);
+  if(!m) return tbl.UDFA;
+  return tbl[+m[1]] ?? tbl.UDFA;
+};
 const dcScoreFromPick = (pos, pickStr) => {
   const tier = DC_TIERS[pos]; if(!tier) return 0;
   const abs = pickToAbs(pickStr);
@@ -2046,15 +2066,14 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
     }
     return out;
   })();
-  const showProspect = (e,id,prospect,model)=>{
-    if(!prospect && !model) return;
+  const showProspect = (e,item,prospect)=>{
     const r=e.currentTarget.getBoundingClientRect();
     const vw=window.innerWidth, vh=window.innerHeight;
     const W=240;
     const x=Math.max(8,Math.min(r.left, vw-W-8));
     let y=r.bottom+6;
     if(y+300>vh) y=Math.max(8,r.top-306);
-    setPopover({id, prospect, model, x, y});
+    setPopover({id:item.id, item, prospect, x, y});
   };
   const hideProspect = ()=>setPopover(null);
 
@@ -2233,16 +2252,15 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                 <span style={{padding:"2px 7px",borderRadius:5,fontSize:12,fontWeight:800,flexShrink:0,background:"#111",color:POS_COLORS[item.pos],border:"1px solid "+POS_COLORS[item.pos]}}>{item.pos}</span>
                 {(()=>{
                   const p=prospects&&prospects[normName(item.name)];
-                  const m=modelBreakdown(item);
-                  const triggerable = !!(p || m);
-                  const und=triggerable?{textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#FFD70088',cursor:'help'}:{};
-                  const handlers=triggerable?(hoverCapable?{
-                    onMouseEnter:e=>showProspect(e,item.id,p,m),
+                  // Popover always triggerable now — every player has a position, which is enough for FF hit rate.
+                  const und={textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#FFD70088',cursor:'help'};
+                  const handlers=hoverCapable?{
+                    onMouseEnter:e=>showProspect(e,item,p),
                     onMouseLeave:hideProspect
                   }:{
-                    onClick:e=>{e.stopPropagation();if(popover&&popover.id===item.id)setPopover(null);else showProspect(e,item.id,p,m);},
+                    onClick:e=>{e.stopPropagation();if(popover&&popover.id===item.id)setPopover(null);else showProspect(e,item,p);},
                     onPointerDown:e=>e.stopPropagation()
-                  }):{};
+                  };
                   return <span {...handlers} style={{fontWeight:700,fontSize:14,flexShrink:0,...und}}>{item.name}</span>;
                 })()}
                 <span className="pfk-rook-college" style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
@@ -2296,41 +2314,51 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
         );
       })}
       {draggingId&&insertBefore===null&&<DropLine/>}
-      {popover&&(
-        <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
-          onClick={e=>e.stopPropagation()}>
-          {popover.prospect&&(<>
-            <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
-            <div style={{fontWeight:900,fontSize:14,marginTop:8,color:'#FFD700'}}>{popover.prospect.name}</div>
-            <div style={{fontSize:13,color:'#888',marginTop:2}}>{popover.prospect.position} · {popover.prospect.college}</div>
-            <div style={{display:'flex',gap:14,marginTop:8,fontSize:14,flexWrap:'wrap'}}>
-              <div><span style={{color:'#555'}}>HT </span><span style={{fontWeight:700}}>{popover.prospect.height||'—'}</span></div>
-              <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
-              <div><span style={{color:'#555'}}>AGE </span><span style={{fontWeight:700}}>{popover.prospect.age!=null?popover.prospect.age:'—'}</span></div>
+      {popover&&(()=>{
+        const it = popover.item;
+        const draft = it ? DRAFT_2026[normName(it.name)] : null;
+        const hr = it ? ffHitRate(it.pos, draft?.pick) : null;
+        const draftLabel = draft?.pick ? (draft.pick==='UDFA' ? 'UDFA' : `${draft.team||'—'} · ${draft.pick}`) : 'Undrafted';
+        const hrLabel = (() => {
+          switch(it?.pos){
+            case 'RB': return 'Top-24 RB season (first 3 yrs)';
+            case 'WR': return 'Top-24 WR season (first 3 yrs)';
+            case 'TE': return 'Top-12 TE season (first 3 yrs)';
+            case 'QB': return 'Top-24 QB season (first 3 yrs)';
+            default:   return 'Fantasy starter (first 3 yrs)';
+          }
+        })();
+        const hrColor = hr==null ? '#444' : (hr>=40 ? '#10b981' : hr>=20 ? '#FFD700' : hr>=10 ? '#f59e0b' : '#ef4444');
+        return (
+          <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
+            onClick={e=>e.stopPropagation()}>
+            {popover.prospect&&(<>
+              <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
+            </>)}
+            <div style={{fontWeight:900,fontSize:14,marginTop:popover.prospect?8:0,color:'#FFD700'}}>{it?.name||popover.prospect?.name||''}</div>
+            <div style={{fontSize:13,color:'#888',marginTop:2}}>{(it?.pos||popover.prospect?.position||'')} · {(it?.college||popover.prospect?.college||'')}</div>
+            {popover.prospect&&(
+              <div style={{display:'flex',gap:14,marginTop:8,fontSize:14,flexWrap:'wrap'}}>
+                <div><span style={{color:'#555'}}>HT </span><span style={{fontWeight:700}}>{popover.prospect.height||'—'}</span></div>
+                <div><span style={{color:'#555'}}>WT </span><span style={{fontWeight:700}}>{popover.prospect.weight?popover.prospect.weight+' lbs':'—'}</span></div>
+                <div><span style={{color:'#555'}}>AGE </span><span style={{fontWeight:700}}>{popover.prospect.age!=null?popover.prospect.age:'—'}</span></div>
+              </div>
+            )}
+            <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid #1a1a1a'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1,marginBottom:4}}>NFL DRAFT CAPITAL</div>
+              <div style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{draftLabel}</div>
             </div>
-          </>)}
-          {popover.model&&(()=>{
-            const m=popover.model;
-            const fmt=v=>v==null||isNaN(v)?'—':v;
-            const Row=({label,val,suffix=''})=>(
-              <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderTop:'1px solid #1a1a1a',fontSize:13}}>
-                <span style={{color:'#888',fontWeight:700,letterSpacing:0.5}}>{label}</span>
-                <span style={{color:'#ddd',fontWeight:800}}>{fmt(val)}{val!=null&&!isNaN(val)?suffix:''}</span>
+            <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid #1a1a1a'}}>
+              <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
+                <span style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1}}>FF HIT RATE</span>
+                <span style={{fontSize:22,fontWeight:900,color:hrColor,letterSpacing:0.5}}>{hr!=null?hr+'%':'—'}</span>
               </div>
-            );
-            return (
-              <div style={{marginTop:popover.prospect?12:0,paddingTop:popover.prospect?6:0}}>
-                {!popover.prospect&&<div style={{fontWeight:900,fontSize:14,color:'#FFD700',marginBottom:6}}>{popover.model.name||''}</div>}
-                <Row label="Stats Score" val={m.stats}/>
-                <Row label="DC Score" val={m.dc}/>
-                <Row label="Film Score" val={m.film}/>
-                <Row label="Landing Spot Score" val={m.landing}/>
-                {!hidePfk && <Row label="PFK Score" val={m.pfk}/>}
-              </div>
-            );
-          })()}
-        </div>
-      )}
+              <div style={{fontSize:11,color:'#666',marginTop:4,lineHeight:1.4}}>{hrLabel}</div>
+              <div style={{fontSize:10,color:'#444',marginTop:6,fontStyle:'italic'}}>Source: Fantasy Footballers, 2000–2018 draft data</div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
