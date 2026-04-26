@@ -20,11 +20,10 @@ const fetchOfficialRankings = async (wanted) => {
   try{
     const { data, error } = await sb.from('pfk_rankings').select('*').order('updated_at',{ascending:false});
     if(error||!data?.length) return null;
-    // Only return PUBLISHED rows (no kind sentinel) — never model rows or dev drafts.
-    if(wanted){
-      const exact = data.find(r=>!r.settings?.kind && sameSettings(r.settings,wanted));
-      if(exact) return exact;
-    }
+    // Only return PUBLISHED rows (no kind sentinel) and ONLY ones that exactly match the requested
+    // combo. No fallback — non-matching combos must return null so derivation logic can kick in.
+    if(wanted) return data.find(r=>!r.settings?.kind && sameSettings(r.settings,wanted)) || null;
+    // Wanted not specified: return any published row.
     return data.find(r=>!r.settings?.kind) || null;
   }catch{ return null; }
 };
