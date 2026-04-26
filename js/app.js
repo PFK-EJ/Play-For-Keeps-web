@@ -3060,7 +3060,7 @@ function App(){
   };
   const publishToProd = async () => {
     if(!officialList?.length){ setDraftMsg('Nothing to publish.'); setTimeout(()=>setDraftMsg(''),2000); return; }
-    if(!confirm('Publish current rankings to PRODUCTION? This pushes the live public site (playforkeeps-web.pages.dev) to match what you see on dev.')) return;
+    if(!confirm('Publish current rankings to PRODUCTION? This pushes the live public site (playforkeepsdynasty.com) to match what you see on dev.')) return;
     setDraftMsg('Publishing to prod...');
     const { error } = await publishToProdRankings(officialList, pfkSettings);
     if(error){ setDraftMsg('Publish error: '+(error.message||error)); }
@@ -3078,7 +3078,7 @@ function App(){
       }
     }
     const fmt=(pfkSettings.format||'Superflex');
-    return `My 2026 ${fmt} Dynasty Rookie 1st Round 🏆\n\n${out.join('\n')}\n\nvia @PlayForKeepsFF\nplayforkeeps-web.pages.dev`;
+    return `My 2026 ${fmt} Dynasty Rookie 1st Round 🏆\n\n${out.join('\n')}\n\nvia @PlayForKeepsFF\nplayforkeepsdynasty.com`;
   };
   const shareTop12=async()=>{
     const players=list.filter(x=>x.type==='player');
