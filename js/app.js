@@ -432,9 +432,9 @@ const pickToAbs = pickStr => {
 //   QB metric: any Top-12 QB (QB1) season — career
 const FF_HIT_RATE = {
   RB: { metric:'Career Top-24 RB (RB2) season', udfa:2, anchors:[
-    {abs:1,rate:92}, {abs:5,rate:90}, {abs:10,rate:85}, {abs:20,rate:70}, {abs:32,rate:58},
-    {abs:48,rate:45}, {abs:64,rate:38}, {abs:96,rate:20},
-    {abs:128,rate:10}, {abs:160,rate:6}, {abs:192,rate:4}, {abs:224,rate:3},
+    {abs:1,rate:95}, {abs:5,rate:92}, {abs:10,rate:88}, {abs:20,rate:75}, {abs:32,rate:62},
+    {abs:48,rate:45}, {abs:64,rate:38}, {abs:96,rate:22},
+    {abs:128,rate:12}, {abs:160,rate:7}, {abs:192,rate:4}, {abs:224,rate:3},
   ]},
   WR: { metric:'Career Top-24 WR (WR2) season', udfa:1, anchors:[
     {abs:1,rate:92}, {abs:5,rate:88}, {abs:10,rate:80}, {abs:20,rate:60}, {abs:32,rate:45},
@@ -442,8 +442,8 @@ const FF_HIT_RATE = {
     {abs:128,rate:5}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:1},
   ]},
   TE: { metric:'Career Top-12 TE season', udfa:1, anchors:[
-    {abs:1,rate:65}, {abs:10,rate:55}, {abs:20,rate:42}, {abs:32,rate:32},
-    {abs:64,rate:14}, {abs:96,rate:12},
+    {abs:1,rate:75}, {abs:5,rate:70}, {abs:10,rate:65}, {abs:20,rate:48}, {abs:32,rate:35},
+    {abs:64,rate:15}, {abs:96,rate:12},
     {abs:128,rate:6}, {abs:160,rate:4}, {abs:192,rate:3}, {abs:224,rate:2},
   ]},
   QB: { metric:'Career Top-12 QB (QB1) season', udfa:1, anchors:[
