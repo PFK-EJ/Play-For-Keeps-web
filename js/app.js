@@ -3186,6 +3186,25 @@ function RookieModelTab(){
   const editInputStyle = {width:60, padding:'4px 6px', background:'#000', border:'1px solid #FFD700', borderRadius:4, color:'#fff', fontSize:13, textAlign:'right'};
   const POS_COLOR = {QB:'#ef4444', RB:'#10b981', WR:'#3b82f6', TE:'#f59e0b'};
 
+  // Returns true if a field's current value differs from its baked/default state.
+  // For fields with no baked default (Evan in/out, Landing, per-combo Override): true if any value set.
+  // Used to color manually-edited cells purple so Evan can see what he's overridden at a glance.
+  const isManuallyEdited = (it, field) => {
+    if(!it) return false;
+    const k = normDraftName(it.name||'');
+    switch(field){
+      case 'stats':         { const b = BAKED_STATS_PCT[k]; return it.stats != null && (b == null || +it.stats !== +b); }
+      case 'dc':            return it.dcOverride != null;
+      case 'film:zoltan':   { const b = BAKED_FILM_ZOLTAN[k];   const v = it.filmScores?.zoltan;   return v != null && (b == null || +v !== +b); }
+      case 'film:zierlein': { const b = BAKED_FILM_ZIERLEIN[k]; const v = it.filmScores?.zierlein; return v != null && (b == null || +v !== +b); }
+      case 'film:evan':     return it.filmScores?.evan != null;
+      case 'landing':       return it.landing != null;
+      case 'override':      return it.comboOverrides?.[settingsSig(modelSettings)] != null;
+      default: return false;
+    }
+  };
+  const EDITED_COLOR = '#c084fc';
+
   const startEdit = (id,field,cur) => { setEditing({id,field}); setEditVal(cur==null?'':String(cur)); };
   const commitEdit = () => {
     if(!editing) return;
@@ -3289,7 +3308,7 @@ function RookieModelTab(){
                   <td style={cellStyle}>{it.name}{it.team?<span style={{color:'#666',fontWeight:600,marginLeft:6,fontSize:11}}>{it.team}</span>:null}</td>
                   <td style={{...cellStyle,textAlign:'center'}}><span style={{display:'inline-block',padding:'2px 6px',borderRadius:4,background:POS_COLOR[it.pos]+'33',color:POS_COLOR[it.pos],fontWeight:800,fontSize:11}}>{it.pos}</span></td>
                   <td style={cellStyle}>{it.pick||'UDFA'}</td>
-                  <td style={numCellStyle}>{renderNum(it,'stats',it.stats)}</td>
+                  <td style={{...numCellStyle, color: isManuallyEdited(it,'stats') ? EDITED_COLOR : '#ddd'}} title={isManuallyEdited(it,'stats') ? 'Manually edited' : 'Click to edit'}>{renderNum(it,'stats',it.stats)}</td>
                   <td style={{...numCellStyle,color: dcOverridden?'#c084fc':'#ddd'}} title={dcOverridden?'Manual override (click to edit / clear)':'Auto from pick (click to override)'}>
                     {renderNum(it,'dc', dcOverridden?it.dcOverride:dc)}
                     {dcOverridden && <button onClick={(e)=>{e.stopPropagation(); updateField(it.id,'dc','');}} style={{marginLeft:4,background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:11}} title="Clear override">×</button>}
@@ -3297,11 +3316,13 @@ function RookieModelTab(){
                   {Object.keys(FILM_SOURCES).map(srcKey=>{
                     const src = FILM_SOURCES[srcKey];
                     const cur = it.filmScores?.[srcKey];
-                    const tooltip = `${src.label} · weight ${src.weight}% · scale ${src.scaleHint}`;
+                    const fieldKey = 'film:'+srcKey;
+                    const edited = isManuallyEdited(it, fieldKey);
+                    const tooltip = `${src.label} · weight ${src.weight}% · scale ${src.scaleHint}${edited ? ' · MANUALLY EDITED' : ''}`;
                     if(src.kind==='categorical'){
                       const opt = cur==null ? null : src.options.find(o=>o.key===cur);
                       return (
-                        <td key={srcKey} style={{...cellStyle, textAlign:'center'}} title={tooltip}>
+                        <td key={srcKey} style={{...cellStyle, textAlign:'center', boxShadow: edited ? `inset 0 0 0 2px ${EDITED_COLOR}` : 'none'}} title={tooltip}>
                           <select
                             value={cur||''}
                             onChange={e=>updateField(it.id,'film:'+srcKey, e.target.value||null)}
@@ -3321,7 +3342,7 @@ function RookieModelTab(){
                       );
                     }
                     return (
-                      <td key={srcKey} style={numCellStyle} title={tooltip}>
+                      <td key={srcKey} style={{...numCellStyle, color: edited ? EDITED_COLOR : '#ddd'}} title={tooltip}>
                         {renderNum(it,'film:'+srcKey, cur)}
                       </td>
                     );
@@ -3329,8 +3350,9 @@ function RookieModelTab(){
                   <td style={{...cellStyle,textAlign:'right',color:filmPct==null?'#444':'#aaa',fontWeight:700}} title="Average of populated sources">{filmPct==null?'—':filmPct}</td>
                   {(() => {
                     const lopt = it.landing==null ? null : LANDING_OPTIONS.find(o=>o.key===+it.landing);
+                    const lEdited = isManuallyEdited(it, 'landing');
                     return (
-                      <td style={{...cellStyle, textAlign:'center'}} title={`Landing multiplier ×${landingMultiplier(it.landing).toFixed(2)}`}>
+                      <td style={{...cellStyle, textAlign:'center', boxShadow: lEdited ? `inset 0 0 0 2px ${EDITED_COLOR}` : 'none'}} title={`Landing multiplier ×${landingMultiplier(it.landing).toFixed(2)}${lEdited ? ' · MANUALLY EDITED' : ''}`}>
                         <select
                           value={it.landing==null?'':String(it.landing)}
                           onChange={e=>updateField(it.id,'landing',e.target.value||null)}
