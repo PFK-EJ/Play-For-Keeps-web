@@ -2839,17 +2839,17 @@ function App(){
   },[pfkSettings,modelByName]);
 
   const list=useMemo(()=>savedLists.find(l=>l.id===activeListId)?.items||buildInitialList(),[savedLists,activeListId]);
+  // Dirty tracking for the custom rankings tab. Any setList call from a user action
+  // marks dirty; applying a sort or clicking Save clears it.
+  const [isDirty,setIsDirty]=useState(false);
   const setList=useCallback(updater=>{
     setSavedLists(prev=>prev.map(l=>l.id===activeListId?{...l,items:typeof updater==='function'?updater(l.items):updater}:l));
+    setIsDirty(true);
   },[activeListId]);
-  // Custom-tab sort: 'custom' = the user's manual order (drag/drop enabled),
-  // 'pfk' = PFK official order, 'draftcapital' = NFL pick, 'pfkmodel' = PFK score.
-  // Default is 'custom' so drag-and-drop works out of the box; the initial list
-  // loads from officialList so the starting view is identical to PFK Official anyway.
-  const [customSort,setCustomSort]=useState('custom');
-  const customSortedList=useMemo(()=>{
+  // Compute a sorted version of the user's current list. Used as a one-time
+  // "starting point" — applied by applySort, then the user is free to drag freely.
+  const computeSortedList=useCallback((sortKey)=>{
     if(!list) return list;
-    if(customSort==='custom') return list; // raw list — drag/drop targets this directly
     const players=list.filter(it=>it?.type==='player');
     if(!players.length) return list;
     const officialIdx=new Map();
@@ -2858,10 +2858,8 @@ function App(){
       for(const it of officialList){ if(it?.type==='player'){ officialIdx.set(normDraftName(it.name),idx++); } }
     }
     const officialRank=(it)=>officialIdx.get(normDraftName(it.name)) ?? Number.POSITIVE_INFINITY;
-    // 'pfk' mode: walk officialList, preserve tier markers, keep only players that are in
-    // the user's list; append custom-only players at the end.
-    if(customSort==='pfk'){
-      if(!officialList) return players;
+    if(sortKey==='pfk'){
+      if(!officialList) return list;
       const userByKey=new Map();
       for(const p of players){ userByKey.set(normDraftName(p.name), p); }
       const out=[]; const seenKeys=new Set();
@@ -2872,7 +2870,6 @@ function App(){
           if(userByKey.has(k)){ out.push(userByKey.get(k)); seenKeys.add(k); }
         }
       }
-      // Drop empty tier markers
       const cleaned=[];
       for(let i=0;i<out.length;i++){
         const it=out[i];
@@ -2885,15 +2882,13 @@ function App(){
           if(hasPlayer) cleaned.push(it);
         } else cleaned.push(it);
       }
-      // Append players in user list but not in PFK official
       const extras=players.filter(p=>!seenKeys.has(normDraftName(p.name)));
       if(extras.length){
-        cleaned.push({type:'tier',id:'tier_custom_extras',name:'Other'});
+        cleaned.push({type:'tier',id:'tier_custom_extras_'+Date.now(),name:'Other'});
         for(const p of extras) cleaned.push(p);
       }
       return cleaned;
     }
-    // Flat sort modes — drop tier markers, sort players by selected criterion.
     const draftAbs=(it)=>{
       const d=DRAFT_2026[normDraftName(it.name)];
       if(!d || !d.pick || d.pick==='UDFA') return Number.POSITIVE_INFINITY;
@@ -2911,17 +2906,31 @@ function App(){
       return baseline * comboMultiplier(pos, pfkSettings);
     };
     return players.slice().sort((a,b)=>{
-      if(customSort==='draftcapital'){
+      if(sortKey==='draftcapital'){
         const da=draftAbs(a), db=draftAbs(b);
         if(da!==db) return da-db;
         return officialRank(a)-officialRank(b);
       }
-      // 'pfkmodel'
       const ma=modelPfk(a), mb=modelPfk(b);
       if(mb!==ma) return mb-ma;
       return officialRank(a)-officialRank(b);
     });
-  },[list,officialList,modelByName,pfkSettings,customSort]);
+  },[list,officialList,modelByName,pfkSettings]);
+  // Apply a sort once as a starting point, then user drags freely from there.
+  const applySort=(sortKey)=>{
+    if(!sortKey) return;
+    if(isDirty){
+      if(!confirm('You have unsaved changes. Applying this sort will overwrite your current order. Continue?')) return;
+    }
+    const sorted=computeSortedList(sortKey);
+    if(!sorted) return;
+    setSavedLists(prev=>prev.map(l=>l.id===activeListId?{...l,items:sorted}:l));
+    setIsDirty(false);
+    flash();
+  };
+  // Save = clear dirty + flash success. The list is already auto-persisted to
+  // localStorage and Supabase on every change; this is a UX checkpoint.
+  const saveList=()=>{ setIsDirty(false); flash(); };
 
   useEffect(()=>{ localStorage.setItem("pfk_saved_lists",JSON.stringify(savedLists)); },[savedLists]);
 
@@ -2931,6 +2940,7 @@ function App(){
       if(data&&data.length){
         setSavedLists(data.map(r=>({id:'cloud_'+r.id,cloudId:r.id,name:r.name,items:r.items})));
         setActiveListId('cloud_'+data[0].id);
+        setIsDirty(false);
       }
     });
   },[session]);
@@ -2956,7 +2966,7 @@ function App(){
 
   const flash=()=>{ setSaved(true); setTimeout(()=>setSaved(false),1500); };
 
-  const switchList=id=>{setActiveListId(id);setHistory([]);};
+  const switchList=id=>{setActiveListId(id);setHistory([]);setIsDirty(false);};
   const createList=()=>{
     const id='list_'+Date.now();
     const n=savedLists.length+1;
@@ -3224,19 +3234,26 @@ function App(){
             <div style={{background:"#111",border:"1px solid #FFD700",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:800,color:"#FFD700"}}>✏️ {savedLists.find(l=>l.id===activeListId)?.name||"My Rankings"}</span>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span style={{fontSize:11,fontWeight:800,color:"#888",letterSpacing:1}}>SORT</span>
-                <select value={customSort} onChange={e=>setCustomSort(e.target.value)} style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#FFD700",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                <span style={{fontSize:11,fontWeight:800,color:"#888",letterSpacing:1}}>STARTING POINT</span>
+                <select value="" onChange={e=>{ const v=e.target.value; e.target.value=""; applySort(v); }} title="Reorder your list as a starting point — you can drag freely from there"
+                  style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#FFD700",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  <option value="" disabled>Apply sort…</option>
                   <option value="pfk">PFK Official Rankings</option>
-                  <option value="custom">My Custom Order</option>
                   <option value="draftcapital">NFL Draft Capital</option>
                   <option value="pfkmodel">PFK Rookie Model</option>
                 </select>
               </div>
-              <span style={{fontSize:13,color:"#666",flex:1}}>Saves automatically</span>
+              {isDirty
+                ? <span style={{fontSize:12,color:"#ef4444",fontWeight:800,letterSpacing:0.5}}>● Unsaved changes</span>
+                : saved
+                  ? <span style={{fontSize:12,color:"#10b981",fontWeight:800,letterSpacing:0.5}}>✓ Saved</span>
+                  : <span style={{fontSize:12,color:"#555"}}>All changes saved</span>}
+              <span style={{flex:1}}/>
               <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Tier</button>
               <button onClick={()=>setShowAdd(v=>!v)} style={{padding:"6px 12px",background:"#222",border:"1px solid #444",borderRadius:7,color:"#ccc",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Player</button>
               <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#FFD700":"#333"),borderRadius:7,color:history.length?"#FFD700":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:14}}>↩ Undo</button>
-              <button onClick={()=>{if(!confirm('Reset to the latest published PFK rankings? Your edits to this list will be lost.')) return; setHistory([]);setList(officialList||buildInitialList());}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:14}}>↺ Reset</button>
+              <button onClick={()=>{if(!confirm('Reset to the latest published PFK rankings? Your edits to this list will be lost.')) return; setHistory([]);setList(officialList||buildInitialList()); setIsDirty(false);}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:14}}>↺ Reset</button>
+              <button onClick={saveList} disabled={!isDirty} style={{padding:"6px 14px",background:isDirty?"#FFD700":"#1a1a1a",border:"none",borderRadius:7,color:isDirty?"#000":"#444",fontWeight:900,cursor:isDirty?"pointer":"default",fontSize:14,letterSpacing:0.5}}>💾 Save</button>
             </div>
             {showAddTier&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
               <input value={newTierName} onChange={e=>setNewTierName(e.target.value)} placeholder="Tier name" onKeyDown={e=>e.key==="Enter"&&addTier()} style={{flex:1,padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:13}}/>
@@ -3252,7 +3269,7 @@ function App(){
             </div>)}
             <FilterBar/>
             <div className="pfk-rookie-list">
-              <RenderList src={customSortedList} allowEdit={true} lockReorder={customSort!=='custom'} {...commonProps}/>
+              <RenderList src={list} allowEdit={true} {...commonProps}/>
             </div>
           </div>
         )}
