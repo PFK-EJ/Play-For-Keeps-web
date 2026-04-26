@@ -2836,9 +2836,9 @@ function App(){
         // Seed three pre-made custom lists on first ever visit. Each starts as a copy
         // of PFK Official rankings — user can drag freely to customize each one.
         setSavedLists([
-          {id:'list_1',name:'Custom Ranks 1',items:row.data},
-          {id:'list_2',name:'Custom Ranks 2',items:row.data},
-          {id:'list_3',name:'Custom Ranks 3',items:row.data},
+          {id:'list_1',name:'Custom1',items:row.data},
+          {id:'list_2',name:'Custom2',items:row.data},
+          {id:'list_3',name:'Custom3',items:row.data},
         ]);
       }
     })();
@@ -2944,8 +2944,32 @@ function App(){
 
   useEffect(()=>{ localStorage.setItem("pfk_saved_lists",JSON.stringify(savedLists)); },[savedLists]);
 
+  // One-time migration: replace any pre-existing local OR cloud lists with three
+  // fresh Custom1/2/3. Gated by a localStorage flag so it only runs once per browser.
+  // Triggers when officialList is loaded so the seed reflects current PFK rankings.
+  useEffect(()=>{
+    if(!officialList) return;
+    if(localStorage.getItem('pfk_lists_seeded_v3')) return;
+    const seedFresh=()=>{
+      setSavedLists([
+        {id:'list_1',name:'Custom1',items:officialList},
+        {id:'list_2',name:'Custom2',items:officialList},
+        {id:'list_3',name:'Custom3',items:officialList},
+      ]);
+      setActiveListId('list_1');
+      setIsDirty(false);
+      localStorage.setItem('pfk_lists_seeded_v3','1');
+    };
+    if(session && sb){
+      sb.from('user_rankings').delete().eq('user_id',session.user.id).then(seedFresh);
+    } else {
+      seedFresh();
+    }
+  },[officialList,session]);
+
   useEffect(()=>{
     if(!session||!sb) return;
+    if(!localStorage.getItem('pfk_lists_seeded_v3')) return; // wait for migration
     sb.from('user_rankings').select('*').eq('user_id',session.user.id).then(({data})=>{
       if(data&&data.length){
         setSavedLists(data.map(r=>({id:'cloud_'+r.id,cloudId:r.id,name:r.name,items:r.items})));
@@ -2980,7 +3004,7 @@ function App(){
   const createList=()=>{
     const id='list_'+Date.now();
     const n=savedLists.length+1;
-    setSavedLists(prev=>[...prev,{id,name:`Custom Ranks ${n}`,items:officialList||buildInitialList()}]);
+    setSavedLists(prev=>[...prev,{id,name:`Custom${n}`,items:officialList||buildInitialList()}]);
     setActiveListId(id);
     setHistory([]);
   };
