@@ -434,9 +434,9 @@ const FORMAT_MULT = {
 // TEP only affects TE per Evan's preference (cross-position effects ignored despite research showing slight squeeze on RB/WR).
 const TEP_MULT = {
   0.5:  {QB:1.00, RB:1.00, WR:1.00, TE:1.00},
-  0.75: {QB:1.00, RB:1.00, WR:1.00, TE:1.05},
-  1.0:  {QB:1.00, RB:1.00, WR:1.00, TE:1.12},
-  1:    {QB:1.00, RB:1.00, WR:1.00, TE:1.12}, // alias for tep stored as integer 1
+  0.75: {QB:1.00, RB:1.00, WR:1.00, TE:1.025},
+  1.0:  {QB:1.00, RB:1.00, WR:1.00, TE:1.06},
+  1:    {QB:1.00, RB:1.00, WR:1.00, TE:1.06}, // alias for tep stored as integer 1
 };
 const PTD_MULT = {
   // Baseline 5 PTD = 1.00. 6 PTD bumps QBs by 5% (Evan-tuned 2026-04-25).
