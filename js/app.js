@@ -2617,20 +2617,17 @@ function App(){
   const doLogout=async()=>{ if(sb) await sb.auth.signOut(); };
 
   useEffect(()=>{
-    // DEV URL: dev draft (Evan's last edit) → fallback to MODEL auto-tier → fallback to published.
-    // PROD URL: published row → fallback to MODEL auto-tier → fallback to nothing.
-    const seedFromModel = () => {
-      const seeded = buildSeedFromModel(modelByName, pfkSettings, null);
-      return seeded ? { data: seeded, settings: pfkSettings, updated_at: null, _isModelSeed: true } : null;
-    };
+    // DEV URL: dev draft (Evan's last edit) → fallback to published per-combo. NEVER auto-seed from model.
+    //          (Model auto-tier is available via the explicit 🌱 SEED FROM MODEL button in Edit Mode.)
+    // PROD URL: published row only.
     const fetchPromise = isDevHost()
-      ? fetchDevDraftRankings(pfkSettings).then(d => d || seedFromModel() || fetchOfficialRankings(pfkSettings))
-      : fetchOfficialRankings(pfkSettings).then(p => p || seedFromModel());
+      ? fetchDevDraftRankings(pfkSettings).then(d => d || fetchOfficialRankings(pfkSettings))
+      : fetchOfficialRankings(pfkSettings);
     fetchPromise.then(row=>{
       if(!row?.data||!Array.isArray(row.data)){
         setPfkMissing(true); setOfficialList(null); setOfficialUpdated(null); return;
       }
-      setPfkMissing(!sameSettings(row.settings,pfkSettings) && !row._isModelSeed);
+      setPfkMissing(!sameSettings(row.settings,pfkSettings));
       setOfficialUpdated(row.updated_at);
       setOfficialList(row.data);
       const hadSaved=loadStorage('pfk_saved_lists',null);
@@ -2747,6 +2744,17 @@ function App(){
     const { error } = await saveDevDraftRankings(officialList, pfkSettings);
     if(error){ setDraftMsg('Save error: '+(error.message||error)); }
     else { setDraftMsg('Draft saved ✓ (dev URL only)'); setTimeout(()=>setDraftMsg(''),3000); }
+  };
+  // 🌱 Seed from Model — manually pulls the model's auto-tier output into officialList.
+  // Only fires when Evan clicks it. Replaces whatever's currently shown. He can edit and SAVE DRAFT after.
+  const seedOfficialFromModel = () => {
+    if(!Object.keys(modelByName).length){ setDraftMsg('Model not loaded yet.'); setTimeout(()=>setDraftMsg(''),2500); return; }
+    const seeded = buildSeedFromModel(modelByName, pfkSettings, officialList);
+    if(!seeded?.length){ setDraftMsg('Could not build from model.'); setTimeout(()=>setDraftMsg(''),2500); return; }
+    if(!confirm(`Replace current dev rankings with the model's auto-tier output (${seeded.filter(x=>x.type==='player').length} players)? Click 💾 SAVE DRAFT after to persist.`)) return;
+    setOfficialList(seeded);
+    setDraftMsg('Seeded from model — edit and SAVE DRAFT to persist.');
+    setTimeout(()=>setDraftMsg(''),4000);
   };
   const publishToProd = async () => {
     if(!officialList?.length){ setDraftMsg('Nothing to publish.'); setTimeout(()=>setDraftMsg(''),2000); return; }
@@ -2870,6 +2878,7 @@ function App(){
                   {!editMode && <button onClick={()=>setEditMode(true)} style={{padding:'8px 14px',background:'transparent',border:'2px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>✏️ EDIT MODE</button>}
                   {editMode && <>
                     <button onClick={officialAddTier} style={{padding:'7px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Tier</button>
+                    <button onClick={seedOfficialFromModel} style={{padding:'7px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:13,fontWeight:700}} title="Replace current list with the model's auto-tier output">🌱 Seed from Model</button>
                     <button onClick={saveDraft} style={{padding:'7px 14px',background:'#10b981',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>💾 SAVE DRAFT</button>
                     <button onClick={publishToProd} style={{padding:'7px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🚀 PUBLISH TO PROD</button>
                     <button onClick={()=>setEditMode(false)} style={{padding:'7px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13}}>Exit</button>
