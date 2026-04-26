@@ -488,34 +488,57 @@ const getEffectiveRankingScore = (item, masterList) => {
   }
   return getAutoRankingScore(item, masterList);
 };
-// Derive a per-combo list from the master list using ranking score × position multiplier.
-// Sorts players by adjusted score, re-buckets via the dynamic auto-tier algorithm with
-// master's tier names. Returns the items array (or null if master is empty).
+// Derive a per-combo list from the master list. WR/RB are ANCHORS — they keep their
+// exact master order and tier placement regardless of combo. Only QB/TE move: each is
+// re-inserted based on its adjusted score (ranking score × combo multiplier) relative
+// to the nearest-lower WR/RB anchor. Empty tier markers (e.g. a master tier that held
+// only QBs that all jumped out) are dropped.
 const deriveListForCombo = (masterList, combo) => {
-  const players = (masterList||[]).filter(it=>it?.type==='player');
-  if(!players.length) return null;
-  const scored = players.map(p => {
+  if(!masterList || !masterList.length) return null;
+  if(!masterList.some(it => it?.type === 'player')) return null;
+  const adjFor = (p) => {
     const rs = getEffectiveRankingScore(p, masterList) ?? 0;
-    return { p, adj: rs * comboMultiplier(p.pos, combo) };
-  });
-  scored.sort((a,b) => b.adj - a.adj);
-  const tierItems = (masterList||[]).filter(it=>it?.type==='tier');
-  const tierNames = tierItems.length ? tierItems.map(t=>t.name) : INITIAL_TIERS.slice();
-  const usableNames = tierNames.slice(0, PFK_TIER_TARGETS.length+1);
-  const scores = scored.map(x => x.adj);
-  const boundaries = autoTierBoundaries(scores, usableNames.length);
-  const out = []; let cur = 0;
-  const ts = Date.now();
-  for(let i=0; i<usableNames.length; i++){
-    const end = (i<boundaries.length) ? boundaries[i] : scored.length;
-    const slice = scored.slice(cur, end);
-    if(slice.length){
-      out.push({type:'tier', id:'tier_derive_'+i+'_'+ts, name:usableNames[i]});
-      for(const {p} of slice) out.push(p);
+    return rs * comboMultiplier(p.pos, combo);
+  };
+  // Skeleton: tier markers + WR/RB players in original master order.
+  const skeleton = [];
+  const movables = [];
+  for(const it of masterList){
+    if(it?.type === 'tier'){ skeleton.push(it); }
+    else if(it?.type === 'player'){
+      if(it.pos === 'QB' || it.pos === 'TE'){ movables.push({p: it, adj: adjFor(it)}); }
+      else { skeleton.push(it); }
     }
-    cur = end;
   }
-  return out;
+  // Insert highest-adj movables first so their relative order is preserved within a tier.
+  movables.sort((a,b) => b.adj - a.adj);
+  const result = skeleton.slice();
+  for(const m of movables){
+    let insertAt = result.length;
+    for(let i=0; i<result.length; i++){
+      const it = result[i];
+      if(it?.type === 'player' && (it.pos === 'WR' || it.pos === 'RB')){
+        if(adjFor(it) < m.adj){ insertAt = i; break; }
+      }
+    }
+    result.splice(insertAt, 0, m.p);
+  }
+  // Drop tier markers that have no following players before the next tier marker / end.
+  const cleaned = [];
+  for(let i=0; i<result.length; i++){
+    const it = result[i];
+    if(it?.type === 'tier'){
+      let hasPlayer = false;
+      for(let j=i+1; j<result.length; j++){
+        if(result[j]?.type === 'tier') break;
+        if(result[j]?.type === 'player'){ hasPlayer = true; break; }
+      }
+      if(hasPlayer) cleaned.push(it);
+    } else {
+      cleaned.push(it);
+    }
+  }
+  return cleaned;
 };
 // Fetch the master list for derivation. Dev URL prefers the master combo's dev draft (most recent
 // edits); prod URL goes straight to the published default combo. Returns the items array or null.
