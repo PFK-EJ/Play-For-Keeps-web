@@ -2833,7 +2833,13 @@ function App(){
       setOfficialList(row.data);
       const hadSaved=loadStorage('pfk_saved_lists',null);
       if(!hadSaved){
-        setSavedLists([{id:'list_1',name:'My Rankings',items:row.data}]);
+        // Seed three pre-made custom lists on first ever visit. Each starts as a copy
+        // of PFK Official rankings — user can drag freely to customize each one.
+        setSavedLists([
+          {id:'list_1',name:'Custom Ranks 1',items:row.data},
+          {id:'list_2',name:'Custom Ranks 2',items:row.data},
+          {id:'list_3',name:'Custom Ranks 3',items:row.data},
+        ]);
       }
     })();
   },[pfkSettings,modelByName]);
@@ -2842,6 +2848,9 @@ function App(){
   // Dirty tracking for the custom rankings tab. Any setList call from a user action
   // marks dirty; applying a sort or clicking Save clears it.
   const [isDirty,setIsDirty]=useState(false);
+  // Last-applied "starting point" sort. Default is PFK Official, matching what the
+  // initial list state actually reflects (lists seed from row.data = published rankings).
+  const [sortBy,setSortBy]=useState('pfk');
   const setList=useCallback(updater=>{
     setSavedLists(prev=>prev.map(l=>l.id===activeListId?{...l,items:typeof updater==='function'?updater(l.items):updater}:l));
     setIsDirty(true);
@@ -2925,6 +2934,7 @@ function App(){
     const sorted=computeSortedList(sortKey);
     if(!sorted) return;
     setSavedLists(prev=>prev.map(l=>l.id===activeListId?{...l,items:sorted}:l));
+    setSortBy(sortKey);
     setIsDirty(false);
     flash();
   };
@@ -2970,7 +2980,7 @@ function App(){
   const createList=()=>{
     const id='list_'+Date.now();
     const n=savedLists.length+1;
-    setSavedLists(prev=>[...prev,{id,name:`List ${n}`,items:officialList||buildInitialList()}]);
+    setSavedLists(prev=>[...prev,{id,name:`Custom Ranks ${n}`,items:officialList||buildInitialList()}]);
     setActiveListId(id);
     setHistory([]);
   };
@@ -3235,9 +3245,8 @@ function App(){
               <span style={{fontSize:13,fontWeight:800,color:"#FFD700"}}>✏️ {savedLists.find(l=>l.id===activeListId)?.name||"My Rankings"}</span>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span style={{fontSize:11,fontWeight:800,color:"#888",letterSpacing:1}}>STARTING POINT</span>
-                <select value="" onChange={e=>{ const v=e.target.value; e.target.value=""; applySort(v); }} title="Reorder your list as a starting point — you can drag freely from there"
+                <select value={sortBy} onChange={e=>applySort(e.target.value)} title="Pick a starting order — you can drag freely from there. Re-pick any time to start over."
                   style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#FFD700",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                  <option value="" disabled>Apply sort…</option>
                   <option value="pfk">PFK Official Rankings</option>
                   <option value="draftcapital">NFL Draft Capital</option>
                   <option value="pfkmodel">PFK Rookie Model</option>
