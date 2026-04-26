@@ -368,6 +368,19 @@ const DRAFT_2026 = {
   'garrettnussmeier':{team:'KC',  pick:'7.33'},
   'deionburks':      {team:'IND', pick:'7.38'},
   'dallenbentley':   {team:'DEN', pick:'7.40'},
+  // 2026 UDFA signings (CBS Sports tracker + team-specific reports)
+  'michaeltrigg':         {team:'DAL', pick:'UDFA'},
+  'johnmichaelgyllenborg':{team:'KC',  pick:'UDFA'},
+  'romanhemby':           {team:'LV',  pick:'UDFA'},
+  'jeffcaldwell':         {team:'KC',  pick:'UDFA'},
+  'desmondreid':          {team:'BUF', pick:'UDFA'},
+  'jadynott':             {team:'KC',  pick:'UDFA'},
+  'aaronanderson':        {team:'CLE', pick:'UDFA'},
+  'deamontetrayanum':     {team:'PHI', pick:'UDFA'},
+  'jmaritaylor':          {team:'JAC', pick:'UDFA'},
+  'terionstewart':        {team:'KC',  pick:'UDFA'},
+  'roberthenryjr':        {team:'WSH', pick:'UDFA'},
+  'leveonmoss':           {team:'MIA', pick:'UDFA'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 
