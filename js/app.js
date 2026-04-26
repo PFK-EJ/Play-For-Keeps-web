@@ -2950,7 +2950,7 @@ function App(){
   // Each list gets a DEEP-CLONED copy of officialList so they're fully independent.
   useEffect(()=>{
     if(!officialList) return;
-    if(localStorage.getItem('pfk_lists_seeded_v4')) return;
+    if(localStorage.getItem('pfk_lists_seeded_v5')) return;
     const seedFresh=()=>{
       const clone=()=>JSON.parse(JSON.stringify(officialList));
       setSavedLists([
@@ -2961,7 +2961,7 @@ function App(){
       setActiveListId('list_1');
       setIsDirty(false);
       localStorage.removeItem('pfk_lists_seeded_v3'); // clear any prior flag
-      localStorage.setItem('pfk_lists_seeded_v4','1');
+      localStorage.setItem('pfk_lists_seeded_v5','1');
     };
     if(session && sb){
       sb.from('user_rankings').delete().eq('user_id',session.user.id).then(seedFresh);
@@ -2972,7 +2972,7 @@ function App(){
 
   useEffect(()=>{
     if(!session||!sb) return;
-    if(!localStorage.getItem('pfk_lists_seeded_v4')) return; // wait for migration
+    if(!localStorage.getItem('pfk_lists_seeded_v5')) return; // wait for migration
     sb.from('user_rankings').select('*').eq('user_id',session.user.id).then(({data})=>{
       if(data&&data.length){
         setSavedLists(data.map(r=>({id:'cloud_'+r.id,cloudId:r.id,name:r.name,items:r.items})));
