@@ -488,6 +488,45 @@ const getEffectiveRankingScore = (item, masterList) => {
   }
   return getAutoRankingScore(item, masterList);
 };
+// Derive a per-combo list from the master list using ranking score × position multiplier.
+// Sorts players by adjusted score, re-buckets via the dynamic auto-tier algorithm with
+// master's tier names. Returns the items array (or null if master is empty).
+const deriveListForCombo = (masterList, combo) => {
+  const players = (masterList||[]).filter(it=>it?.type==='player');
+  if(!players.length) return null;
+  const scored = players.map(p => {
+    const rs = getEffectiveRankingScore(p, masterList) ?? 0;
+    return { p, adj: rs * comboMultiplier(p.pos, combo) };
+  });
+  scored.sort((a,b) => b.adj - a.adj);
+  const tierItems = (masterList||[]).filter(it=>it?.type==='tier');
+  const tierNames = tierItems.length ? tierItems.map(t=>t.name) : INITIAL_TIERS.slice();
+  const usableNames = tierNames.slice(0, PFK_TIER_TARGETS.length+1);
+  const scores = scored.map(x => x.adj);
+  const boundaries = autoTierBoundaries(scores, usableNames.length);
+  const out = []; let cur = 0;
+  const ts = Date.now();
+  for(let i=0; i<usableNames.length; i++){
+    const end = (i<boundaries.length) ? boundaries[i] : scored.length;
+    const slice = scored.slice(cur, end);
+    if(slice.length){
+      out.push({type:'tier', id:'tier_derive_'+i+'_'+ts, name:usableNames[i]});
+      for(const {p} of slice) out.push(p);
+    }
+    cur = end;
+  }
+  return out;
+};
+// Fetch the master list for derivation. Dev URL prefers the master combo's dev draft (most recent
+// edits); prod URL goes straight to the published default combo. Returns the items array or null.
+const fetchMasterListForDerivation = async () => {
+  if(isDevHost()){
+    const draft = await fetchDevDraftRankings(DEFAULT_SETTINGS);
+    if(draft?.data && Array.isArray(draft.data)) return draft.data;
+  }
+  const pub = await fetchOfficialRankings(DEFAULT_SETTINGS);
+  return (pub?.data && Array.isArray(pub.data)) ? pub.data : null;
+};
 // Build a per-combo PFK score for a model entry (with override + landing + combo multiplier).
 const computeComboPfk = (m, settings) => {
   const pos = m.pos;
@@ -2672,24 +2711,33 @@ function App(){
   const doLogout=async()=>{ if(sb) await sb.auth.signOut(); };
 
   useEffect(()=>{
-    // DEV URL: dev draft (Evan's last edit) → fallback to published per-combo. NEVER auto-seed from model.
-    //          (Model auto-tier is available via the explicit 🌱 SEED FROM MODEL button in Edit Mode.)
-    // PROD URL: published row only.
-    const fetchPromise = isDevHost()
-      ? fetchDevDraftRankings(pfkSettings).then(d => d || fetchOfficialRankings(pfkSettings))
-      : fetchOfficialRankings(pfkSettings);
-    fetchPromise.then(row=>{
+    // Fetch order:
+    //   DEV URL:  dev draft for combo → published for combo → DERIVED FROM MASTER (if non-default)
+    //   PROD URL: published for combo →                       DERIVED FROM MASTER (if non-default)
+    // Default combo never derives (it IS the master).
+    (async () => {
+      const isDefault = sameSettings(pfkSettings, DEFAULT_SETTINGS);
+      let row = null;
+      if(isDevHost()) row = await fetchDevDraftRankings(pfkSettings);
+      if(!row) row = await fetchOfficialRankings(pfkSettings);
+      if(!row && !isDefault){
+        const master = await fetchMasterListForDerivation();
+        if(master){
+          const derived = deriveListForCombo(master, pfkSettings);
+          if(derived) row = { data: derived, settings: pfkSettings, updated_at: null, _isDerived: true };
+        }
+      }
       if(!row?.data||!Array.isArray(row.data)){
         setPfkMissing(true); setOfficialList(null); setOfficialUpdated(null); return;
       }
-      setPfkMissing(!sameSettings(row.settings,pfkSettings));
+      setPfkMissing(!sameSettings(row.settings,pfkSettings) && !row._isDerived);
       setOfficialUpdated(row.updated_at);
       setOfficialList(row.data);
       const hadSaved=loadStorage('pfk_saved_lists',null);
       if(!hadSaved){
         setSavedLists([{id:'list_1',name:'My Rankings',items:row.data}]);
       }
-    });
+    })();
   },[pfkSettings,modelByName]);
 
   const list=useMemo(()=>savedLists.find(l=>l.id===activeListId)?.items||buildInitialList(),[savedLists,activeListId]);
@@ -2816,6 +2864,21 @@ function App(){
     setDraftMsg('Seeded from model — edit and SAVE DRAFT to persist.');
     setTimeout(()=>setDraftMsg(''),4000);
   };
+  // 🔄 Derive from Master — only meaningful on non-default combos. Pulls the master combo's
+  // current state, applies position multipliers for THIS combo, re-buckets into tiers. Replaces
+  // the current officialList. Use it after editing master, or to reset a combo override back to
+  // the derived view. Click 💾 SAVE DRAFT to persist as combo-specific override; otherwise just
+  // click EXIT and the next reload will re-derive.
+  const deriveFromMaster = async () => {
+    const master = await fetchMasterListForDerivation();
+    if(!master?.length){ setDraftMsg('Master list not found.'); setTimeout(()=>setDraftMsg(''),3000); return; }
+    const derived = deriveListForCombo(master, pfkSettings);
+    if(!derived?.length){ setDraftMsg('Could not derive.'); setTimeout(()=>setDraftMsg(''),3000); return; }
+    if(!confirm(`Rebuild this combo's rankings by deriving from your master list (${derived.filter(x=>x.type==='player').length} players, position multipliers applied for ${pfkSettings.format}/${pfkSettings.tep}TEP/${pfkSettings.passTd}PTD)? Existing edits to this combo will be replaced.`)) return;
+    setOfficialList(derived);
+    setDraftMsg('Derived from master — edit and 💾 SAVE DRAFT to persist as combo override, or just exit and the page will re-derive next load.');
+    setTimeout(()=>setDraftMsg(''),5500);
+  };
   const publishToProd = async () => {
     if(!officialList?.length){ setDraftMsg('Nothing to publish.'); setTimeout(()=>setDraftMsg(''),2000); return; }
     if(!confirm('Publish current rankings to PRODUCTION? This pushes the live public site (playforkeeps-web.pages.dev) to match what you see on dev.')) return;
@@ -2938,7 +3001,11 @@ function App(){
                   {!editMode && <button onClick={()=>setEditMode(true)} style={{padding:'8px 14px',background:'transparent',border:'2px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>✏️ EDIT MODE</button>}
                   {editMode && <>
                     <button onClick={officialAddTier} style={{padding:'7px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Tier</button>
-                    <button onClick={seedOfficialFromModel} style={{padding:'7px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:13,fontWeight:700}} title="Replace current list with the model's auto-tier output">🌱 Seed from Model</button>
+                    {sameSettings(pfkSettings, DEFAULT_SETTINGS) ? (
+                      <button onClick={seedOfficialFromModel} style={{padding:'7px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:13,fontWeight:700}} title="Replace current list with the model's auto-tier output">🌱 Seed from Model</button>
+                    ) : (
+                      <button onClick={deriveFromMaster} style={{padding:'7px 12px',background:'transparent',border:'1px solid #06b6d4',borderRadius:6,color:'#06b6d4',cursor:'pointer',fontSize:13,fontWeight:700}} title="Rebuild this combo from the master list with position multipliers applied">🔄 Derive from Master</button>
+                    )}
                     <button onClick={saveDraft} style={{padding:'7px 14px',background:'#10b981',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>💾 SAVE DRAFT</button>
                     <button onClick={publishToProd} style={{padding:'7px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🚀 PUBLISH TO PROD</button>
                     <button onClick={()=>setEditMode(false)} style={{padding:'7px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13}}>Exit</button>
