@@ -420,25 +420,50 @@ const pickToAbs = pickStr => {
   const r = +m[1], s = Math.min(+m[2], 32);
   return (r-1)*32 + s;
 };
-// FF "hit rate" = chance of a fantasy-startable season in a player's first 3 NFL years,
-// by NFL draft round. Sources: Fantasy Footballers (2000-2018, n=1349) for RB/WR/TE/QB
-// + fantasyclassroom.org for QB Round-1/Round-2 detail. Numbers rounded to whole %.
-//   RB metric: any RB2-or-better season (top-24)
-//   WR metric: any WR2-or-better season (top-24)
+// FF "hit rate" = % chance of a fantasy-startable season in a player's first 3 NFL years.
+// Pick-bracket anchors with linear interpolation between them — mirrors dcScoreFromPick.
+// Sources: Fantasy Footballers (2000-2018 study, n=1349), fantasyclassroom.org (QB R1/R2),
+// ESPN/Yahoo/PFF top-10-pick analyses (modern early-R1 RB/WR/QB hit rates trend higher
+// than the 20-year average because volume gets force-fed to top picks).
+//   RB metric: any Top-24 RB (RB2) season
+//   WR metric: any Top-24 WR (WR2) season
 //   TE metric: any Top-12 TE season
-//   QB metric: any QB1+QB2 (top-24) season
+//   QB metric: any Top-12 QB (QB1) season  ← Top-24 was too easy per Evan
 const FF_HIT_RATE = {
-  RB: { 1:55, 2:28, 3:12, 4:4,  5:4,  6:2,  7:2,  UDFA:1 },
-  WR: { 1:18, 2:11, 3:4,  4:1,  5:1,  6:1,  7:1,  UDFA:1 },
-  TE: { 1:26, 2:3,  3:14, 4:5,  5:3,  6:3,  7:3,  UDFA:1 },
-  QB: { 1:75, 2:56, 3:9,  4:5,  5:2,  6:4,  7:1,  UDFA:1 },
+  RB: { metric:'Top-24 RB season (first 3 yrs)', udfa:1, anchors:[
+    {abs:1,rate:80}, {abs:10,rate:75}, {abs:20,rate:60}, {abs:32,rate:50},
+    {abs:48,rate:38}, {abs:64,rate:32}, {abs:96,rate:15},
+    {abs:128,rate:6}, {abs:160,rate:4}, {abs:192,rate:2}, {abs:224,rate:2},
+  ]},
+  WR: { metric:'Top-24 WR season (first 3 yrs)', udfa:1, anchors:[
+    {abs:1,rate:50}, {abs:10,rate:45}, {abs:20,rate:35}, {abs:32,rate:25},
+    {abs:48,rate:15}, {abs:64,rate:11}, {abs:96,rate:4},
+    {abs:128,rate:2}, {abs:160,rate:1}, {abs:192,rate:1}, {abs:224,rate:1},
+  ]},
+  TE: { metric:'Top-12 TE season (first 3 yrs)', udfa:1, anchors:[
+    {abs:1,rate:40}, {abs:16,rate:32}, {abs:32,rate:22},
+    {abs:64,rate:8},  {abs:96,rate:6},
+    {abs:128,rate:4}, {abs:160,rate:3}, {abs:192,rate:2}, {abs:224,rate:2},
+  ]},
+  QB: { metric:'Top-12 QB season (first 3 yrs)', udfa:1, anchors:[
+    {abs:1,rate:75}, {abs:5,rate:70}, {abs:10,rate:60}, {abs:32,rate:50},
+    {abs:64,rate:18}, {abs:96,rate:8},
+    {abs:128,rate:5}, {abs:160,rate:2}, {abs:192,rate:1}, {abs:224,rate:1},
+  ]},
 };
 const ffHitRate = (pos, pickStr) => {
-  const tbl = FF_HIT_RATE[pos]; if(!tbl) return null;
-  if(!pickStr || pickStr==='UDFA') return tbl.UDFA;
-  const m = String(pickStr).match(/^(\d+)\./);
-  if(!m) return tbl.UDFA;
-  return tbl[+m[1]] ?? tbl.UDFA;
+  const tier = FF_HIT_RATE[pos]; if(!tier) return null;
+  const abs = pickToAbs(pickStr);
+  if(abs===null) return tier.udfa;
+  const a = tier.anchors;
+  if(abs <= a[0].abs) return Math.round(a[0].rate);
+  for(let i=0; i<a.length-1; i++){
+    if(abs >= a[i].abs && abs < a[i+1].abs){
+      const t = (abs - a[i].abs) / (a[i+1].abs - a[i].abs);
+      return Math.round(a[i].rate + t*(a[i+1].rate - a[i].rate));
+    }
+  }
+  return Math.round(a[a.length-1].rate);
 };
 const dcScoreFromPick = (pos, pickStr) => {
   const tier = DC_TIERS[pos]; if(!tier) return 0;
@@ -2319,15 +2344,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
         const draft = it ? DRAFT_2026[normName(it.name)] : null;
         const hr = it ? ffHitRate(it.pos, draft?.pick) : null;
         const draftLabel = draft?.pick ? (draft.pick==='UDFA' ? 'UDFA' : `${draft.team||'—'} · ${draft.pick}`) : 'Undrafted';
-        const hrLabel = (() => {
-          switch(it?.pos){
-            case 'RB': return 'Top-24 RB season (first 3 yrs)';
-            case 'WR': return 'Top-24 WR season (first 3 yrs)';
-            case 'TE': return 'Top-12 TE season (first 3 yrs)';
-            case 'QB': return 'Top-24 QB season (first 3 yrs)';
-            default:   return 'Fantasy starter (first 3 yrs)';
-          }
-        })();
+        const hrLabel = it?.pos && FF_HIT_RATE[it.pos] ? FF_HIT_RATE[it.pos].metric : 'Fantasy starter (first 3 yrs)';
         const hrColor = hr==null ? '#444' : (hr>=40 ? '#10b981' : hr>=20 ? '#FFD700' : hr>=10 ? '#f59e0b' : '#ef4444');
         return (
           <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
@@ -2354,7 +2371,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                 <span style={{fontSize:22,fontWeight:900,color:hrColor,letterSpacing:0.5}}>{hr!=null?hr+'%':'—'}</span>
               </div>
               <div style={{fontSize:11,color:'#666',marginTop:4,lineHeight:1.4}}>{hrLabel}</div>
-              <div style={{fontSize:10,color:'#444',marginTop:6,fontStyle:'italic'}}>Source: Fantasy Footballers, 2000–2018 draft data</div>
+              <div style={{fontSize:10,color:'#444',marginTop:6,fontStyle:'italic'}}>Sources: Fantasy Footballers, fantasyclassroom.org, ESPN/Yahoo/PFF top-pick analyses</div>
             </div>
           </div>
         );
