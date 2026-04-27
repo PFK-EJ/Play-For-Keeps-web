@@ -4179,5 +4179,393 @@ function AdminApp(){
   );
 }
 
-const isAdminRoute = window.location.pathname.replace(/\/$/,'').endsWith('/admin');
-ReactDOM.render(isAdminRoute ? <AdminApp/> : <App/>, document.getElementById("root"));
+// ============================================================
+// DISPERSAL DRAFT — multi-user snake draft for orphaned dynasty teams
+// Route: /dispersal (commish setup) | /dispersal/[id] (live draft)
+// Storage: dispersal_drafts table in Supabase. Polling-based refresh
+// (every 3s while live). Manager identity persisted to localStorage
+// per draft (no account needed; passcode-based slot claim).
+// ============================================================
+
+const DISP_POOL_TYPES = { PLAYER:'player', PICK:'pick' };
+const dispGenPasscode = () => String(Math.floor(1000 + Math.random()*9000));
+const dispGenItemId = () => 'i_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+// Snake-aware: given pickIdx + numTeams + pick_order, return the team slot whose turn it is.
+const dispSlotForPick = (pickIdx, numTeams, snake, pickOrder) => {
+  if(!numTeams || numTeams<1) return null;
+  const round = Math.floor(pickIdx / numTeams);
+  const posInRound = pickIdx % numTeams;
+  const idx = (snake && round % 2 === 1) ? (numTeams - 1 - posInRound) : posInRound;
+  return pickOrder[idx];
+};
+
+const dispFetch = async (id) => {
+  if(!sb) return null;
+  const { data, error } = await sb.from('dispersal_drafts').select('*').eq('id', id).maybeSingle();
+  if(error){ console.error(error); return null; }
+  return data;
+};
+const dispCreate = async (payload) => {
+  if(!sb) return { error:'Supabase not loaded' };
+  const { data, error } = await sb.from('dispersal_drafts').insert(payload).select().single();
+  return { data, error };
+};
+const dispUpdate = async (id, patch) => {
+  if(!sb) return { error:'Supabase not loaded' };
+  const { error } = await sb.from('dispersal_drafts').update({...patch, updated_at:new Date().toISOString()}).eq('id', id);
+  return { error };
+};
+
+// ---------- Setup (commish creates a new draft) ----------
+function DispersalSetup(){
+  const [name,setName] = useState('');
+  const [poolText,setPoolText] = useState('');
+  const [picksText,setPicksText] = useState('');
+  const [teamsText,setTeamsText] = useState('');
+  const [snake,setSnake] = useState(true);
+  const [timer,setTimer] = useState('off'); // 'off' | '4h' | '8h'
+  const [creating,setCreating] = useState(false);
+  const [createdDraft,setCreatedDraft] = useState(null);
+  const [err,setErr] = useState('');
+
+  const create = async () => {
+    setErr('');
+    if(!name.trim()){ setErr('Name required'); return; }
+    const players = poolText.split('\n').map(s=>s.trim()).filter(Boolean);
+    const futurePicks = picksText.split('\n').map(s=>s.trim()).filter(Boolean);
+    const usernames = teamsText.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(players.length === 0 && futurePicks.length === 0){ setErr('Pool is empty — paste players and/or future picks'); return; }
+    if(usernames.length < 2){ setErr('Need at least 2 teams'); return; }
+    const pool = [
+      ...players.map(n => ({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name:n })),
+      ...futurePicks.map(n => ({ id:dispGenItemId(), type:DISP_POOL_TYPES.PICK, name:n })),
+    ];
+    // Shuffle pick order randomly for fairness — commish can re-roll on the lobby page (future)
+    const order = usernames.map((_,i)=>i);
+    for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:dispGenPasscode(), joined:false }));
+    const timerSeconds = timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+    setCreating(true);
+    const { data, error } = await dispCreate({
+      name:name.trim(), snake, timer_seconds:timerSeconds,
+      pool, teams, pick_order:order, picks:[],
+      current_pick_idx:0, status:'lobby',
+    });
+    setCreating(false);
+    if(error){ setErr(error.message || 'Create failed'); return; }
+    setCreatedDraft(data);
+  };
+
+  if(createdDraft){
+    const url = `${window.location.origin}/dispersal/${createdDraft.id}`;
+    return (
+      <div style={{maxWidth:760,margin:'24px auto',padding:'20px',color:'#eee'}}>
+        <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:12,padding:'18px 22px',marginBottom:18}}>
+          <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:4}}>✓ DRAFT CREATED</div>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:12}}>{createdDraft.name}</div>
+          <div style={{fontSize:12,color:'#888',marginBottom:6}}>SHARE THIS LINK WITH ALL MANAGERS:</div>
+          <input readOnly value={url} onFocus={e=>e.target.select()} style={{width:'100%',padding:'10px 12px',background:'#000',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontWeight:700,fontSize:14,fontFamily:'monospace'}}/>
+          <div style={{fontSize:12,color:'#888',marginTop:14,marginBottom:6}}>EACH MANAGER NEEDS THEIR PASSCODE TO CLAIM THEIR TEAM (text/Discord these to them):</div>
+          <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:14,lineHeight:1.9}}>
+            {createdDraft.teams.map(t=>(
+              <div key={t.slot}><span style={{color:'#FFD700',fontWeight:700}}>{t.username}</span> <span style={{color:'#666'}}>passcode:</span> <span style={{color:'#10b981',fontWeight:800}}>{t.passcode}</span></div>
+            ))}
+          </div>
+          <div style={{marginTop:16,display:'flex',gap:8}}>
+            <button onClick={()=>{ navigator.clipboard.writeText(url); }} style={{padding:'10px 16px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>COPY LINK</button>
+            <button onClick={()=>{
+              const lines = createdDraft.teams.map(t=>`${t.username}: ${t.passcode}`).join('\n');
+              navigator.clipboard.writeText(`Dispersal Draft: ${createdDraft.name}\n${url}\n\n${lines}`);
+            }} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>COPY ALL DETAILS</button>
+            <a href={`/dispersal/${createdDraft.id}`} style={{padding:'10px 16px',background:'#10b981',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1,textDecoration:'none'}}>OPEN DRAFT →</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const inputStyle = {width:'100%',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'};
+  const labelStyle = {fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6,display:'block'};
+
+  return (
+    <div style={{maxWidth:760,margin:'24px auto',padding:'20px',color:'#eee'}}>
+      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
+        <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:2}}>🎲 DISPERSAL DRAFT</div>
+      </div>
+      <div style={{fontSize:13,color:'#888',marginBottom:22,lineHeight:1.6}}>Set up a snake dispersal draft for an orphaned dynasty league. Pool the assets, list the new managers, and share the link. Each manager joins with their passcode and drafts on their own device. <span style={{color:'#FFD700'}}>Sleeper auto-import + live timer coming next session.</span></div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
+        <div>
+          <label style={labelStyle}>DRAFT NAME</label>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
+        </div>
+        <div>
+          <label style={labelStyle}>PLAYER POOL (one player per line)</label>
+          <textarea value={poolText} onChange={e=>setPoolText(e.target.value)} placeholder={`Justin Jefferson\nBijan Robinson\n...`} rows={8} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+        </div>
+        <div>
+          <label style={labelStyle}>FUTURE PICKS (one per line — optional)</label>
+          <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`2026 1.04\n2027 1st round pick\n2027 2nd from team Spider`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+        </div>
+        <div>
+          <label style={labelStyle}>NEW MANAGER USERNAMES (one per line — these are the people drafting)</label>
+          <textarea value={teamsText} onChange={e=>setTeamsText(e.target.value)} placeholder={`evan\nmike\nsteve`} rows={5} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+          <div style={{fontSize:11,color:'#666',marginTop:5}}>Pick order will be randomized after creation. Each manager gets an auto-generated 4-digit passcode to claim their team.</div>
+        </div>
+        <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
+          <div>
+            <label style={labelStyle}>FORMAT</label>
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={()=>setSnake(true)} style={{padding:'8px 14px',background:snake?'#FFD700':'#0a0a0a',color:snake?'#000':'#888',border:'1px solid '+(snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>🐍 Snake</button>
+              <button onClick={()=>setSnake(false)} style={{padding:'8px 14px',background:!snake?'#FFD700':'#0a0a0a',color:!snake?'#000':'#888',border:'1px solid '+(!snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>↓ Linear</button>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>TIMER PER PICK</label>
+            <div style={{display:'flex',gap:6}}>
+              {[['off','None'],['4h','4 hrs'],['8h','8 hrs']].map(([k,l])=>(
+                <button key={k} onClick={()=>setTimer(k)} style={{padding:'8px 14px',background:timer===k?'#FFD700':'#0a0a0a',color:timer===k?'#000':'#888',border:'1px solid '+(timer===k?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>{l}</button>
+              ))}
+            </div>
+            <div style={{fontSize:11,color:'#666',marginTop:5}}>When a pick clock expires, the draft pauses for the commish to advance.</div>
+          </div>
+        </div>
+        {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
+        <button onClick={create} disabled={creating} style={{padding:'14px 24px',background:creating?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:creating?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{creating?'CREATING…':'CREATE DRAFT'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Active draft view (lobby / live / complete) ----------
+function DispersalDraft({draftId}){
+  const [draft,setDraft] = useState(null);
+  const [loading,setLoading] = useState(true);
+  const [me,setMe] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch{ return null; }
+  });
+  const [claimUser,setClaimUser] = useState('');
+  const [claimPass,setClaimPass] = useState('');
+  const [claimErr,setClaimErr] = useState('');
+  const [pickErr,setPickErr] = useState('');
+
+  // Initial load + polling
+  useEffect(()=>{
+    let cancelled = false;
+    const load = async () => {
+      const d = await dispFetch(draftId);
+      if(!cancelled){ setDraft(d); setLoading(false); }
+    };
+    load();
+    const t = setInterval(load, 3000);
+    return ()=>{ cancelled = true; clearInterval(t); };
+  },[draftId]);
+
+  const claim = async () => {
+    setClaimErr('');
+    const u = claimUser.trim().toLowerCase();
+    const p = claimPass.trim();
+    const team = draft.teams.find(t => t.username.toLowerCase() === u);
+    if(!team){ setClaimErr('Username not found in this draft'); return; }
+    if(team.passcode !== p){ setClaimErr('Wrong passcode'); return; }
+    if(team.joined && (!me || me.slot !== team.slot)){
+      // already claimed by someone else; allow re-claim if same passcode (shared device)
+    }
+    const newTeams = draft.teams.map(t => t.slot===team.slot ? {...t, joined:true} : t);
+    const { error } = await dispUpdate(draftId, { teams:newTeams });
+    if(error){ setClaimErr(error.message || 'Claim failed'); return; }
+    const meNew = { slot:team.slot, username:team.username, passcode:team.passcode };
+    localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew));
+    setMe(meNew);
+    setClaimUser(''); setClaimPass('');
+  };
+
+  const startDraft = async () => {
+    if(draft.teams.some(t=>!t.joined)){
+      if(!confirm('Some managers haven\'t joined yet. Start anyway?')) return;
+    }
+    const deadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    await dispUpdate(draftId, { status:'live', pick_deadline:deadline });
+  };
+
+  const makePick = async (poolItemId) => {
+    setPickErr('');
+    if(!me){ setPickErr('You must claim a team first'); return; }
+    const onClockSlot = dispSlotForPick(draft.current_pick_idx, draft.teams.length, draft.snake, draft.pick_order);
+    if(onClockSlot !== me.slot){ setPickErr('Not your turn'); return; }
+    const item = draft.pool.find(p => p.id === poolItemId);
+    if(!item || item.drafted){ setPickErr('Already drafted'); return; }
+    const newPool = draft.pool.map(p => p.id===poolItemId ? {...p, drafted:true} : p);
+    const newPicks = [...draft.picks, { pickIdx:draft.current_pick_idx, slot:me.slot, poolItemId, ts:new Date().toISOString() }];
+    const newIdx = draft.current_pick_idx + 1;
+    const totalPicks = draft.pool.length;
+    const newStatus = newIdx >= totalPicks ? 'complete' : 'live';
+    const newDeadline = (newStatus==='live' && draft.timer_seconds) ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    const { error } = await dispUpdate(draftId, {
+      pool:newPool, picks:newPicks, current_pick_idx:newIdx,
+      status:newStatus, pick_deadline:newDeadline,
+    });
+    if(error){ setPickErr(error.message || 'Pick failed'); return; }
+  };
+
+  const signOut = () => {
+    localStorage.removeItem('pfk_disp_'+draftId);
+    setMe(null);
+  };
+
+  if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>Loading draft…</div>;
+  if(!draft) return <div style={{padding:40,textAlign:'center',color:'#ef4444'}}>Draft not found.</div>;
+
+  // Compute roster per team
+  const rosters = draft.teams.map(t => ({
+    ...t,
+    picks: draft.picks.filter(p => p.slot===t.slot).map(p => ({...p, item:draft.pool.find(it=>it.id===p.poolItemId)}))
+  }));
+
+  const onClockSlot = draft.status==='live' ? dispSlotForPick(draft.current_pick_idx, draft.teams.length, draft.snake, draft.pick_order) : null;
+  const onClockTeam = onClockSlot != null ? draft.teams.find(t => t.slot === onClockSlot) : null;
+  const myTurn = me && onClockSlot === me.slot;
+  const round = Math.floor(draft.current_pick_idx / Math.max(1,draft.teams.length)) + 1;
+  const posInRound = (draft.current_pick_idx % Math.max(1,draft.teams.length)) + 1;
+
+  return (
+    <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
+        <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
+        <div style={{padding:'4px 10px',background:draft.status==='live'?'#0a2a1a':draft.status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(draft.status==='live'?'#10b981':draft.status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:draft.status==='live'?'#10b981':draft.status==='complete'?'#a78bfa':'#FFD700'}}>{draft.status.toUpperCase()}</div>
+        <div style={{flex:1}}/>
+        {me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
+      </div>
+
+      {/* Lobby phase */}
+      {draft.status === 'lobby' && (
+        <>
+          <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>WAITING FOR MANAGERS · {draft.teams.filter(t=>t.joined).length} of {draft.teams.length} joined</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
+              {draft.teams.map((t,i)=>(
+                <div key={t.slot} style={{padding:'10px 12px',background:t.joined?'#0a2a1a':'#0a0a0a',border:'1px solid '+(t.joined?'#10b981':'#222'),borderRadius:8,display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{color:t.joined?'#10b981':'#666',fontSize:18}}>{t.joined?'✓':'○'}</span>
+                  <div>
+                    <div style={{fontWeight:800,fontSize:14}}>{t.username}</div>
+                    <div style={{fontSize:11,color:'#666'}}>Pick #{draft.pick_order.indexOf(t.slot)+1}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={startDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
+          </div>
+          {!me && (
+            <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'16px 18px'}}>
+              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:10,letterSpacing:1}}>CLAIM YOUR TEAM</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <input value={claimUser} onChange={e=>setClaimUser(e.target.value)} placeholder="Username" style={{flex:'1 1 160px',padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14}}/>
+                <input value={claimPass} onChange={e=>setClaimPass(e.target.value)} onKeyDown={e=>e.key==='Enter'&&claim()} placeholder="4-digit passcode" style={{flex:'1 1 140px',padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'monospace'}}/>
+                <button onClick={claim} style={{padding:'10px 18px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>CLAIM</button>
+              </div>
+              {claimErr && <div style={{marginTop:8,color:'#ef4444',fontSize:12}}>{claimErr}</div>}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Live or complete: show on-clock + pool + rosters */}
+      {(draft.status === 'live' || draft.status === 'complete') && (
+        <>
+          {draft.status === 'live' && onClockTeam && (
+            <div style={{background:myTurn?'#0a2a1a':'#0a0a0a',border:'2px solid '+(myTurn?'#10b981':'#FFD700'),borderRadius:10,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+              <div style={{fontSize:11,fontWeight:800,color:myTurn?'#10b981':'#FFD700',letterSpacing:1.5}}>{myTurn?'YOUR TURN':'ON THE CLOCK'}</div>
+              <div style={{fontSize:18,fontWeight:900}}>{onClockTeam.username}</div>
+              <div style={{fontSize:13,color:'#888'}}>Round {round} · Pick {posInRound} (overall #{draft.current_pick_idx+1})</div>
+            </div>
+          )}
+          {draft.status === 'complete' && (
+            <div style={{background:'#1a1a3a',border:'2px solid #a78bfa',borderRadius:10,padding:'14px 18px',marginBottom:14}}>
+              <div style={{fontSize:14,fontWeight:900,color:'#a78bfa',letterSpacing:1.5}}>🏆 DRAFT COMPLETE — {draft.picks.length} picks made</div>
+            </div>
+          )}
+          {pickErr && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{pickErr}</div>}
+
+          <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1.2fr)',gap:14}} className="pfk-disp-grid">
+            {/* Pool */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>AVAILABLE · {draft.pool.filter(p=>!p.drafted).length} of {draft.pool.length}</div>
+              <div style={{maxHeight:600,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
+                {draft.pool.filter(p=>!p.drafted).map(item=>{
+                  const clickable = myTurn && draft.status==='live';
+                  return (
+                    <div key={item.id} onClick={clickable?()=>makePick(item.id):undefined}
+                      style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,cursor:clickable?'pointer':'default',display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
+                      <span style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':'PLAYER'}</span>
+                      <span style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
+                      {clickable && <span style={{fontSize:11,color:'#10b981',fontWeight:800}}>DRAFT →</span>}
+                    </div>
+                  );
+                })}
+                {draft.pool.filter(p=>!p.drafted).length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>Pool is empty.</div>}
+              </div>
+            </div>
+
+            {/* Rosters */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>ROSTERS</div>
+              <div style={{display:'flex',flexDirection:'column',gap:10,maxHeight:600,overflowY:'auto'}}>
+                {rosters.map(t=>{
+                  const isOnClock = onClockSlot === t.slot;
+                  return (
+                    <div key={t.slot} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                        <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24}}>#{draft.pick_order.indexOf(t.slot)+1}</span>
+                        <span style={{fontWeight:800,fontSize:14}}>{t.username}</span>
+                        {isOnClock && <span style={{fontSize:10,color:'#10b981',fontWeight:800,padding:'2px 6px',background:'#0a2a1a',borderRadius:3,letterSpacing:1}}>ON CLOCK</span>}
+                        <span style={{flex:1}}/>
+                        <span style={{fontSize:11,color:'#666'}}>{t.picks.length} picks</span>
+                      </div>
+                      {t.picks.length>0 && (
+                        <div style={{fontSize:12,color:'#aaa',lineHeight:1.6,paddingLeft:32}}>
+                          {t.picks.map(p=>(
+                            <div key={p.pickIdx}><span style={{color:'#666',display:'inline-block',width:32}}>{p.pickIdx+1}.</span> {p.item?.name || '(missing)'}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------- Top-level Dispersal page (route: /dispersal[/id]) ----------
+function DispersalApp({draftId}){
+  return (
+    <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
+        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14}}>
+          <a href="/" style={{textDecoration:'none'}}><img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/></a>
+          <a href="/" style={{textDecoration:'none'}}>
+            <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:2}}>PLAY FOR KEEPS</div>
+            <div style={{fontSize:10,color:'#8B6914',letterSpacing:2,fontWeight:600,textTransform:'uppercase'}}>Dispersal Draft</div>
+          </a>
+        </div>
+      </div>
+      {draftId ? <DispersalDraft draftId={draftId}/> : <DispersalSetup/>}
+    </div>
+  );
+}
+
+const path = window.location.pathname.replace(/\/$/,'');
+const isAdminRoute = path.endsWith('/admin');
+const dispersalMatch = path.match(/^\/dispersal(?:\/([0-9a-f-]+))?$/i);
+ReactDOM.render(
+  isAdminRoute ? <AdminApp/>
+  : dispersalMatch ? <DispersalApp draftId={dispersalMatch[1] || null}/>
+  : <App/>,
+  document.getElementById("root")
+);
