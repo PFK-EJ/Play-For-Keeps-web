@@ -4179,33 +4179,5 @@ function AdminApp(){
   );
 }
 
-// Public read-only "PFK vs Zolty" page — sharable link, no admin / edit affordances.
-function ComparePublicPage(){
-  return (
-    <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'14px 20px'}}>
-        <div style={{maxWidth:1140,margin:'0 auto',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-          <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:64,height:64,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/>
-          <div>
-            <div style={{fontSize:22,fontWeight:900,color:'#FFD700',letterSpacing:3,textShadow:'0 0 20px #FFD700'}}>PLAY FOR KEEPS</div>
-            <div style={{fontSize:11,color:'#8B6914',letterSpacing:3,textTransform:'uppercase',fontWeight:600}}>2026 Rookie Rankings — PFK vs Zolty</div>
-          </div>
-          <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{marginLeft:'auto',display:'inline-flex',alignItems:'center',gap:6,padding:'6px 11px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:20,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:13}}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
-            <span>@PlayForKeepsFF</span>
-          </a>
-        </div>
-      </div>
-      <div style={{maxWidth:1140,margin:'0 auto'}}>
-        <PFKvsZoltyTab/>
-      </div>
-    </div>
-  );
-}
-const path = window.location.pathname.replace(/\/$/,'');
-const isAdminRoute = path.endsWith('/admin');
-const isCompareRoute = path.endsWith('/zolty') || path.endsWith('/compare');
-ReactDOM.render(
-  isAdminRoute ? <AdminApp/> : isCompareRoute ? <ComparePublicPage/> : <App/>,
-  document.getElementById("root")
-);
+const isAdminRoute = window.location.pathname.replace(/\/$/,'').endsWith('/admin');
+ReactDOM.render(isAdminRoute ? <AdminApp/> : <App/>, document.getElementById("root"));
