@@ -4492,6 +4492,8 @@ function DispersalDraft({draftId}){
     const t = setInterval(()=>setNow(Date.now()), 1000);
     return ()=>clearInterval(t);
   },[]);
+  // Refs must be at top of component (before any conditional returns) per React Rules of Hooks.
+  const rosterRefs = useRef({});
 
   // Initial load + Supabase realtime subscription. Falls back to polling every
   // 15s as a safety net in case the websocket drops.
@@ -4619,7 +4621,6 @@ function DispersalDraft({draftId}){
   const round = Math.floor(draft.current_pick_idx / Math.max(1,teams.length)) + 1;
   const posInRound = (draft.current_pick_idx % Math.max(1,teams.length)) + 1;
 
-  const rosterRefs = useRef({});
   const screenshotRoster = async (slot, username) => {
     const el = rosterRefs.current[slot];
     if(!el || !window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
