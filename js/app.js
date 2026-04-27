@@ -4266,6 +4266,8 @@ function DispersalSetup(){
           <div style={{fontSize:18,fontWeight:800,marginBottom:12}}>{createdDraft.name}</div>
           <div style={{fontSize:12,color:'#888',marginBottom:6}}>SHARE THIS LINK WITH ALL MANAGERS:</div>
           <input readOnly value={url} onFocus={e=>e.target.select()} style={{width:'100%',padding:'10px 12px',background:'#000',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontWeight:700,fontSize:14,fontFamily:'monospace'}}/>
+          <div style={{fontSize:12,color:'#888',marginTop:10,marginBottom:6}}>👀 SPECTATOR LINK (anyone in your league can watch but not participate):</div>
+          <input readOnly value={url+'?spectate=1'} onFocus={e=>e.target.select()} style={{width:'100%',padding:'10px 12px',background:'#000',border:'1px solid #a78bfa',borderRadius:6,color:'#a78bfa',fontWeight:700,fontSize:14,fontFamily:'monospace'}}/>
           <div style={{fontSize:12,color:'#888',marginTop:14,marginBottom:6}}>EACH MANAGER NEEDS THEIR PASSCODE TO CLAIM THEIR TEAM (text/Discord these to them):</div>
           <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:14,lineHeight:1.9}}>
             {createdDraft.teams.map(t=>(
@@ -4342,7 +4344,11 @@ function DispersalSetup(){
 function DispersalDraft({draftId}){
   const [draft,setDraft] = useState(null);
   const [loading,setLoading] = useState(true);
+  // Spectator mode: ?spectate=1 in URL hides claim/pick UI; the user can watch
+  // but never interact. Useful for league mates not in the disperse pool.
+  const isSpectator = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('spectate')==='1';
   const [me,setMe] = useState(()=>{
+    if(isSpectator) return null;
     try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch(e){ return null; }
   });
   const [claimUser,setClaimUser] = useState('');
@@ -4350,7 +4356,8 @@ function DispersalDraft({draftId}){
   const [claimErr,setClaimErr] = useState('');
   const [pickErr,setPickErr] = useState('');
 
-  // Initial load + polling
+  // Initial load + Supabase realtime subscription. Falls back to polling every
+  // 15s as a safety net in case the websocket drops.
   useEffect(()=>{
     let cancelled = false;
     const load = async () => {
@@ -4358,8 +4365,16 @@ function DispersalDraft({draftId}){
       if(!cancelled){ setDraft(d); setLoading(false); }
     };
     load();
-    const t = setInterval(load, 3000);
-    return ()=>{ cancelled = true; clearInterval(t); };
+    let channel = null;
+    if(sb && sb.channel){
+      channel = sb.channel('dispersal_'+draftId)
+        .on('postgres_changes', {event:'UPDATE', schema:'public', table:'dispersal_drafts', filter:`id=eq.${draftId}`}, (payload)=>{
+          if(!cancelled && payload?.new) setDraft(payload.new);
+        })
+        .subscribe();
+    }
+    const t = setInterval(load, 15000);
+    return ()=>{ cancelled = true; clearInterval(t); if(channel && sb?.removeChannel) sb.removeChannel(channel); };
   },[draftId]);
 
   const claim = async () => {
@@ -4443,7 +4458,8 @@ function DispersalDraft({draftId}){
         <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
         <div style={{padding:'4px 10px',background:status==='live'?'#0a2a1a':status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'}}>{status.toUpperCase()}</div>
         <div style={{flex:1}}/>
-        {me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
+        {isSpectator && <div style={{padding:'4px 10px',background:'#1a1a3a',border:'1px solid #a78bfa',borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:'#a78bfa'}}>👀 SPECTATING</div>}
+        {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
       </div>
 
       {/* Lobby phase */}
@@ -4464,7 +4480,7 @@ function DispersalDraft({draftId}){
             </div>
             <button onClick={startDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
           </div>
-          {!me && (
+          {!me && !isSpectator && (
             <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'16px 18px'}}>
               <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:10,letterSpacing:1}}>CLAIM YOUR TEAM</div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>

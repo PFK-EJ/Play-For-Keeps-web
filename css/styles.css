@@ -42,4 +42,8 @@ input, select { font-family:inherit; }
   .pfk-admin-actions { width:100%; justify-content:flex-start !important; }
   .pfk-admin-actions button { flex:1 1 auto; padding:7px 8px !important; font-size:12px !important; }
   .pfk-admin-list { padding:10px 4px !important; }
+  /* Dispersal draft: stack pool/rosters columns on mobile */
+  .pfk-disp-grid { display:block !important; }
+  .pfk-disp-grid > div { margin-bottom:12px; }
+  .pfk-disp-grid > div > div[style*="maxHeight"] { max-height:380px !important; }
 }
