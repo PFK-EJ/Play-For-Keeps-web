@@ -385,6 +385,10 @@ const DRAFT_2026 = {
   'leveonmoss':           {team:'MIA', pick:'UDFA'},
 };
 const normDraftName = s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+// Zoltan's 2026 dynasty rookie rankings + ADP. Static snapshot dated 2026-04-26.
+// Used by the admin "PFK vs Zolty" tab to compare Evan's PFK rankings against Zolty's
+// rankings + the consensus ADP that Zolty publishes alongside.
+const ZOLTY_2026 = [{"name":"Jeremiyah Love","pos":"RB","rank":1,"adp":1},{"name":"Carnell Tate","pos":"WR","rank":2,"adp":2},{"name":"Makai Lemon","pos":"WR","rank":3,"adp":5},{"name":"KC Concepcion","pos":"WR","rank":4,"adp":8},{"name":"Fernando Mendoza","pos":"QB","rank":5,"adp":3},{"name":"Jordyn Tyson","pos":"WR","rank":6,"adp":4},{"name":"Omar Cooper","pos":"WR","rank":7,"adp":9},{"name":"Kenyon Sadiq","pos":"TE","rank":8,"adp":7},{"name":"Jadarian Price","pos":"RB","rank":9,"adp":6},{"name":"Ty Simpson","pos":"QB","rank":10,"adp":10},{"name":"Denzel Boston","pos":"WR","rank":11,"adp":12},{"name":"Eli Stowers","pos":"TE","rank":12,"adp":11},{"name":"Chris Brazzell","pos":"WR","rank":13,"adp":21},{"name":"Emmett Johnson","pos":"RB","rank":14,"adp":22},{"name":"Jonah Coleman","pos":"RB","rank":15,"adp":13},{"name":"Zachariah Branch","pos":"WR","rank":16,"adp":19},{"name":"Nicholas Singleton","pos":"RB","rank":17,"adp":15},{"name":"Antonio Williams","pos":"WR","rank":18,"adp":17},{"name":"Chris Bell","pos":"WR","rank":19,"adp":14},{"name":"Eli Raridon","pos":"TE","rank":20,"adp":37},{"name":"De'Zhaun Stribling","pos":"WR","rank":21,"adp":23},{"name":"Drew Allar","pos":"QB","rank":22,"adp":31},{"name":"Carson Beck","pos":"QB","rank":23,"adp":25},{"name":"Brenen Thompson","pos":"WR","rank":24,"adp":47},{"name":"Max Klare","pos":"TE","rank":25,"adp":28},{"name":"Germie Bernard","pos":"WR","rank":26,"adp":18},{"name":"Kaytron Allen","pos":"RB","rank":27,"adp":27},{"name":"Elijah Sarratt","pos":"WR","rank":28,"adp":24},{"name":"Ja'Kobi Lane","pos":"WR","rank":29,"adp":60},{"name":"Kevin Coleman","pos":"WR","rank":30,"adp":41},{"name":"Ted Hurst","pos":"WR","rank":31,"adp":30},{"name":"Oscar Delp","pos":"TE","rank":32,"adp":35},{"name":"Malachi Fields","pos":"WR","rank":33,"adp":20},{"name":"Cade Klubnik","pos":"QB","rank":34,"adp":34},{"name":"Bryce Lance","pos":"WR","rank":35,"adp":46},{"name":"Cyrus Allen","pos":"WR","rank":36,"adp":58},{"name":"Demond Claiborne","pos":"RB","rank":37,"adp":32},{"name":"Skyler Bell","pos":"WR","rank":38,"adp":29},{"name":"Mike Washington","pos":"RB","rank":39,"adp":16},{"name":"Adam Randall","pos":"RB","rank":40,"adp":45},{"name":"Michael Trigg","pos":"TE","rank":41,"adp":42},{"name":"Justin Joly","pos":"TE","rank":42,"adp":40},{"name":"Sam Roush","pos":"TE","rank":43,"adp":60},{"name":"Tanner Koziol","pos":"TE","rank":44,"adp":55},{"name":"Jack Endries","pos":"TE","rank":45,"adp":52},{"name":"Cole Payton","pos":"QB","rank":46,"adp":49},{"name":"Zavion Thomas","pos":"WR","rank":47,"adp":50},{"name":"Caleb Douglas","pos":"WR","rank":48,"adp":43},{"name":"Marlin Klein","pos":"TE","rank":49,"adp":56},{"name":"Kaelon Black","pos":"RB","rank":50,"adp":33},{"name":"Joe Royer","pos":"TE","rank":51,"adp":60},{"name":"Seth Mcgowan","pos":"RB","rank":52,"adp":48},{"name":"Eli Heidenreich","pos":"RB","rank":53,"adp":38},{"name":"CJ Daniels","pos":"WR","rank":54,"adp":60},{"name":"Deion Burks","pos":"WR","rank":55,"adp":60},{"name":"Taylen Green","pos":"QB","rank":56,"adp":60},{"name":"Malik Benson","pos":"WR","rank":57,"adp":53}];
 
 // PFK Rookie Model — admin-only, dev-page tab.
 // Composite score: 0.35*stats + 0.50*draftCapital + 0.15*film, all on 0-100 scale.
@@ -3339,6 +3343,133 @@ function App(){
 
 // PFK Rookie Model — admin-only tab. One sortable table across all positions.
 // Each row: name, pos, stats% (editable), draft capital (auto from pick / overridable), film% (editable), PFK score (computed).
+// Admin "PFK vs Zolty" tab — side-by-side comparison of Evan's PFK rankings against
+// Zoltan's static rankings + ADP. Shows only players present in BOTH lists.
+function PFKvsZoltyTab(){
+  const [officialList,setOfficialList]=useState(null);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    fetchOfficialRankings(DEFAULT_SETTINGS).then(row=>{
+      setOfficialList(row?.data || []);
+      setLoading(false);
+    });
+  },[]);
+  const rows = useMemo(()=>{
+    if(!officialList) return [];
+    // Build PFK rank map: walk master list, count player position.
+    const pfkRank = new Map();
+    let r = 0;
+    for(const it of officialList){
+      if(it?.type === 'player'){
+        r++;
+        pfkRank.set(normDraftName(it.name), { rank:r, name:it.name, pos:it.pos });
+      }
+    }
+    // Index Zolty by normalized name.
+    const zByKey = new Map();
+    for(const z of ZOLTY_2026){ zByKey.set(normDraftName(z.name), z); }
+    // Intersection: players in both. Sort by PFK rank ascending.
+    const out = [];
+    for(const [key, p] of pfkRank.entries()){
+      const z = zByKey.get(key);
+      if(!z) continue;
+      out.push({
+        name: p.name, pos: p.pos,
+        pfk: p.rank, zolty: z.rank, adp: z.adp,
+        vsZolty: z.rank - p.rank, // positive = PFK ranks higher (more bullish)
+        vsAdp:   z.adp  - p.rank,
+      });
+    }
+    out.sort((a,b)=>a.pfk - b.pfk);
+    return out;
+  },[officialList]);
+
+  const onlyPfk = useMemo(()=>{
+    if(!officialList) return [];
+    const zKeys = new Set(ZOLTY_2026.map(z=>normDraftName(z.name)));
+    const out = []; let r = 0;
+    for(const it of officialList){
+      if(it?.type === 'player'){
+        r++;
+        if(!zKeys.has(normDraftName(it.name))) out.push({name:it.name,pos:it.pos,pfk:r});
+      }
+    }
+    return out;
+  },[officialList]);
+
+  const onlyZolty = useMemo(()=>{
+    if(!officialList) return [];
+    const pfkKeys = new Set();
+    for(const it of officialList){ if(it?.type==='player') pfkKeys.add(normDraftName(it.name)); }
+    return ZOLTY_2026.filter(z=>!pfkKeys.has(normDraftName(z.name)));
+  },[officialList]);
+
+  if(loading) return <div style={{padding:20,color:'#888'}}>Loading rankings…</div>;
+
+  const POS_COLORS = {QB:'#a855f7', RB:'#22d3ee', WR:'#fbbf24', TE:'#f87171'};
+  const Diff = ({n}) => {
+    if(n===0) return <span style={{color:'#888',fontWeight:800}}>±0</span>;
+    const color = n>0 ? '#10b981' : '#ef4444';
+    const sign = n>0 ? '+' : '';
+    return <span style={{color,fontWeight:900}}>{sign}{n}</span>;
+  };
+  const th = {padding:'8px 10px',textAlign:'left',fontSize:11,letterSpacing:1,color:'#888',fontWeight:800,borderBottom:'1px solid #222',background:'#0a0a0a',position:'sticky',top:0};
+  const td = {padding:'8px 10px',fontSize:13,borderBottom:'1px solid #161616'};
+
+  return (
+    <div style={{padding:'16px 20px',color:'#eee'}}>
+      <div style={{marginBottom:14,display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap'}}>
+        <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PFK vs ZOLTY</div>
+        <div style={{fontSize:12,color:'#888'}}>{rows.length} players in both lists · sorted by PFK rank · green = PFK higher · red = PFK lower</div>
+      </div>
+      <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden'}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr>
+              <th style={{...th,width:60,textAlign:'right'}}>PFK</th>
+              <th style={th}>PLAYER</th>
+              <th style={{...th,width:50}}>POS</th>
+              <th style={{...th,width:80,textAlign:'right'}}>ZOLTY</th>
+              <th style={{...th,width:80,textAlign:'right'}}>ADP</th>
+              <th style={{...th,width:110,textAlign:'right'}}>VS ZOLTY</th>
+              <th style={{...th,width:110,textAlign:'right'}}>VS ADP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r,i)=>(
+              <tr key={r.name} style={{background:i%2?'#0d0d0d':'#0f0f0f'}}>
+                <td style={{...td,textAlign:'right',fontWeight:900,color:'#FFD700'}}>{r.pfk}</td>
+                <td style={{...td,fontWeight:700}}>{r.name}</td>
+                <td style={td}><span style={{padding:'2px 7px',borderRadius:4,fontSize:11,fontWeight:800,background:'#111',color:POS_COLORS[r.pos]||'#888',border:'1px solid '+(POS_COLORS[r.pos]||'#333')}}>{r.pos}</span></td>
+                <td style={{...td,textAlign:'right',color:'#aaa'}}>{r.zolty}</td>
+                <td style={{...td,textAlign:'right',color:'#aaa'}}>{r.adp}</td>
+                <td style={{...td,textAlign:'right'}}><Diff n={r.vsZolty}/></td>
+                <td style={{...td,textAlign:'right'}}><Diff n={r.vsAdp}/></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {(onlyPfk.length>0 || onlyZolty.length>0) && (
+        <div style={{marginTop:18,display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 14px'}}>
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:'#888',marginBottom:6}}>ONLY ON PFK ({onlyPfk.length})</div>
+            <div style={{fontSize:12,color:'#aaa',lineHeight:1.7}}>
+              {onlyPfk.map(p=><div key={p.name}><span style={{color:'#FFD700',fontWeight:700,display:'inline-block',width:30}}>{p.pfk}</span> {p.name} <span style={{color:'#666'}}>({p.pos})</span></div>)}
+            </div>
+          </div>
+          <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 14px'}}>
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:'#888',marginBottom:6}}>ONLY ON ZOLTY ({onlyZolty.length})</div>
+            <div style={{fontSize:12,color:'#aaa',lineHeight:1.7}}>
+              {onlyZolty.map(p=><div key={p.name}><span style={{color:'#aaa',fontWeight:700,display:'inline-block',width:30}}>{p.rank}</span> {p.name} <span style={{color:'#666'}}>({p.pos})</span></div>)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RookieModelTab(){
   const [items,setItems]=useState(null); // null = loading
   const [savedJson,setSavedJson]=useState('');
@@ -3994,7 +4125,7 @@ function AdminApp(){
       </div>
       {publishMsg&&<div style={{padding:'8px 16px',background:publishMsg.startsWith('Error')?'#3a1010':'#103a10',color:publishMsg.startsWith('Error')?'#ef4444':'#10b981',fontSize:14,fontWeight:700}}>{publishMsg}</div>}
       <div style={{display:'flex',gap:0,background:'#080808',borderBottom:'1px solid #222',padding:'0 16px'}}>
-        {[['rankings','RANKINGS'],['model','ROOKIE MODEL']].map(([k,label])=>(
+        {[['rankings','RANKINGS'],['model','ROOKIE MODEL'],['compare','PFK vs ZOLTY']].map(([k,label])=>(
           <button key={k} onClick={()=>setAdminTab(k)} style={{
             padding:'10px 18px', background:'transparent', border:'none',
             borderBottom: adminTab===k ? '2px solid #FFD700' : '2px solid transparent',
@@ -4002,7 +4133,7 @@ function AdminApp(){
           }}>{label}</button>
         ))}
       </div>
-      {adminTab==='model' ? <RookieModelTab/> : (<>
+      {adminTab==='model' ? <RookieModelTab/> : adminTab==='compare' ? <PFKvsZoltyTab/> : (<>
       <div style={{padding:'12px 16px',background:'#0a0a0a',borderBottom:'1px solid #222'}}>
         <div style={{fontSize:12,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
         <SettingsToggleBar value={adminSettings} onChange={setAdminSettings}/>
