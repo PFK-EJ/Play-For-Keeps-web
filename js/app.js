@@ -4312,9 +4312,8 @@ function DispersalSetup(){
       ...players.map(n => ({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name:n })),
       ...futurePicks.map(n => ({ id:dispGenItemId(), type:DISP_POOL_TYPES.PICK, name:n })),
     ];
-    // Shuffle pick order randomly for fairness — commish can re-roll on the lobby page (future)
+    // Pick order = order in the textarea (commish controls this — see Randomize button).
     const order = usernames.map((_,i)=>i);
-    for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
     const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:dispGenPasscode(), joined:false }));
     const timerSeconds = timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
     setCreating(true);
@@ -4385,9 +4384,16 @@ function DispersalSetup(){
           <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`2026 1.04\n2027 1st round pick\n2027 2nd from team Spider`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
-          <label style={labelStyle}>NEW MANAGER USERNAMES (one per line — these are the people drafting)</label>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:8}}>
+            <label style={{...labelStyle,marginBottom:0}}>NEW MANAGER USERNAMES (one per line — top = pick #1)</label>
+            <button type="button" onClick={()=>{
+              const lines = teamsText.split('\n').map(s=>s.trim()).filter(Boolean);
+              for(let i=lines.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [lines[i],lines[j]]=[lines[j],lines[i]]; }
+              setTeamsText(lines.join('\n'));
+            }} style={{padding:'5px 11px',background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>🎲 RANDOMIZE ORDER</button>
+          </div>
           <textarea value={teamsText} onChange={e=>setTeamsText(e.target.value)} placeholder={`evan\nmike\nsteve`} rows={5} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
-          <div style={{fontSize:11,color:'#666',marginTop:5}}>Pick order will be randomized after creation. Each manager gets an auto-generated 4-digit passcode to claim their team.</div>
+          <div style={{fontSize:11,color:'#666',marginTop:5}}>Order in this list = draft pick order. Each manager gets an auto-generated 4-digit passcode to claim their team.</div>
         </div>
         <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
           <div>
@@ -4613,8 +4619,23 @@ function DispersalDraft({draftId}){
   const round = Math.floor(draft.current_pick_idx / Math.max(1,teams.length)) + 1;
   const posInRound = (draft.current_pick_idx % Math.max(1,teams.length)) + 1;
 
+  const rosterRefs = useRef({});
+  const screenshotRoster = async (slot, username) => {
+    const el = rosterRefs.current[slot];
+    if(!el || !window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
+    try{
+      const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2 });
+      const link = document.createElement('a');
+      link.download = `${draft.name.replace(/[^a-z0-9]/gi,'_')}_${username}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
+  };
+
+  // status==='lobby' has no sticky rosters bar so no extra bottom padding needed.
+  const stickyRostersActive = status==='live' || status==='complete';
   return (
-    <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto'}}>
+    <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:stickyRostersActive?'46vh':14}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
         <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
@@ -4698,49 +4719,53 @@ function DispersalDraft({draftId}){
             </div>
           )}
 
-          <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1.2fr)',gap:14}} className="pfk-disp-grid">
-            {/* Pool */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
-                <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>AVAILABLE · {pool.filter(p=>!p.drafted).length} of {pool.length}</div>
-                <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder="Search pool…" style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
-                {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
-              </div>
-              <div style={{maxHeight:600,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
-                {pool.filter(p=>!p.drafted).filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).map(item=>{
-                  const clickable = myTurn && status==='live';
-                  return (
-                    <div key={item.id} onClick={clickable?()=>makePick(item.id):undefined} className="pfk-disp-pool-item"
-                      style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,cursor:clickable?'pointer':'default',display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
-                      <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':'PLAYER'}</span>
-                      <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
-                      {clickable && <span className="pfk-disp-pool-action" style={{fontSize:11,color:'#10b981',fontWeight:800}}>DRAFT →</span>}
-                    </div>
-                  );
-                })}
-                {pool.filter(p=>!p.drafted).length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>Pool is empty.</div>}
-              </div>
+          {/* Pool — flows in normal page scroll, has padding-bottom so it isn't hidden by the sticky-bottom rosters bar */}
+          <div className="pfk-disp-pool-block" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,paddingBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>AVAILABLE · {pool.filter(p=>!p.drafted).length} of {pool.length}</div>
+              <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder="Search pool…" style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+              {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
             </div>
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {pool.filter(p=>!p.drafted).filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).map(item=>{
+                const clickable = myTurn && status==='live';
+                return (
+                  <div key={item.id} onClick={clickable?()=>makePick(item.id):undefined} className="pfk-disp-pool-item"
+                    style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,cursor:clickable?'pointer':'default',display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
+                    <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':'PLAYER'}</span>
+                    <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
+                    {clickable && <span className="pfk-disp-pool-action" style={{fontSize:11,color:'#10b981',fontWeight:800}}>DRAFT →</span>}
+                  </div>
+                );
+              })}
+              {pool.filter(p=>!p.drafted).length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>Pool is empty.</div>}
+            </div>
+          </div>
 
-            {/* Rosters */}
-            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>ROSTERS</div>
-              <div style={{display:'flex',flexDirection:'column',gap:10,maxHeight:600,overflowY:'auto'}}>
+          {/* Rosters — sticky-bottom on viewport so they're always in view as you scroll the pool */}
+          <div className="pfk-disp-rosters" style={{position:'fixed',left:0,right:0,bottom:0,background:'#080808',borderTop:'2px solid #FFD700',padding:'10px 14px',maxHeight:'42vh',overflowY:'auto',zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)'}}>
+            <div style={{maxWidth:1240,margin:'0 auto'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
+                <span>ROSTERS · {rosters.length} teams</span>
+                {status==='complete' && <span style={{color:'#a78bfa'}}>· tap 📸 on any roster to download</span>}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
                 {rosters.map(t=>{
                   const isOnClock = onClockSlot === t.slot;
                   return (
-                    <div key={t.slot} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px'}}>
+                    <div key={t.slot} ref={el=>{ if(el) rosterRefs.current[t.slot]=el; }} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px'}}>
                       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
                         <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24}}>#{pickOrder.indexOf(t.slot)+1}</span>
                         <span style={{fontWeight:800,fontSize:14}}>{t.username}</span>
                         {isOnClock && <span style={{fontSize:10,color:'#10b981',fontWeight:800,padding:'2px 6px',background:'#0a2a1a',borderRadius:3,letterSpacing:1}}>ON CLOCK</span>}
                         <span style={{flex:1}}/>
                         <span style={{fontSize:11,color:'#666'}}>{t.picks.length} picks</span>
+                        {status==='complete' && <button onClick={()=>screenshotRoster(t.slot, t.username)} title={`Download ${t.username}'s roster as PNG`} style={{padding:'2px 6px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11}}>📸</button>}
                       </div>
                       {t.picks.length>0 && (
-                        <div style={{fontSize:12,color:'#aaa',lineHeight:1.6,paddingLeft:32}}>
+                        <div style={{fontSize:12,color:'#aaa',lineHeight:1.6,paddingLeft:0}}>
                           {t.picks.map(p=>(
-                            <div key={p.pickIdx}><span style={{color:'#666',display:'inline-block',width:32}}>{p.pickIdx+1}.</span> {p.item?.name || '(missing)'}</div>
+                            <div key={p.pickIdx}><span style={{color:'#666',display:'inline-block',width:28}}>{p.pickIdx+1}.</span> {p.item?.name || '(missing)'}</div>
                           ))}
                         </div>
                       )}
