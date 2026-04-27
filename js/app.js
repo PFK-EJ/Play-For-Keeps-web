@@ -4327,6 +4327,7 @@ function DispersalSetup(){
       });
       setCreating(false);
       if(error){ setErr(error.message || 'Create failed'); return; }
+      try{ localStorage.setItem('pfk_disp_creator_'+data.id, '1'); }catch(e){}
       setCreatedDraft(data);
     }catch(e){ setErr(e.message || 'Build failed'); }
     finally{ setSleeperBuilding(false); }
@@ -4386,6 +4387,8 @@ function DispersalSetup(){
     });
     setCreating(false);
     if(error){ setErr(error.message || 'Create failed'); return; }
+    // Mark creator as commish in localStorage so they have commish controls in the draft view
+    try{ localStorage.setItem('pfk_disp_creator_'+data.id, '1'); }catch(e){}
     setCreatedDraft(data);
   };
 
@@ -4421,6 +4424,39 @@ function DispersalSetup(){
 
   const inputStyle = {width:'100%',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'};
   const labelStyle = {fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6,display:'block'};
+
+  // Year-pick dropdowns above the future picks textarea. In Sleeper mode the
+  // options include "via {username}" for every Sleeper user; in Custom mode the
+  // option is "via" (no username) and commish types it after.
+  const PICK_YEARS = [2026, 2027, 2028, 2029];
+  const PICK_ROUNDS = [['1st','1st'],['2nd','2nd'],['3rd','3rd'],['4th','4th']];
+  const usernamesForDropdowns = (() => {
+    if(setupMode==='sleeper'){
+      return (sleeperData?.users||[]).map(u => (u.display_name || u.username || '').trim()).filter(Boolean);
+    }
+    return teamsText.split('\n').map(s=>s.trim()).filter(Boolean);
+  })();
+  const addPickFromDropdown = (line) => {
+    setPicksText(prev => (prev ? prev.replace(/\n+$/,'') + '\n' : '') + line);
+  };
+  const PickYearDropdowns = () => (
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+      {PICK_YEARS.map(y => (
+        <select key={y} value="" onChange={e=>{ if(e.target.value){ addPickFromDropdown(e.target.value); e.target.value=''; } }}
+          style={{flex:'1 1 130px',padding:'7px 9px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+          <option value="">+ Add {y} pick</option>
+          {setupMode==='sleeper'
+            ? PICK_ROUNDS.flatMap(([rk,rl]) => usernamesForDropdowns.map(u => (
+                <option key={`${rk}-${u}`} value={`${y} ${rl} via ${u}`}>{rl} via {u}</option>
+              )))
+            : PICK_ROUNDS.map(([rk,rl]) => (
+                <option key={rk} value={`${y} ${rl} via `}>{rl} via</option>
+              ))
+          }
+        </select>
+      ))}
+    </div>
+  );
 
   return (
     <div style={{maxWidth:760,margin:'24px auto',padding:'20px',color:'#eee'}}>
@@ -4481,8 +4517,9 @@ function DispersalSetup(){
             );
           })()}
           <div>
-            <label style={labelStyle}>FUTURE PICKS (one per line — optional)</label>
-            <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`2027 1st\n2028 2nd from team Spider`} rows={3} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+            <label style={labelStyle}>FUTURE PICKS (use the dropdowns to add quickly, or type custom picks)</label>
+            <PickYearDropdowns/>
+            <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above…\nor type custom: 2027 1st via spoof`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
           </div>
           <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
             <div>
@@ -4520,20 +4557,14 @@ function DispersalSetup(){
           <textarea value={poolText} onChange={e=>setPoolText(e.target.value)} placeholder={`Justin Jefferson\nBijan Robinson\n...`} rows={8} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
-          <label style={labelStyle}>FUTURE PICKS (one per line — optional)</label>
-          <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`2026 1.04\n2027 1st round pick\n2027 2nd from team Spider`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+          <label style={labelStyle}>FUTURE PICKS (use the dropdowns to add, then type the username after "via")</label>
+          <PickYearDropdowns/>
+          <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to insert "2027 1st via " and type the username after`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:8}}>
-            <label style={{...labelStyle,marginBottom:0}}>NEW MANAGER USERNAMES (one per line — top = pick #1)</label>
-            <button type="button" onClick={()=>{
-              const lines = teamsText.split('\n').map(s=>s.trim()).filter(Boolean);
-              for(let i=lines.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [lines[i],lines[j]]=[lines[j],lines[i]]; }
-              setTeamsText(lines.join('\n'));
-            }} style={{padding:'5px 11px',background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>🎲 RANDOMIZE ORDER</button>
-          </div>
+          <label style={labelStyle}>NEW MANAGER USERNAMES (one per line)</label>
           <textarea value={teamsText} onChange={e=>setTeamsText(e.target.value)} placeholder={`evan\nmike\nsteve`} rows={5} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
-          <div style={{fontSize:11,color:'#666',marginTop:5}}>Order in this list = draft pick order. Each manager gets an auto-generated 4-digit passcode to claim their team.</div>
+          <div style={{fontSize:11,color:'#666',marginTop:5}}>Each manager gets an auto-generated 4-digit passcode. Pick order can be randomized in the lobby once everyone joins.</div>
         </div>
         <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
           <div>
@@ -4618,6 +4649,9 @@ function DispersalDraft({draftId}){
   // Spectator mode: ?spectate=1 in URL hides claim/pick UI; the user can watch
   // but never interact. Useful for league mates not in the disperse pool.
   const isSpectator = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('spectate')==='1';
+  // Commissioner = the browser that created the draft (flagged in localStorage on create).
+  // The Sleeper league commish almost always IS the setup user, so this single check covers both.
+  const isCommish = !isSpectator && (()=>{ try{ return localStorage.getItem('pfk_disp_creator_'+draftId)==='1'; }catch(e){ return false; } })();
   const [me,setMe] = useState(()=>{
     if(isSpectator) return null;
     try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch(e){ return null; }
@@ -4740,6 +4774,12 @@ function DispersalDraft({draftId}){
     const newDeadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
     await dispUpdate(draftId, { status:'live', pick_deadline:newDeadline });
   };
+  const randomizeOrder = async () => {
+    if(!confirm('Randomize the pick order?')) return;
+    const order = (draft.pick_order||[]).slice();
+    for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    await dispUpdate(draftId, { pick_order:order });
+  };
 
   if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>Loading draft… <span style={{fontSize:11,color:'#444'}}>(id: {draftId})</span></div>;
   if(!draft) return <div style={{padding:40,textAlign:'center',color:'#ef4444'}}>Draft not found. <div style={{fontSize:11,color:'#666',marginTop:6}}>id: {draftId}</div></div>;
@@ -4796,19 +4836,26 @@ function DispersalDraft({draftId}){
       {status === 'lobby' && (
         <>
           <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
-            <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>WAITING FOR MANAGERS · {teams.filter(t=>t.joined).length} of {teams.length} joined</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
-              {teams.map((t,i)=>(
-                <div key={t.slot} style={{padding:'10px 12px',background:t.joined?'#0a2a1a':'#0a0a0a',border:'1px solid '+(t.joined?'#10b981':'#222'),borderRadius:8,display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{color:t.joined?'#10b981':'#666',fontSize:18}}>{t.joined?'✓':'○'}</span>
-                  <div>
-                    <div style={{fontWeight:800,fontSize:14}}>{t.username}</div>
-                    <div style={{fontSize:11,color:'#666'}}>Pick #{pickOrder.indexOf(t.slot)+1}</div>
-                  </div>
-                </div>
-              ))}
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>WAITING FOR MANAGERS · {teams.filter(t=>t.joined).length} of {teams.length} joined · DRAFT ORDER:</div>
+              {isCommish && <button onClick={randomizeOrder} style={{marginLeft:'auto',padding:'5px 11px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>🎲 RANDOMIZE ORDER</button>}
             </div>
-            <button onClick={startDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
+              {pickOrder.map((slotIdx,i)=>{
+                const t = teams.find(x=>x.slot===slotIdx);
+                if(!t) return null;
+                return (
+                  <div key={t.slot} style={{padding:'10px 12px',background:t.joined?'#0a2a1a':'#0a0a0a',border:'1px solid '+(t.joined?'#10b981':'#222'),borderRadius:8,display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{color:t.joined?'#10b981':'#666',fontSize:18}}>{t.joined?'✓':'○'}</span>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:14}}>{t.username}</div>
+                      <div style={{fontSize:11,color:'#666'}}>Pick #{i+1}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {isCommish ? <button onClick={startDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to start the draft…</div>}
           </div>
           {!me && !isSpectator && (
             <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'16px 18px'}}>
@@ -4871,7 +4918,7 @@ function DispersalDraft({draftId}){
           )}
           {pickErr && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{pickErr}</div>}
 
-          {!isSpectator && (
+          {isCommish && (
             <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
               <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginRight:6}}>COMMISH:</div>
               <button onClick={undoLastPick} disabled={!picks.length} style={{padding:'6px 12px',background:'transparent',border:'1px solid '+(picks.length?'#FFD700':'#333'),borderRadius:6,color:picks.length?'#FFD700':'#444',fontSize:12,fontWeight:800,cursor:picks.length?'pointer':'default'}}>↩ Undo last pick</button>
