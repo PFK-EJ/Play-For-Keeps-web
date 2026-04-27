@@ -4217,6 +4217,24 @@ const dispUpdate = async (id, patch) => {
   return { error };
 };
 
+// Sleeper API helpers — public API, no auth needed.
+// players/nfl is ~10MB; cached in module scope so repeated imports during one
+// session don't re-fetch.
+let _sleeperPlayersCache = null;
+const sleeperLeague = async (id) => {
+  const [users, rosters] = await Promise.all([
+    fetch(`https://api.sleeper.app/v1/league/${id}/users`).then(r=>{ if(!r.ok) throw new Error('Sleeper league not found'); return r.json(); }),
+    fetch(`https://api.sleeper.app/v1/league/${id}/rosters`).then(r=>r.json()),
+  ]);
+  return { users, rosters };
+};
+const sleeperPlayers = async () => {
+  if(_sleeperPlayersCache) return _sleeperPlayersCache;
+  const data = await fetch('https://api.sleeper.app/v1/players/nfl').then(r=>r.json());
+  _sleeperPlayersCache = data;
+  return data;
+};
+
 // ---------- Setup (commish creates a new draft) ----------
 function DispersalSetup(){
   const [name,setName] = useState('');
@@ -4228,6 +4246,59 @@ function DispersalSetup(){
   const [creating,setCreating] = useState(false);
   const [createdDraft,setCreatedDraft] = useState(null);
   const [err,setErr] = useState('');
+  // Sleeper import state
+  const [sleeperOpen,setSleeperOpen] = useState(false);
+  const [sleeperId,setSleeperId] = useState('');
+  const [sleeperLoading,setSleeperLoading] = useState(false);
+  const [sleeperData,setSleeperData] = useState(null); // {users, rosters}
+  const [sleeperSelected,setSleeperSelected] = useState(()=>new Set());
+  const [sleeperErr,setSleeperErr] = useState('');
+  const [sleeperPlayersLoading,setSleeperPlayersLoading] = useState(false);
+
+  const fetchSleeperLeague = async () => {
+    setSleeperErr(''); setSleeperData(null);
+    if(!sleeperId.trim()){ setSleeperErr('Enter a league ID'); return; }
+    setSleeperLoading(true);
+    try{
+      const data = await sleeperLeague(sleeperId.trim());
+      setSleeperData(data);
+      // Auto-select rosters with no owner (orphaned)
+      const auto = new Set();
+      (data.rosters||[]).forEach(r => { if(!r.owner_id) auto.add(r.roster_id); });
+      setSleeperSelected(auto);
+    }catch(e){ setSleeperErr(e.message || 'Fetch failed'); }
+    finally{ setSleeperLoading(false); }
+  };
+
+  const importSelected = async () => {
+    if(!sleeperData || sleeperSelected.size===0){ setSleeperErr('Pick at least one team'); return; }
+    setSleeperPlayersLoading(true);
+    try{
+      const players = await sleeperPlayers();
+      // Pull player IDs from selected rosters
+      const playerIds = new Set();
+      (sleeperData.rosters||[]).forEach(r => {
+        if(!sleeperSelected.has(r.roster_id)) return;
+        (r.players||[]).forEach(pid => playerIds.add(pid));
+      });
+      // Resolve to "First Last (POS)" — sortable, readable
+      const lines = [];
+      playerIds.forEach(pid => {
+        const p = players[pid];
+        if(!p) return;
+        const fullName = p.full_name || `${p.first_name||''} ${p.last_name||''}`.trim() || pid;
+        const pos = p.position || '';
+        lines.push(pos ? `${fullName} (${pos})` : fullName);
+      });
+      lines.sort();
+      // Append (de-duped) to existing pool textarea
+      const existing = new Set(poolText.split('\n').map(s=>s.trim()).filter(Boolean));
+      const merged = [...existing, ...lines.filter(l=>!existing.has(l))];
+      setPoolText(merged.join('\n'));
+      setSleeperOpen(false);
+    }catch(e){ setSleeperErr(e.message || 'Player lookup failed'); }
+    finally{ setSleeperPlayersLoading(false); }
+  };
 
   const create = async () => {
     setErr('');
@@ -4295,7 +4366,7 @@ function DispersalSetup(){
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
         <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:2}}>🎲 DISPERSAL DRAFT</div>
       </div>
-      <div style={{fontSize:13,color:'#888',marginBottom:22,lineHeight:1.6}}>Set up a snake dispersal draft for an orphaned dynasty league. Pool the assets, list the new managers, and share the link. Each manager joins with their passcode and drafts on their own device. <span style={{color:'#FFD700'}}>Sleeper auto-import + live timer coming next session.</span></div>
+      <div style={{fontSize:13,color:'#888',marginBottom:22,lineHeight:1.6}}>Set up a snake dispersal draft for an orphaned dynasty league. Pool the assets, list the new managers, and share the link. Each manager joins with their passcode and drafts on their own device. Use <span style={{color:'#FFD700'}}>📥 Import from Sleeper</span> to auto-fill the pool from orphaned teams in your league.</div>
 
       <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
         <div>
@@ -4303,7 +4374,10 @@ function DispersalSetup(){
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
         </div>
         <div>
-          <label style={labelStyle}>PLAYER POOL (one player per line)</label>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:8}}>
+            <label style={{...labelStyle,marginBottom:0}}>PLAYER POOL (one player per line)</label>
+            <button onClick={()=>setSleeperOpen(true)} type="button" style={{padding:'5px 11px',background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>📥 IMPORT FROM SLEEPER</button>
+          </div>
           <textarea value={poolText} onChange={e=>setPoolText(e.target.value)} placeholder={`Justin Jefferson\nBijan Robinson\n...`} rows={8} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
@@ -4336,6 +4410,56 @@ function DispersalSetup(){
         {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
         <button onClick={create} disabled={creating} style={{padding:'14px 24px',background:creating?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:creating?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{creating?'CREATING…':'CREATE DRAFT'}</button>
       </div>
+
+      {/* Sleeper import modal */}
+      {sleeperOpen && (()=>{
+        const usersById = {}; (sleeperData?.users||[]).forEach(u=>{ usersById[u.user_id]=u; });
+        return (
+          <div onClick={()=>setSleeperOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:540,maxHeight:'90vh',overflowY:'auto',background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:12,padding:'18px 22px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                <div style={{fontWeight:900,fontSize:16,letterSpacing:1.5,color:'#FFD700'}}>📥 IMPORT FROM SLEEPER</div>
+                <button onClick={()=>setSleeperOpen(false)} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
+              </div>
+              <div style={{fontSize:12,color:'#888',marginBottom:10,lineHeight:1.5}}>Paste your Sleeper league ID (the long number from <code style={{color:'#FFD700'}}>sleeper.com/leagues/&lt;id&gt;</code>). We'll pull the team list. Pick the orphaned teams to import their rosters into the pool.</div>
+              <div style={{display:'flex',gap:8,marginBottom:14}}>
+                <input value={sleeperId} onChange={e=>setSleeperId(e.target.value)} onKeyDown={e=>e.key==='Enter'&&fetchSleeperLeague()} placeholder="Sleeper league ID" style={{flex:1,padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'monospace'}}/>
+                <button onClick={fetchSleeperLeague} disabled={sleeperLoading} style={{padding:'10px 16px',background:sleeperLoading?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:sleeperLoading?'default':'pointer',fontSize:13,letterSpacing:1}}>{sleeperLoading?'…':'FETCH'}</button>
+              </div>
+              {sleeperErr && <div style={{padding:'8px 12px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:12,marginBottom:12}}>{sleeperErr}</div>}
+              {sleeperData && (
+                <>
+                  <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:8}}>SELECT ORPHANED TEAMS · {sleeperSelected.size} of {(sleeperData.rosters||[]).length} selected</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14,maxHeight:280,overflowY:'auto'}}>
+                    {(sleeperData.rosters||[]).map(r=>{
+                      const owner = r.owner_id ? usersById[r.owner_id] : null;
+                      const sel = sleeperSelected.has(r.roster_id);
+                      const orphan = !r.owner_id;
+                      const playerCount = (r.players||[]).length;
+                      return (
+                        <div key={r.roster_id} onClick={()=>{
+                          const next = new Set(sleeperSelected);
+                          if(sel) next.delete(r.roster_id); else next.add(r.roster_id);
+                          setSleeperSelected(next);
+                        }} style={{padding:'8px 12px',background:sel?'#0a2a1a':'#0a0a0a',border:'1px solid '+(sel?'#10b981':'#222'),borderRadius:6,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                          <span style={{color:sel?'#10b981':'#666',fontSize:18}}>{sel?'☑':'☐'}</span>
+                          <div style={{flex:1}}>
+                            <div style={{fontWeight:700,fontSize:14}}>{owner?.display_name || owner?.username || `Team #${r.roster_id}`}</div>
+                            <div style={{fontSize:11,color:'#666'}}>{playerCount} players · roster #{r.roster_id} {orphan && <span style={{color:'#f59e0b',fontWeight:800,marginLeft:6}}>· ORPHAN</span>}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button onClick={importSelected} disabled={sleeperPlayersLoading || sleeperSelected.size===0} style={{width:'100%',padding:'12px',background:sleeperPlayersLoading||sleeperSelected.size===0?'#444':'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:sleeperPlayersLoading||sleeperSelected.size===0?'default':'pointer',fontSize:14,letterSpacing:1}}>
+                    {sleeperPlayersLoading ? 'LOADING PLAYER NAMES (~10MB, one-time)…' : 'ADD PLAYERS TO POOL →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
