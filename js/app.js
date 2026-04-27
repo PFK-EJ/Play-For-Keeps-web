@@ -2952,7 +2952,7 @@ function App(){
   // Each list gets a DEEP-CLONED copy of officialList so they're fully independent.
   useEffect(()=>{
     if(!officialList) return;
-    if(localStorage.getItem('pfk_lists_seeded_v5')) return;
+    if(localStorage.getItem('pfk_lists_seeded_v6')) return;
     const seedFresh=()=>{
       const clone=()=>JSON.parse(JSON.stringify(officialList));
       setSavedLists([
@@ -2963,7 +2963,7 @@ function App(){
       setActiveListId('list_1');
       setIsDirty(false);
       localStorage.removeItem('pfk_lists_seeded_v3'); // clear any prior flag
-      localStorage.setItem('pfk_lists_seeded_v5','1');
+      localStorage.setItem('pfk_lists_seeded_v6','1');
     };
     if(session && sb){
       sb.from('user_rankings').delete().eq('user_id',session.user.id).then(seedFresh);
@@ -2974,7 +2974,7 @@ function App(){
 
   useEffect(()=>{
     if(!session||!sb) return;
-    if(!localStorage.getItem('pfk_lists_seeded_v5')) return; // wait for migration
+    if(!localStorage.getItem('pfk_lists_seeded_v6')) return; // wait for migration
     // Order by id so the lists appear in the order they were inserted (Custom1, Custom2,
     // Custom3...) instead of arbitrary Supabase row order. The schema has no created_at
     // column — id is auto-increment so it preserves insertion order.
