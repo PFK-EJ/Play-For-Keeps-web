@@ -4343,7 +4343,7 @@ function DispersalDraft({draftId}){
   const [draft,setDraft] = useState(null);
   const [loading,setLoading] = useState(true);
   const [me,setMe] = useState(()=>{
-    try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch{ return null; }
+    try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch(e){ return null; }
   });
   const [claimUser,setClaimUser] = useState('');
   const [claimPass,setClaimPass] = useState('');
