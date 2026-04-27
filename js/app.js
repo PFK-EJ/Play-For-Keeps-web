@@ -4563,9 +4563,22 @@ function DispersalApp({draftId}){
 const path = window.location.pathname.replace(/\/$/,'');
 const isAdminRoute = path.endsWith('/admin');
 const dispersalMatch = path.match(/^\/dispersal(?:\/([0-9a-f-]+))?$/i);
+const isDeadRoute = path === '/zolty' || path === '/compare';
+function NotFoundPage(){
+  return (
+    <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{textAlign:'center',maxWidth:480}}>
+        <div style={{fontSize:96,fontWeight:900,color:'#FFD700',letterSpacing:6,textShadow:'0 0 30px #FFD70066'}}>404</div>
+        <div style={{fontSize:18,color:'#888',marginTop:8,letterSpacing:1}}>PAGE NOT FOUND</div>
+        <a href="/" style={{display:'inline-block',marginTop:24,padding:'10px 24px',background:'#FFD700',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,letterSpacing:1.5,fontSize:14}}>Back to Play For Keeps</a>
+      </div>
+    </div>
+  );
+}
 ReactDOM.render(
   isAdminRoute ? <AdminApp/>
   : dispersalMatch ? <DispersalApp draftId={dispersalMatch[1] || null}/>
+  : isDeadRoute ? <NotFoundPage/>
   : <App/>,
   document.getElementById("root")
 );
