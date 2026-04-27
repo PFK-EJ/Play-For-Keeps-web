@@ -3345,15 +3345,19 @@ function App(){
 // Each row: name, pos, stats% (editable), draft capital (auto from pick / overridable), film% (editable), PFK score (computed).
 // Admin "PFK vs Zolty" tab — side-by-side comparison of Evan's PFK rankings against
 // Zoltan's static rankings + ADP. Shows only players present in BOTH lists.
-function PFKvsZoltyTab(){
-  const [officialList,setOfficialList]=useState(null);
-  const [loading,setLoading]=useState(true);
+function PFKvsZoltyTab({officialList:livOfficialList}){
+  // If AdminApp passes its live list (the in-memory rankings being edited), use that —
+  // updates instantly as you drag/edit. Falls back to its own fetch if no prop given.
+  const [fetchedList,setFetchedList]=useState(null);
+  const [loading,setLoading]=useState(livOfficialList ? false : true);
   useEffect(()=>{
+    if(livOfficialList) return;
     fetchOfficialRankings(DEFAULT_SETTINGS).then(row=>{
-      setOfficialList(row?.data || []);
+      setFetchedList(row?.data || []);
       setLoading(false);
     });
-  },[]);
+  },[livOfficialList]);
+  const officialList = livOfficialList || fetchedList;
   // Strip trailing suffixes (Jr, Sr, II, III, IV) before matching, so "Omar Cooper Jr."
   // matches Zolty's "Omar Cooper" and "Chris Brazzell II" matches "Chris Brazzell".
   const compareKey = (s)=>normDraftName(s).replace(/(jr|sr|ii|iii|iv|v)$/, '');
@@ -4133,7 +4137,7 @@ function AdminApp(){
           }}>{label}</button>
         ))}
       </div>
-      {adminTab==='model' ? <RookieModelTab/> : adminTab==='compare' ? <PFKvsZoltyTab/> : (<>
+      {adminTab==='model' ? <RookieModelTab/> : adminTab==='compare' ? <PFKvsZoltyTab officialList={list}/> : (<>
       <div style={{padding:'12px 16px',background:'#0a0a0a',borderBottom:'1px solid #222'}}>
         <div style={{fontSize:12,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
         <SettingsToggleBar value={adminSettings} onChange={setAdminSettings}/>
