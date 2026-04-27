@@ -4392,7 +4392,7 @@ function DispersalDraft({draftId}){
   const makePick = async (poolItemId) => {
     setPickErr('');
     if(!me){ setPickErr('You must claim a team first'); return; }
-    const onClockSlot = dispSlotForPick(draft.current_pick_idx, draft.teams.length, draft.snake, draft.pick_order);
+    const onClockSlot = dispSlotForPick(draft.current_pick_idx, teams.length, draft.snake, draft.pick_order);
     if(onClockSlot !== me.slot){ setPickErr('Not your turn'); return; }
     const item = draft.pool.find(p => p.id === poolItemId);
     if(!item || item.drafted){ setPickErr('Already drafted'); return; }
@@ -4414,43 +4414,50 @@ function DispersalDraft({draftId}){
     setMe(null);
   };
 
-  if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>Loading draft…</div>;
-  if(!draft) return <div style={{padding:40,textAlign:'center',color:'#ef4444'}}>Draft not found.</div>;
+  if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>Loading draft… <span style={{fontSize:11,color:'#444'}}>(id: {draftId})</span></div>;
+  if(!draft) return <div style={{padding:40,textAlign:'center',color:'#ef4444'}}>Draft not found. <div style={{fontSize:11,color:'#666',marginTop:6}}>id: {draftId}</div></div>;
+
+  // Defensive defaults — if Supabase returns nulls or missing fields we still render.
+  const teams = Array.isArray(draft.teams) ? draft.teams : [];
+  const picks = Array.isArray(draft.picks) ? draft.picks : [];
+  const pool  = Array.isArray(draft.pool)  ? draft.pool  : [];
+  const pickOrder = Array.isArray(draft.pick_order) ? draft.pick_order : teams.map((_,i)=>i);
+  const status = draft.status || 'lobby';
 
   // Compute roster per team
-  const rosters = draft.teams.map(t => ({
+  const rosters = teams.map(t => ({
     ...t,
-    picks: draft.picks.filter(p => p.slot===t.slot).map(p => ({...p, item:draft.pool.find(it=>it.id===p.poolItemId)}))
+    picks: picks.filter(p => p.slot===t.slot).map(p => ({...p, item:pool.find(it=>it.id===p.poolItemId)}))
   }));
 
-  const onClockSlot = draft.status==='live' ? dispSlotForPick(draft.current_pick_idx, draft.teams.length, draft.snake, draft.pick_order) : null;
-  const onClockTeam = onClockSlot != null ? draft.teams.find(t => t.slot === onClockSlot) : null;
+  const onClockSlot = status==='live' ? dispSlotForPick(draft.current_pick_idx||0, teams.length, draft.snake, pickOrder) : null;
+  const onClockTeam = onClockSlot != null ? teams.find(t => t.slot === onClockSlot) : null;
   const myTurn = me && onClockSlot === me.slot;
-  const round = Math.floor(draft.current_pick_idx / Math.max(1,draft.teams.length)) + 1;
-  const posInRound = (draft.current_pick_idx % Math.max(1,draft.teams.length)) + 1;
+  const round = Math.floor(draft.current_pick_idx / Math.max(1,teams.length)) + 1;
+  const posInRound = (draft.current_pick_idx % Math.max(1,teams.length)) + 1;
 
   return (
     <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto'}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
         <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
-        <div style={{padding:'4px 10px',background:draft.status==='live'?'#0a2a1a':draft.status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(draft.status==='live'?'#10b981':draft.status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:draft.status==='live'?'#10b981':draft.status==='complete'?'#a78bfa':'#FFD700'}}>{draft.status.toUpperCase()}</div>
+        <div style={{padding:'4px 10px',background:status==='live'?'#0a2a1a':status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'}}>{status.toUpperCase()}</div>
         <div style={{flex:1}}/>
         {me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
       </div>
 
       {/* Lobby phase */}
-      {draft.status === 'lobby' && (
+      {status === 'lobby' && (
         <>
           <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
-            <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>WAITING FOR MANAGERS · {draft.teams.filter(t=>t.joined).length} of {draft.teams.length} joined</div>
+            <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>WAITING FOR MANAGERS · {teams.filter(t=>t.joined).length} of {teams.length} joined</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
-              {draft.teams.map((t,i)=>(
+              {teams.map((t,i)=>(
                 <div key={t.slot} style={{padding:'10px 12px',background:t.joined?'#0a2a1a':'#0a0a0a',border:'1px solid '+(t.joined?'#10b981':'#222'),borderRadius:8,display:'flex',alignItems:'center',gap:8}}>
                   <span style={{color:t.joined?'#10b981':'#666',fontSize:18}}>{t.joined?'✓':'○'}</span>
                   <div>
                     <div style={{fontWeight:800,fontSize:14}}>{t.username}</div>
-                    <div style={{fontSize:11,color:'#666'}}>Pick #{draft.pick_order.indexOf(t.slot)+1}</div>
+                    <div style={{fontSize:11,color:'#666'}}>Pick #{pickOrder.indexOf(t.slot)+1}</div>
                   </div>
                 </div>
               ))}
@@ -4472,18 +4479,18 @@ function DispersalDraft({draftId}){
       )}
 
       {/* Live or complete: show on-clock + pool + rosters */}
-      {(draft.status === 'live' || draft.status === 'complete') && (
+      {(status === 'live' || status === 'complete') && (
         <>
-          {draft.status === 'live' && onClockTeam && (
+          {status === 'live' && onClockTeam && (
             <div style={{background:myTurn?'#0a2a1a':'#0a0a0a',border:'2px solid '+(myTurn?'#10b981':'#FFD700'),borderRadius:10,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
               <div style={{fontSize:11,fontWeight:800,color:myTurn?'#10b981':'#FFD700',letterSpacing:1.5}}>{myTurn?'YOUR TURN':'ON THE CLOCK'}</div>
               <div style={{fontSize:18,fontWeight:900}}>{onClockTeam.username}</div>
               <div style={{fontSize:13,color:'#888'}}>Round {round} · Pick {posInRound} (overall #{draft.current_pick_idx+1})</div>
             </div>
           )}
-          {draft.status === 'complete' && (
+          {status === 'complete' && (
             <div style={{background:'#1a1a3a',border:'2px solid #a78bfa',borderRadius:10,padding:'14px 18px',marginBottom:14}}>
-              <div style={{fontSize:14,fontWeight:900,color:'#a78bfa',letterSpacing:1.5}}>🏆 DRAFT COMPLETE — {draft.picks.length} picks made</div>
+              <div style={{fontSize:14,fontWeight:900,color:'#a78bfa',letterSpacing:1.5}}>🏆 DRAFT COMPLETE — {picks.length} picks made</div>
             </div>
           )}
           {pickErr && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{pickErr}</div>}
@@ -4491,10 +4498,10 @@ function DispersalDraft({draftId}){
           <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1.2fr)',gap:14}} className="pfk-disp-grid">
             {/* Pool */}
             <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>AVAILABLE · {draft.pool.filter(p=>!p.drafted).length} of {draft.pool.length}</div>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>AVAILABLE · {pool.filter(p=>!p.drafted).length} of {pool.length}</div>
               <div style={{maxHeight:600,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
-                {draft.pool.filter(p=>!p.drafted).map(item=>{
-                  const clickable = myTurn && draft.status==='live';
+                {pool.filter(p=>!p.drafted).map(item=>{
+                  const clickable = myTurn && status==='live';
                   return (
                     <div key={item.id} onClick={clickable?()=>makePick(item.id):undefined}
                       style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,cursor:clickable?'pointer':'default',display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
@@ -4504,7 +4511,7 @@ function DispersalDraft({draftId}){
                     </div>
                   );
                 })}
-                {draft.pool.filter(p=>!p.drafted).length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>Pool is empty.</div>}
+                {pool.filter(p=>!p.drafted).length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>Pool is empty.</div>}
               </div>
             </div>
 
@@ -4517,7 +4524,7 @@ function DispersalDraft({draftId}){
                   return (
                     <div key={t.slot} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px'}}>
                       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                        <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24}}>#{draft.pick_order.indexOf(t.slot)+1}</span>
+                        <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24}}>#{pickOrder.indexOf(t.slot)+1}</span>
                         <span style={{fontWeight:800,fontSize:14}}>{t.username}</span>
                         {isOnClock && <span style={{fontSize:10,color:'#10b981',fontWeight:800,padding:'2px 6px',background:'#0a2a1a',borderRadius:3,letterSpacing:1}}>ON CLOCK</span>}
                         <span style={{flex:1}}/>
