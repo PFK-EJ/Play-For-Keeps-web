@@ -64,7 +64,9 @@ const publishOfficialRankings = async (items, settings) => {
   const { data:userData } = await sb.auth.getUser();
   const email = userData?.user?.email || 'PFK Staff';
   const { data:existing } = await sb.from('pfk_rankings').select('id,settings').order('updated_at',{ascending:false});
-  const match = (existing||[]).find(r=>sameSettings(r.settings,settings));
+  // Match the published row only (no kind sentinel) — without this, sameSettings could pick
+  // an archived or per-combo row and "promote" it back to master, leaving duplicate masters.
+  const match = (existing||[]).find(r=>!r.settings?.kind && sameSettings(r.settings,settings));
   if(match){
     const { error } = await sb.from('pfk_rankings').update({ data:items, updated_by:email, updated_at:new Date().toISOString(), settings }).eq('id',match.id);
     return { error };
