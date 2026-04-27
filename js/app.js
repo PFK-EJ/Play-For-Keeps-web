@@ -4355,6 +4355,13 @@ function DispersalDraft({draftId}){
   const [claimPass,setClaimPass] = useState('');
   const [claimErr,setClaimErr] = useState('');
   const [pickErr,setPickErr] = useState('');
+  const [poolFilter,setPoolFilter] = useState('');
+  // 1-second tick for the live timer countdown (only ticks when live + deadline set)
+  const [now,setNow] = useState(()=>Date.now());
+  useEffect(()=>{
+    const t = setInterval(()=>setNow(Date.now()), 1000);
+    return ()=>clearInterval(t);
+  },[]);
 
   // Initial load + Supabase realtime subscription. Falls back to polling every
   // 15s as a safety net in case the websocket drops.
@@ -4429,6 +4436,37 @@ function DispersalDraft({draftId}){
     setMe(null);
   };
 
+  // Commish controls — anyone with the (non-spectator) link can use these.
+  // Trade off some security for "any league mate can rescue a stuck draft."
+  const undoLastPick = async () => {
+    if(!draft.picks?.length){ alert('No picks to undo.'); return; }
+    if(!confirm('Undo the last pick?')) return;
+    const last = draft.picks[draft.picks.length-1];
+    const newPicks = draft.picks.slice(0,-1);
+    const newPool = (draft.pool||[]).map(p => p.id===last.poolItemId ? {...p, drafted:false} : p);
+    const newIdx = Math.max(0, (draft.current_pick_idx||0) - 1);
+    const newDeadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    await dispUpdate(draftId, { pool:newPool, picks:newPicks, current_pick_idx:newIdx, status:'live', pick_deadline:newDeadline });
+  };
+  const forceSkip = async () => {
+    if((draft.status||'lobby')!=='live'){ alert('Draft not live.'); return; }
+    if(!confirm('Skip the on-clock manager? Their pick is forfeited.')) return;
+    const newIdx = (draft.current_pick_idx||0) + 1;
+    const totalSlots = (draft.pool||[]).length;
+    const newStatus = newIdx >= totalSlots ? 'complete' : 'live';
+    const newDeadline = (newStatus==='live' && draft.timer_seconds) ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    await dispUpdate(draftId, { current_pick_idx:newIdx, status:newStatus, pick_deadline:newDeadline });
+  };
+  const endDraft = async () => {
+    if(!confirm('Force the draft to complete now? Remaining pool items stay undrafted.')) return;
+    await dispUpdate(draftId, { status:'complete', pick_deadline:null });
+  };
+  const reopenDraft = async () => {
+    if(!confirm('Reopen the draft? Anyone whose turn it is can resume picking.')) return;
+    const newDeadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    await dispUpdate(draftId, { status:'live', pick_deadline:newDeadline });
+  };
+
   if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>Loading draft… <span style={{fontSize:11,color:'#444'}}>(id: {draftId})</span></div>;
   if(!draft) return <div style={{padding:40,textAlign:'center',color:'#ef4444'}}>Draft not found. <div style={{fontSize:11,color:'#666',marginTop:6}}>id: {draftId}</div></div>;
 
@@ -4497,13 +4535,28 @@ function DispersalDraft({draftId}){
       {/* Live or complete: show on-clock + pool + rosters */}
       {(status === 'live' || status === 'complete') && (
         <>
-          {status === 'live' && onClockTeam && (
-            <div style={{background:myTurn?'#0a2a1a':'#0a0a0a',border:'2px solid '+(myTurn?'#10b981':'#FFD700'),borderRadius:10,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-              <div style={{fontSize:11,fontWeight:800,color:myTurn?'#10b981':'#FFD700',letterSpacing:1.5}}>{myTurn?'YOUR TURN':'ON THE CLOCK'}</div>
-              <div style={{fontSize:18,fontWeight:900}}>{onClockTeam.username}</div>
-              <div style={{fontSize:13,color:'#888'}}>Round {round} · Pick {posInRound} (overall #{draft.current_pick_idx+1})</div>
-            </div>
-          )}
+          {status === 'live' && onClockTeam && (()=>{
+            const deadlineMs = draft.pick_deadline ? new Date(draft.pick_deadline).getTime() : null;
+            const remaining = deadlineMs ? Math.max(0, deadlineMs - now) : null;
+            const mins = remaining!=null ? Math.floor(remaining/60000) : null;
+            const secs = remaining!=null ? Math.floor((remaining%60000)/1000) : null;
+            const expired = remaining===0;
+            const lowTime = remaining!=null && remaining < 60000 && !expired;
+            const timerColor = expired ? '#ef4444' : lowTime ? '#f59e0b' : myTurn ? '#10b981' : '#FFD700';
+            const borderColor = expired ? '#ef4444' : myTurn ? '#10b981' : '#FFD700';
+            return (
+              <div style={{background:myTurn?'#0a2a1a':'#0a0a0a',border:'2px solid '+borderColor,borderRadius:10,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+                <div style={{fontSize:11,fontWeight:800,color:expired?'#ef4444':myTurn?'#10b981':'#FFD700',letterSpacing:1.5}}>{expired?'TIME EXPIRED':myTurn?'YOUR TURN':'ON THE CLOCK'}</div>
+                <div style={{fontSize:18,fontWeight:900}}>{onClockTeam.username}</div>
+                <div style={{fontSize:13,color:'#888'}}>Round {round} · Pick {posInRound} (overall #{draft.current_pick_idx+1})</div>
+                {remaining!=null && (
+                  <div style={{marginLeft:'auto',fontSize:22,fontWeight:900,color:timerColor,fontFamily:'monospace',letterSpacing:2}}>
+                    {String(mins).padStart(2,'0')}:{String(secs).padStart(2,'0')}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {status === 'complete' && (
             <div style={{background:'#1a1a3a',border:'2px solid #a78bfa',borderRadius:10,padding:'14px 18px',marginBottom:14}}>
               <div style={{fontSize:14,fontWeight:900,color:'#a78bfa',letterSpacing:1.5}}>🏆 DRAFT COMPLETE — {picks.length} picks made</div>
@@ -4511,19 +4564,33 @@ function DispersalDraft({draftId}){
           )}
           {pickErr && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{pickErr}</div>}
 
+          {!isSpectator && (
+            <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginRight:6}}>COMMISH:</div>
+              <button onClick={undoLastPick} disabled={!picks.length} style={{padding:'6px 12px',background:'transparent',border:'1px solid '+(picks.length?'#FFD700':'#333'),borderRadius:6,color:picks.length?'#FFD700':'#444',fontSize:12,fontWeight:800,cursor:picks.length?'pointer':'default'}}>↩ Undo last pick</button>
+              {status==='live' && <button onClick={forceSkip} style={{padding:'6px 12px',background:'transparent',border:'1px solid #f59e0b',borderRadius:6,color:'#f59e0b',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏭ Force skip</button>}
+              {status==='live' && <button onClick={endDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏹ End draft</button>}
+              {status==='complete' && <button onClick={reopenDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #10b981',borderRadius:6,color:'#10b981',fontSize:12,fontWeight:800,cursor:'pointer'}}>▶ Reopen draft</button>}
+            </div>
+          )}
+
           <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1.2fr)',gap:14}} className="pfk-disp-grid">
             {/* Pool */}
             <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:10}}>AVAILABLE · {pool.filter(p=>!p.drafted).length} of {pool.length}</div>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+                <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>AVAILABLE · {pool.filter(p=>!p.drafted).length} of {pool.length}</div>
+                <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder="Search pool…" style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+                {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
+              </div>
               <div style={{maxHeight:600,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
-                {pool.filter(p=>!p.drafted).map(item=>{
+                {pool.filter(p=>!p.drafted).filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).map(item=>{
                   const clickable = myTurn && status==='live';
                   return (
-                    <div key={item.id} onClick={clickable?()=>makePick(item.id):undefined}
+                    <div key={item.id} onClick={clickable?()=>makePick(item.id):undefined} className="pfk-disp-pool-item"
                       style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,cursor:clickable?'pointer':'default',display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
-                      <span style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':'PLAYER'}</span>
-                      <span style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
-                      {clickable && <span style={{fontSize:11,color:'#10b981',fontWeight:800}}>DRAFT →</span>}
+                      <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':'PLAYER'}</span>
+                      <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
+                      {clickable && <span className="pfk-disp-pool-action" style={{fontSize:11,color:'#10b981',fontWeight:800}}>DRAFT →</span>}
                     </div>
                   );
                 })}

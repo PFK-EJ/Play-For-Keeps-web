@@ -42,8 +42,13 @@ input, select { font-family:inherit; }
   .pfk-admin-actions { width:100%; justify-content:flex-start !important; }
   .pfk-admin-actions button { flex:1 1 auto; padding:7px 8px !important; font-size:12px !important; }
   .pfk-admin-list { padding:10px 4px !important; }
-  /* Dispersal draft: stack pool/rosters columns on mobile */
+  /* Dispersal draft: stack pool/rosters columns on mobile + bigger tap targets */
   .pfk-disp-grid { display:block !important; }
   .pfk-disp-grid > div { margin-bottom:12px; }
-  .pfk-disp-grid > div > div[style*="maxHeight"] { max-height:380px !important; }
+  .pfk-disp-grid > div > div[style*="maxHeight"] { max-height:420px !important; }
+  /* Pool item rows: bigger, easier to tap */
+  .pfk-disp-pool-item { padding:14px 14px !important; flex-wrap:wrap !important; gap:10px !important; }
+  .pfk-disp-pool-item .pfk-disp-pool-name { font-size:16px !important; flex:1 1 100% !important; order:2; }
+  .pfk-disp-pool-item .pfk-disp-pool-badge { order:1; font-size:11px !important; }
+  .pfk-disp-pool-item .pfk-disp-pool-action { order:3; flex:1 1 100% !important; text-align:center; padding:10px !important; background:#10b981 !important; color:#000 !important; border-radius:6px; font-size:14px !important; }
 }
