@@ -3354,21 +3354,21 @@ function PFKvsZoltyTab(){
       setLoading(false);
     });
   },[]);
+  // Strip trailing suffixes (Jr, Sr, II, III, IV) before matching, so "Omar Cooper Jr."
+  // matches Zolty's "Omar Cooper" and "Chris Brazzell II" matches "Chris Brazzell".
+  const compareKey = (s)=>normDraftName(s).replace(/(jr|sr|ii|iii|iv|v)$/, '');
   const rows = useMemo(()=>{
     if(!officialList) return [];
-    // Build PFK rank map: walk master list, count player position.
     const pfkRank = new Map();
     let r = 0;
     for(const it of officialList){
       if(it?.type === 'player'){
         r++;
-        pfkRank.set(normDraftName(it.name), { rank:r, name:it.name, pos:it.pos });
+        pfkRank.set(compareKey(it.name), { rank:r, name:it.name, pos:it.pos });
       }
     }
-    // Index Zolty by normalized name.
     const zByKey = new Map();
-    for(const z of ZOLTY_2026){ zByKey.set(normDraftName(z.name), z); }
-    // Intersection: players in both. Sort by PFK rank ascending.
+    for(const z of ZOLTY_2026){ zByKey.set(compareKey(z.name), z); }
     const out = [];
     for(const [key, p] of pfkRank.entries()){
       const z = zByKey.get(key);
@@ -3376,7 +3376,7 @@ function PFKvsZoltyTab(){
       out.push({
         name: p.name, pos: p.pos,
         pfk: p.rank, zolty: z.rank, adp: z.adp,
-        vsZolty: z.rank - p.rank, // positive = PFK ranks higher (more bullish)
+        vsZolty: z.rank - p.rank,
         vsAdp:   z.adp  - p.rank,
       });
     }
@@ -3386,12 +3386,12 @@ function PFKvsZoltyTab(){
 
   const onlyPfk = useMemo(()=>{
     if(!officialList) return [];
-    const zKeys = new Set(ZOLTY_2026.map(z=>normDraftName(z.name)));
+    const zKeys = new Set(ZOLTY_2026.map(z=>compareKey(z.name)));
     const out = []; let r = 0;
     for(const it of officialList){
       if(it?.type === 'player'){
         r++;
-        if(!zKeys.has(normDraftName(it.name))) out.push({name:it.name,pos:it.pos,pfk:r});
+        if(!zKeys.has(compareKey(it.name))) out.push({name:it.name,pos:it.pos,pfk:r});
       }
     }
     return out;
@@ -3400,8 +3400,8 @@ function PFKvsZoltyTab(){
   const onlyZolty = useMemo(()=>{
     if(!officialList) return [];
     const pfkKeys = new Set();
-    for(const it of officialList){ if(it?.type==='player') pfkKeys.add(normDraftName(it.name)); }
-    return ZOLTY_2026.filter(z=>!pfkKeys.has(normDraftName(z.name)));
+    for(const it of officialList){ if(it?.type==='player') pfkKeys.add(compareKey(it.name)); }
+    return ZOLTY_2026.filter(z=>!pfkKeys.has(compareKey(z.name)));
   },[officialList]);
 
   if(loading) return <div style={{padding:20,color:'#888'}}>Loading rankings…</div>;
