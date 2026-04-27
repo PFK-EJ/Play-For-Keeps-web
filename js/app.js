@@ -3426,8 +3426,8 @@ function PFKvsZoltyTab({officialList:livOfficialList}){
         <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PFK vs ZOLTY</div>
         <div style={{fontSize:12,color:'#888'}}>{rows.length} players in both lists · sorted by PFK rank · green = PFK higher · red = PFK lower</div>
       </div>
-      <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden'}}>
-        <table style={{width:'100%',borderCollapse:'collapse'}}>
+      <div className="pfk-wide-scroll" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10}}>
+        <table style={{width:'100%',borderCollapse:'collapse',minWidth:560}}>
           <thead>
             <tr>
               <th style={{...th,width:60,textAlign:'right'}}>PFK</th>
@@ -3455,7 +3455,7 @@ function PFKvsZoltyTab({officialList:livOfficialList}){
         </table>
       </div>
       {(onlyPfk.length>0 || onlyZolty.length>0) && (
-        <div style={{marginTop:18,display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <div className="pfk-pr-grid" style={{marginTop:18,display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
           <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 14px'}}>
             <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:'#888',marginBottom:6}}>ONLY ON PFK ({onlyPfk.length})</div>
             <div style={{fontSize:12,color:'#aaa',lineHeight:1.7}}>
