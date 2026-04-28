@@ -5111,11 +5111,17 @@ function DispersalDraft({draftId}){
               <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:6}}>🏆 DRAFT COMPLETE</div>
               <div style={{fontSize:13,color:'#a78bfa',marginBottom:14,letterSpacing:1}}>{picks.length} picks made · 📸 download each roster from the bar below</div>
               <div style={{fontSize:14,color:'#eee',marginBottom:6,fontWeight:700}}>Thanks for drafting with Play For Keeps!</div>
-              <div style={{fontSize:12,color:'#aaa',marginBottom:14,maxWidth:420,marginLeft:'auto',marginRight:'auto',lineHeight:1.5}}>If this saved your league a Google Sheets disaster, follow @PlayForKeepsFF on X for more dynasty tools — built by one fan, free for the community.</div>
-              <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'#FFD700',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1}}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="#000" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
-                FOLLOW @PlayForKeepsFF
-              </a>
+              <div style={{fontSize:12,color:'#aaa',marginBottom:14,maxWidth:460,marginLeft:'auto',marginRight:'auto',lineHeight:1.5}}>If this saved you time please follow @PlayForKeepsFF on twitter. Check out playforkeepsdynasty.com for more free dynasty tools and content.</div>
+              <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
+                <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'#FFD700',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#000" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+                  FOLLOW @PlayForKeepsFF
+                </a>
+                <a href="https://playforkeepsdynasty.com/" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'transparent',color:'#FFD700',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1,border:'2px solid #FFD700'}}>
+                  <span style={{fontSize:16}}>👑</span>
+                  PLAYFORKEEPSDYNASTY.COM
+                </a>
+              </div>
             </div>
           )}
           {pickErr && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{pickErr}</div>}
@@ -5205,14 +5211,13 @@ function DispersalDraft({draftId}){
                 {rosters.map(t=>{
                   const isOnClock = onClockSlot === t.slot;
                   return (
-                    <div key={t.slot} ref={el=>{ if(el) rosterRefs.current[t.slot]=el; }} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                        <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24}}>#{pickOrder.indexOf(t.slot)+1}</span>
-                        <span style={{fontWeight:800,fontSize:14}}>{t.username}</span>
-                        {isOnClock && <span style={{fontSize:10,color:'#10b981',fontWeight:800,padding:'2px 6px',background:'#0a2a1a',borderRadius:3,letterSpacing:1}}>ON CLOCK</span>}
-                        <span style={{flex:1}}/>
-                        <span style={{fontSize:11,color:'#666'}}>{t.picks.length} picks</span>
-                        {status==='complete' && <button onClick={()=>screenshotRoster(t.slot, t.username)} title={`Download ${t.username}'s roster as PNG`} style={{padding:'2px 6px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11}}>📸</button>}
+                    <div key={t.slot} ref={el=>{ if(el) rosterRefs.current[t.slot]=el; }} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px',overflow:'hidden'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap'}}>
+                        <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24,flexShrink:0}}>#{pickOrder.indexOf(t.slot)+1}</span>
+                        <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0}}>{t.username}</span>
+                        {isOnClock && <span style={{fontSize:9,color:'#10b981',fontWeight:800,padding:'2px 5px',background:'#0a2a1a',borderRadius:3,letterSpacing:0.5,flexShrink:0}}>ON CLOCK</span>}
+                        <span style={{fontSize:11,color:'#666',flexShrink:0}}>{t.picks.length}p</span>
+                        {status==='complete' && <button onClick={()=>screenshotRoster(t.slot, t.username)} title={`Download ${t.username}'s roster as PNG`} style={{padding:'2px 6px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11,flexShrink:0}}>📸</button>}
                       </div>
                       {t.picks.length>0 && (
                         <div style={{fontSize:12,color:'#aaa',lineHeight:1.6,paddingLeft:0}}>
