@@ -4260,6 +4260,7 @@ function DispersalSetup(){
   const [sleeperErr,setSleeperErr] = useState('');
   const [sleeperPlayersLoading,setSleeperPlayersLoading] = useState(false);
   const [sleeperBuilding,setSleeperBuilding] = useState(false);
+  const [showTeamsHelp,setShowTeamsHelp] = useState(false);
 
   const fetchSleeperLeague = async () => {
     setSleeperErr(''); setSleeperData(null);
@@ -4493,7 +4494,23 @@ function DispersalSetup(){
             const usersById = {}; (sleeperData.users||[]).forEach(u=>{ usersById[u.user_id]=u; });
             return (
               <div>
-                <label style={labelStyle}>SELECT TEAMS · {sleeperSelected.size} of {(sleeperData.rosters||[]).length} selected (their players → pool, their names → drafters)</label>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
+                  <label style={{...labelStyle,marginBottom:0}}>CHOOSE TEAMS & ROSTERS TO INCLUDE · {sleeperSelected.size} of {(sleeperData.rosters||[]).length} selected</label>
+                  <button type="button" onClick={()=>setShowTeamsHelp(v=>!v)} title="What does this do?" style={{padding:'2px 8px',background:'transparent',border:'1px solid #FFD70055',borderRadius:12,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showTeamsHelp?'hide':'what is this?'}</button>
+                </div>
+                {showTeamsHelp && (
+                  <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
+                    <div style={{fontWeight:800,color:'#FFD700',marginBottom:6,letterSpacing:0.5}}>HOW THIS WORKS</div>
+                    Every team you <strong>check</strong> below will be part of the dispersal:
+                    <div style={{paddingLeft:14,marginTop:6}}>
+                      • Their entire current roster goes into the draft pool<br/>
+                      • Their owner (or you can rename) becomes one of the drafting managers<br/>
+                      • Each manager gets an auto-generated 4-digit passcode to claim their team
+                    </div>
+                    <div style={{marginTop:8,color:'#aaa'}}>Teams you leave <strong>unchecked</strong> stay untouched — their rosters and managers don't participate.</div>
+                    <div style={{marginTop:8,color:'#aaa'}}>Most common use: pick the 2-4 teams whose owners abandoned the league. New owners then re-draft the pooled players.</div>
+                  </div>
+                )}
                 <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:340,overflowY:'auto',border:'1px solid #222',borderRadius:8,padding:8}}>
                   {(sleeperData.rosters||[]).map(r=>{
                     const owner = r.owner_id ? usersById[r.owner_id] : null;
@@ -4515,7 +4532,7 @@ function DispersalSetup(){
                     );
                   })}
                 </div>
-                <div style={{fontSize:11,color:'#666',marginTop:6}}>The selected teams' rosters get pooled. The username next to each becomes the manager who drafts (edit before creating).</div>
+                <div style={{fontSize:11,color:'#666',marginTop:6}}>Tip: edit the username next to any team before creating — that's what shows up in the draft.</div>
               </div>
             );
           })()}
