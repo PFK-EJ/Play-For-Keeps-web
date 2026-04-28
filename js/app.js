@@ -4754,7 +4754,15 @@ function DispersalDraft({draftId}){
     if(sb && sb.channel){
       channel = sb.channel('dispersal_'+draftId)
         .on('postgres_changes', {event:'UPDATE', schema:'public', table:'dispersal_drafts', filter:`id=eq.${draftId}`}, (payload)=>{
-          if(!cancelled && payload?.new) setDraft(payload.new);
+          if(cancelled) return;
+          // Use payload.new only if it actually contains parsed JSONB arrays — Supabase
+          // realtime sometimes truncates large rows or returns JSONB columns as strings.
+          // In any partial / suspect case, fall back to a fresh fetch so we never render
+          // picks that can't find their pool item ("(missing)" for ~10s until polling).
+          const n = payload?.new;
+          const ok = n && Array.isArray(n.pool) && Array.isArray(n.picks) && Array.isArray(n.teams);
+          if(ok) setDraft(n);
+          else load();
         })
         .subscribe();
     }
