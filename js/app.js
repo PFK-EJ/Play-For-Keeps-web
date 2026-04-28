@@ -5046,7 +5046,7 @@ function DispersalSetup(){
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.managersNeeded||0}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>MANAGERS NEEDED</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS NEEDED</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0a1f10',border:'1px solid #10b981',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:22,fontWeight:900,color:'#10b981',lineHeight:1}}>{(() => {
