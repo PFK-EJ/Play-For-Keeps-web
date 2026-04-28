@@ -3214,7 +3214,7 @@ function App(){
             <a href="mailto:ej@playforkeepsdynasty.com?subject=Play%20For%20Keeps%20feedback"
                title="Email Play For Keeps with feedback or bug reports"
                style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 11px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:20,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:13,letterSpacing:0.3}}>
-              📧 CONTACT
+              📧 EMAIL PLAY FOR KEEPS
             </a>
             {session?(
               <>
@@ -5241,7 +5241,7 @@ function DispersalApp({draftId}){
           <span style={{flex:1}}/>
           <a href="mailto:ej@playforkeepsdynasty.com?subject=Play%20For%20Keeps%20feedback" title="Email Play For Keeps with feedback or bug reports"
              style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 11px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:20,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:13,letterSpacing:0.3}}>
-            📧 CONTACT
+            📧 EMAIL PLAY FOR KEEPS
           </a>
         </div>
       </div>
