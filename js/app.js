@@ -4293,6 +4293,11 @@ function DispersalSetup(){
   const [showTeamsHelp,setShowTeamsHelp] = useState(false);
   const [showModeHelp,setShowModeHelp] = useState(false);
   const [showPicksHelp,setShowPicksHelp] = useState(false);
+  // Bulk-add picks ("all managers have own picks" shortcut). When checked, the year
+  // toggle pills appear; clicking ADD appends N managers × 4 rounds × |selected years|
+  // generic pick lines to the picks textarea.
+  const [allHavePicks,setAllHavePicks] = useState(false);
+  const [bulkPicksYears,setBulkPicksYears] = useState(()=>new Set([2026,2027,2028,2029]));
   // Share-pool state — for the 📸 SHARE POOL button (commish previews + shares
   // a PFK-branded image of the pool BEFORE creating the draft, to advertise it).
   const poolCardRef = useRef(null);
@@ -4689,6 +4694,65 @@ function DispersalSetup(){
   const addPickFromDropdown = (line) => {
     setPicksText(prev => (prev ? prev.replace(/\n+$/,'') + '\n' : '') + line);
   };
+  // Manager count for the "all managers have own picks" bulk-add. Sleeper mode uses
+  // the count of selected rosters; custom mode uses the count of typed usernames.
+  const managerCountForBulk = setupMode === 'sleeper'
+    ? sleeperSelected.size
+    : teamsText.split('\n').map(s=>s.trim()).filter(Boolean).length;
+  const bulkPicksTotal = managerCountForBulk * 4 * bulkPicksYears.size;
+  const toggleBulkYear = (y) => {
+    setBulkPicksYears(prev => {
+      const next = new Set(prev);
+      if(next.has(y)) next.delete(y); else next.add(y);
+      return next;
+    });
+  };
+  const applyBulkPicks = () => {
+    if(managerCountForBulk === 0 || bulkPicksYears.size === 0) return;
+    const lines = [];
+    const years = Array.from(bulkPicksYears).sort();
+    years.forEach(y => {
+      PICK_ROUNDS.forEach(([rk,rl]) => {
+        for(let i=0;i<managerCountForBulk;i++){
+          lines.push(`${y} ${rl}`);
+        }
+      });
+    });
+    setPicksText(prev => (prev ? prev.replace(/\n+$/,'') + '\n' : '') + lines.join('\n'));
+    setAllHavePicks(false); // collapse the controls so commish doesn't double-fire
+  };
+  // Bulk-picks controls UI — defined as a JSX value (not a Component) so React
+  // reconciles in place. (Same lesson as the leagueInfoInputs focus-loss fix.)
+  const bulkPicksControls = (
+    <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,padding:'10px 12px',marginBottom:8}}>
+      <label style={{display:'flex',alignItems:'center',gap:9,cursor:'pointer',fontSize:13,color:'#ddd',fontWeight:700}}>
+        <input type="checkbox" checked={allHavePicks} onChange={e=>setAllHavePicks(e.target.checked)} style={{width:16,height:16,accentColor:'#FFD700',cursor:'pointer'}}/>
+        🪄 All managers have their own future picks
+      </label>
+      {allHavePicks && (
+        <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid #1e1e1e'}}>
+          <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>SELECT YEARS · {bulkPicksYears.size} of {PICK_YEARS.length}</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+            {PICK_YEARS.map(y => {
+              const sel = bulkPicksYears.has(y);
+              return (
+                <button key={y} type="button" onClick={()=>toggleBulkYear(y)} style={{padding:'6px 14px',background:sel?'#FFD700':'#0a0a0a',color:sel?'#000':'#888',border:'1px solid '+(sel?'#FFD700':'#333'),borderRadius:14,fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:0.5}}>{sel?'✓ ':''}{y}</button>
+              );
+            })}
+          </div>
+          <button type="button" onClick={applyBulkPicks} disabled={managerCountForBulk===0 || bulkPicksYears.size===0}
+            style={{width:'100%',padding:'10px 14px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'#222':'#10b981',border:'none',borderRadius:6,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#666':'#000',fontWeight:900,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:13,letterSpacing:1}}>
+            {managerCountForBulk===0
+              ? (setupMode==='sleeper' ? 'SELECT MANAGERS FIRST' : 'TYPE MANAGER USERNAMES FIRST')
+              : bulkPicksYears.size===0
+                ? 'PICK AT LEAST ONE YEAR'
+                : `🪄 ADD ${bulkPicksTotal} PICKS  ·  ${managerCountForBulk} mgrs × 4 rounds × ${bulkPicksYears.size} ${bulkPicksYears.size===1?'year':'years'}`}
+          </button>
+          <div style={{fontSize:11,color:'#666',marginTop:6,textAlign:'center'}}>Picks are appended to the textarea below — your existing entries stay.</div>
+        </div>
+      )}
+    </div>
+  );
   const PickYearDropdowns = () => (
     <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
       {PICK_YEARS.map(y => (
@@ -4805,6 +4869,7 @@ function DispersalSetup(){
                 <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add draft picks fast.</div>
               </div>
             )}
+            {bulkPicksControls}
             <PickYearDropdowns/>
             <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to add a pick`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
           </div>
@@ -4868,7 +4933,8 @@ function DispersalSetup(){
               <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add draft picks fast.</div>
             </div>
           )}
-          <PickYearDropdowns/>
+          {bulkPicksControls}
+            <PickYearDropdowns/>
           <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to add a pick, then type the original owner's username after "via"`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
