@@ -4263,7 +4263,6 @@ function DispersalSetup(){
   const [showTeamsHelp,setShowTeamsHelp] = useState(false);
   const [showModeHelp,setShowModeHelp] = useState(false);
   const [showPicksHelp,setShowPicksHelp] = useState(false);
-  const [showFormatHelp,setShowFormatHelp] = useState(false);
 
   const fetchSleeperLeague = async () => {
     setSleeperErr(''); setSleeperData(null);
@@ -4470,7 +4469,7 @@ function DispersalSetup(){
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
         <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:2}}>🎲 DISPERSAL DRAFT</div>
       </div>
-      <div style={{fontSize:13,color:'#888',marginBottom:18,lineHeight:1.6}}>Set up a snake dispersal draft for an orphaned dynasty league. Pool the assets, list the new managers, and share the link. Each manager joins with their passcode and drafts on their own device.</div>
+      <div style={{fontSize:13,color:'#888',marginBottom:18,lineHeight:1.6}}>Set up a snake dispersal draft. Pool the rosters and picks of the teams that are re-drafting, share the link with the new managers, and they each draft on their own device.</div>
 
       {/* Mode selector */}
       <div style={{marginBottom:18}}>
@@ -4480,8 +4479,8 @@ function DispersalSetup(){
         </div>
         {showModeHelp && (
           <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:10,fontSize:12,color:'#ddd',lineHeight:1.6}}>
-            <div style={{marginBottom:6}}><strong style={{color:'#FFD700'}}>📥 SLEEPER LEAGUE ID</strong> — fastest. Paste your Sleeper league ID and we'll auto-pull every team's roster + manager name. Pick the orphaned teams to disperse and you're done. Best for active Sleeper leagues.</div>
-            <div><strong style={{color:'#FFD700'}}>✏️ CUSTOM</strong> — for non-Sleeper leagues (ESPN, Yahoo, MFL, etc.) or custom scenarios. Paste your player pool and manager usernames yourself. More work but works for any league.</div>
+            <div style={{marginBottom:6}}><strong style={{color:'#FFD700'}}>📥 SLEEPER LEAGUE ID</strong> — Fastest. Paste your Sleeper league ID and we'll auto-pull every team's roster + manager name. Pick the new managers to disperse and you're done. Best for active Sleeper leagues.</div>
+            <div><strong style={{color:'#FFD700'}}>✏️ CUSTOM</strong> — For non-Sleeper leagues (ESPN, Yahoo, MFL, etc.) or custom scenarios. Paste your player pool and manager usernames yourself. More work but works for any league.</div>
           </div>
         )}
         <div style={{display:'flex',gap:8,padding:6,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10}}>
@@ -4515,15 +4514,7 @@ function DispersalSetup(){
                 </div>
                 {showTeamsHelp && (
                   <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
-                    <div style={{fontWeight:800,color:'#FFD700',marginBottom:6,letterSpacing:0.5}}>HOW THIS WORKS</div>
-                    Every team you <strong>check</strong> below will be part of the dispersal:
-                    <div style={{paddingLeft:14,marginTop:6}}>
-                      • Their entire current roster goes into the draft pool<br/>
-                      • Their owner (or you can rename) becomes one of the drafting managers<br/>
-                      • Each manager gets an auto-generated 4-digit passcode to claim their team
-                    </div>
-                    <div style={{marginTop:8,color:'#aaa'}}>Teams you leave <strong>unchecked</strong> stay untouched — their rosters and managers don't participate.</div>
-                    <div style={{marginTop:8,color:'#aaa'}}>Most common use: pick the 2-4 teams whose owners abandoned the league. New owners then re-draft the pooled players.</div>
+                    Every team you check below will be part of the dispersal. Their entire current roster goes into the draft pool. Each manager gets an auto-generated 4-digit passcode to claim their team.
                   </div>
                 )}
                 <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:340,overflowY:'auto',border:'1px solid #222',borderRadius:8,padding:8}}>
@@ -4558,29 +4549,20 @@ function DispersalSetup(){
             </div>
             {showPicksHelp && (
               <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
-                Sleeper doesn't track future rookie picks reliably, so add them here manually. These get pooled alongside the players and can be drafted just like any other asset.
-                <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add picks fast (e.g. <code style={{color:'#FFD700'}}>2027 1st via Evan</code>), or type any custom format on its own line — anything in this box becomes a draftable pick.</div>
+                Sleeper doesn't track future picks reliably, so add them here manually. These get pooled alongside the players and can be drafted just like any other asset.
+                <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add draft picks fast.</div>
               </div>
             )}
             <PickYearDropdowns/>
-            <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above…\nor type custom: 2027 1st via spoof`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+            <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to add a pick`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
           </div>
           <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
             <div>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
-                <label style={{...labelStyle,marginBottom:0}}>FORMAT</label>
-                <button type="button" onClick={()=>setShowFormatHelp(v=>!v)} style={{padding:'1px 7px',background:'transparent',border:'1px solid #FFD70055',borderRadius:12,color:'#FFD700',cursor:'pointer',fontSize:10,fontWeight:800}}>ⓘ</button>
-              </div>
+              <label style={labelStyle}>FORMAT</label>
               <div style={{display:'flex',gap:6}}>
                 <button onClick={()=>setSnake(true)} style={{padding:'8px 14px',background:snake?'#FFD700':'#0a0a0a',color:snake?'#000':'#888',border:'1px solid '+(snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>🐍 Snake</button>
                 <button onClick={()=>setSnake(false)} style={{padding:'8px 14px',background:!snake?'#FFD700':'#0a0a0a',color:!snake?'#000':'#888',border:'1px solid '+(!snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>↓ Linear</button>
               </div>
-              {showFormatHelp && (
-                <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'10px 12px',marginTop:8,fontSize:12,color:'#ddd',lineHeight:1.5,maxWidth:340}}>
-                  <strong style={{color:'#FFD700'}}>Snake</strong> — order reverses every round. Pick #1 in round 1 picks last in round 2, then first in round 3. Standard for fairness.<br/>
-                  <strong style={{color:'#FFD700'}}>Linear</strong> — same order every round. Pick #1 always picks first.
-                </div>
-              )}
             </div>
             <div>
               <label style={labelStyle}>TIMER PER PICK</label>
@@ -4616,12 +4598,12 @@ function DispersalSetup(){
           </div>
           {showPicksHelp && (
             <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
-              Add any tradeable rookie picks (e.g. <code style={{color:'#FFD700'}}>2027 1st via SomeUser</code>) so they're draftable in the dispersal alongside the players.
-              <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to insert "<code style={{color:'#FFD700'}}>YEAR ROUND via</code>" with one click, then type the original owner's username. Or type any custom line — anything in this box becomes a draftable pick.</div>
+              Sleeper doesn't track future picks reliably, so add them here manually. These get pooled alongside the players and can be drafted just like any other asset.
+              <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add draft picks fast.</div>
             </div>
           )}
           <PickYearDropdowns/>
-          <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to insert "2027 1st via " and type the username after`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+          <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to add a pick, then type the original owner's username after "via"`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
           <label style={labelStyle}>NEW MANAGER USERNAMES (one per line)</label>
