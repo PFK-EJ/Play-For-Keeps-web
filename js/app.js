@@ -4454,12 +4454,16 @@ function DispersalSetup(){
           style={{flex:'1 1 130px',padding:'7px 9px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:12,fontWeight:700,cursor:'pointer'}}>
           <option value="">+ Add {y} pick</option>
           {setupMode==='sleeper'
-            ? PICK_ROUNDS.flatMap(([rk,rl]) => usernamesForDropdowns.map(u => (
-                <option key={`${rk}-${u}`} value={`${y} ${rl} via ${u}`}>{rl} via {u}</option>
-              )))
-            : PICK_ROUNDS.map(([rk,rl]) => (
+            ? PICK_ROUNDS.flatMap(([rk,rl]) => [
+                <option key={`${rk}-generic`} value={`${y} ${rl}`}>{y} {rl}</option>,
+                ...usernamesForDropdowns.map(u => (
+                  <option key={`${rk}-${u}`} value={`${y} ${rl} via ${u}`}>{rl} via {u}</option>
+                ))
+              ])
+            : PICK_ROUNDS.flatMap(([rk,rl]) => [
+                <option key={`${rk}-generic`} value={`${y} ${rl}`}>{y} {rl}</option>,
                 <option key={rk} value={`${y} ${rl} via `}>{rl} via</option>
-              ))
+              ])
           }
         </select>
       ))}
