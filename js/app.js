@@ -4267,7 +4267,8 @@ function DispersalSetup(){
   const [picksText,setPicksText] = useState('');
   const [teamsText,setTeamsText] = useState('');
   const [snake,setSnake] = useState(true);
-  const [timer,setTimer] = useState('off'); // 'off' | '4h' | '8h'
+  const [timer,setTimer] = useState('off'); // 'off' | '1h' | '2h' | '4h' | '8h'
+  const [autoPick,setAutoPick] = useState(false);
   const [creating,setCreating] = useState(false);
   const [createdDraft,setCreatedDraft] = useState(null);
   const [err,setErr] = useState('');
@@ -4348,10 +4349,10 @@ function DispersalSetup(){
         joined:false,
       }));
       const order = teams.map((_,i)=>i);
-      const timerSeconds = timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+      const timerSeconds = timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
       setCreating(true);
       const { data, error } = await dispCreate({
-        name:name.trim(), snake, timer_seconds:timerSeconds,
+        name:name.trim(), snake, timer_seconds:timerSeconds, auto_pick:autoPick,
         pool:poolItems, teams, pick_order:order, picks:[],
         current_pick_idx:0, status:'lobby',
       });
@@ -4408,7 +4409,7 @@ function DispersalSetup(){
     // Pick order = order in the textarea (commish controls this — see Randomize button).
     const order = usernames.map((_,i)=>i);
     const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:dispGenPasscode(), joined:false }));
-    const timerSeconds = timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+    const timerSeconds = timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
     setCreating(true);
     const { data, error } = await dispCreate({
       name:name.trim(), snake, timer_seconds:timerSeconds,
@@ -4590,11 +4591,20 @@ function DispersalSetup(){
             </div>
             <div>
               <label style={labelStyle}>TIMER PER PICK</label>
-              <div style={{display:'flex',gap:6}}>
-                {[['off','None'],['4h','4 hrs'],['8h','8 hrs']].map(([k,l])=>(
-                  <button key={k} onClick={()=>setTimer(k)} style={{padding:'8px 14px',background:timer===k?'#FFD700':'#0a0a0a',color:timer===k?'#000':'#888',border:'1px solid '+(timer===k?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>{l}</button>
-                ))}
-              </div>
+              <select value={timer} onChange={e=>setTimer(e.target.value)} style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:800,cursor:'pointer',minWidth:160}}>
+                <option value="off">None (no clock)</option>
+                <option value="1h">1 hour</option>
+                <option value="2h">2 hours</option>
+                <option value="4h">4 hours</option>
+                <option value="8h">8 hours</option>
+              </select>
+              {timer !== 'off' && (
+                <label style={{display:'flex',alignItems:'center',gap:8,marginTop:8,fontSize:12,color:'#aaa',cursor:'pointer'}}>
+                  <input type="checkbox" checked={autoPick} onChange={e=>setAutoPick(e.target.checked)} style={{width:16,height:16,accentColor:'#10b981'}}/>
+                  Auto-pick best available if a manager misses their pick
+                </label>
+              )}
+              {timer !== 'off' && !autoPick && <div style={{fontSize:11,color:'#666',marginTop:5}}>When a pick clock expires, the draft pauses for the commish to advance.</div>}
             </div>
           </div>
           {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
@@ -4741,6 +4751,8 @@ function DispersalDraft({draftId}){
   const [pickConfirm,setPickConfirm] = useState(null); // pool item awaiting Yes/No
   const [fcValues,setFcValues] = useState(null); // {bySleeperId, byName} from FantasyCalc — silent sort
   useEffect(()=>{ fetchFcValues().then(setFcValues); },[]);
+  // Track in-flight auto-pick attempts so we don't double-fire on the same pick index.
+  const autoPickAttempted = useRef(new Set());
   // 1-second tick for the live timer countdown (only ticks when live + deadline set)
   const [now,setNow] = useState(()=>Date.now());
   useEffect(()=>{
@@ -4826,6 +4838,49 @@ function DispersalDraft({draftId}){
     localStorage.removeItem('pfk_disp_'+draftId);
     setMe(null);
   };
+
+  // Auto-pick when the timer expires (only if draft.auto_pick is true). Any client viewing
+  // the draft can fire this; we use eq('current_pick_idx', expectedIdx) on the update so
+  // only the first to land wins — the rest become no-ops.
+  useEffect(()=>{
+    if(!draft || draft.status !== 'live' || !draft.auto_pick) return;
+    if(!draft.pick_deadline) return;
+    const deadlineMs = new Date(draft.pick_deadline).getTime();
+    if(now < deadlineMs) return;
+    const idx = draft.current_pick_idx || 0;
+    if(autoPickAttempted.current.has(idx)) return;
+    autoPickAttempted.current.add(idx);
+    // Slight random delay to spread contention across clients
+    const delay = 200 + Math.floor(Math.random()*800);
+    const t = setTimeout(async () => {
+      // Find best available player by FC value (skip future picks — auto-pick only does players)
+      const available = (draft.pool||[]).filter(p => !p.drafted && p.type !== 'pick');
+      if(!available.length) return;
+      const valueOf = (it) => {
+        if(!fcValues) return 0;
+        if(it.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
+        const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
+        const k = normDraftName(stripped);
+        return fcValues.byName[k] != null ? fcValues.byName[k] : -1;
+      };
+      const best = available.slice().sort((a,b)=>valueOf(b)-valueOf(a))[0];
+      if(!best) return;
+      const onClock = dispSlotForPick(idx, (draft.teams||[]).length, draft.snake, draft.pick_order||[]);
+      if(onClock == null) return;
+      const newPool = (draft.pool||[]).map(p => p.id===best.id ? {...p, drafted:true} : p);
+      const newPicks = [...(draft.picks||[]), { pickIdx:idx, slot:onClock, poolItemId:best.id, ts:new Date().toISOString(), auto:true }];
+      const newIdx = idx + 1;
+      const totalSlots = (draft.pool||[]).length;
+      const newStatus = newIdx >= totalSlots ? 'complete' : 'live';
+      const newDeadline = (newStatus==='live' && draft.timer_seconds) ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+      // Conditional update: only succeed if current_pick_idx still matches what we expected
+      await sb.from('dispersal_drafts').update({
+        pool:newPool, picks:newPicks, current_pick_idx:newIdx,
+        status:newStatus, pick_deadline:newDeadline, updated_at:new Date().toISOString(),
+      }).eq('id', draftId).eq('current_pick_idx', idx);
+    }, delay);
+    return ()=>clearTimeout(t);
+  },[draft, now, fcValues, draftId]);
 
   // Commish controls — anyone with the (non-spectator) link can use these.
   // Trade off some security for "any league mate can rescue a stuck draft."
@@ -5161,7 +5216,7 @@ function DispersalDraft({draftId}){
                       {t.picks.length>0 && (
                         <div style={{fontSize:12,color:'#aaa',lineHeight:1.6,paddingLeft:0}}>
                           {t.picks.map(p=>(
-                            <div key={p.pickIdx}><span style={{color:'#666',display:'inline-block',width:28}}>{p.pickIdx+1}.</span> {p.item?.name || '(missing)'}</div>
+                            <div key={p.pickIdx}><span style={{color:'#666',display:'inline-block',width:28}}>{p.pickIdx+1}.</span> {p.item?.name || '(missing)'}{p.auto && <span style={{color:'#f59e0b',fontStyle:'italic',marginLeft:6,fontSize:10}}>(auto)</span>}</div>
                           ))}
                         </div>
                       )}
