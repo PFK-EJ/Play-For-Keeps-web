@@ -4293,6 +4293,11 @@ function DispersalSetup(){
   const [showTeamsHelp,setShowTeamsHelp] = useState(false);
   const [showModeHelp,setShowModeHelp] = useState(false);
   const [showPicksHelp,setShowPicksHelp] = useState(false);
+  // Share-pool state — for the 📸 SHARE POOL button (commish previews + shares
+  // a PFK-branded image of the pool BEFORE creating the draft, to advertise it).
+  const poolCardRef = useRef(null);
+  const [poolShareBusy,setPoolShareBusy] = useState(false);
+  const [previewData,setPreviewData] = useState(null);
 
   const fetchSleeperLeague = async () => {
     setSleeperErr(''); setSleeperData(null);
@@ -4429,6 +4434,123 @@ function DispersalSetup(){
   };
 
   // (success screen removed — commish is redirected straight to /dispersal/[id] after create)
+
+  // Build the pool data needed for the share-card from current setup state.
+  // Returns { players, picks, teamCount, draftName, snake } or null if there's nothing to render.
+  // Used by the 📸 SHARE POOL preview/share flow on this setup page.
+  const buildPreviewPool = async () => {
+    const draftName = name.trim() || 'Dispersal Draft';
+    const pickLines = picksText.split('\n').map(s=>s.trim()).filter(Boolean);
+    let players = [];
+    let teamCount = 0;
+    if(setupMode === 'sleeper'){
+      if(!sleeperData || sleeperSelected.size === 0) return null;
+      const playersDb = await sleeperPlayers();
+      const selectedRosters = (sleeperData.rosters||[]).filter(r=>sleeperSelected.has(r.roster_id));
+      const seen = new Set();
+      selectedRosters.forEach(r => {
+        (r.players||[]).forEach(pid => {
+          if(seen.has(pid)) return; seen.add(pid);
+          const p = playersDb[pid];
+          if(!p) return;
+          const fullName = p.full_name || `${p.first_name||''} ${p.last_name||''}`.trim() || pid;
+          const pos = (p.position || '').toUpperCase();
+          players.push({ id:'p_'+pid, name: pos ? `${fullName} (${pos})` : fullName, sleeperId:String(pid), pos });
+        });
+      });
+      teamCount = sleeperSelected.size;
+    } else {
+      const lines = poolText.split('\n').map(s=>s.trim()).filter(Boolean);
+      players = lines.map((n,i) => {
+        const m = n.match(/\(([^)]+)\)\s*$/);
+        const pos = m ? m[1].toUpperCase() : '';
+        return { id:'p_c_'+i, name:n, pos };
+      });
+      teamCount = teamsText.split('\n').map(s=>s.trim()).filter(Boolean).length;
+    }
+    if(players.length === 0 && pickLines.length === 0) return null;
+    // Sort players by FantasyCalc value within position
+    const fc = await fetchFcValues();
+    const valOf = (it) => {
+      if(it.sleeperId && fc.bySleeperId[it.sleeperId] != null) return fc.bySleeperId[it.sleeperId];
+      const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
+      const k = normDraftName(stripped);
+      return fc.byName[k] != null ? fc.byName[k] : 0;
+    };
+    const POS_ORDER = ['QB','RB','WR','TE','K','DEF'];
+    const playersByPos = {};
+    POS_ORDER.forEach(p => { playersByPos[p] = []; });
+    playersByPos.OTHER = [];
+    players.forEach(it => {
+      const bucket = POS_ORDER.includes(it.pos) ? it.pos : 'OTHER';
+      playersByPos[bucket].push(it);
+    });
+    Object.keys(playersByPos).forEach(p => playersByPos[p].sort((a,b)=>valOf(b)-valOf(a)));
+    // Sort picks by year, then round
+    const picks = pickLines.map((n,i) => ({ id:'pk_'+i, name:n }));
+    const parsePick = (n) => {
+      const yM = (n||'').match(/(\d{4})/);
+      const rM = (n||'').match(/(\d)(st|nd|rd|th)/i);
+      return { year: yM?+yM[1]:9999, round: rM?+rM[1]:9 };
+    };
+    picks.sort((a,b)=>{
+      const pa = parsePick(a.name), pb = parsePick(b.name);
+      return pa.year - pb.year || pa.round - pb.round;
+    });
+    return { draftName, players, playersByPos, picks, teamCount, snake, posOrder: POS_ORDER };
+  };
+
+  const stripPosFromName = (n) => (n || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+  // 📸 SHARE POOL — builds preview data, renders the off-screen card, then captures
+  // and saves/shares via Web Share API on mobile / download fallback on desktop.
+  const sharePoolImage = async () => {
+    if(!window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
+    setPoolShareBusy(true);
+    try{
+      const data = await buildPreviewPool();
+      if(!data){
+        alert(setupMode==='sleeper'
+          ? 'Fetch a Sleeper league and select at least one team first.'
+          : 'Add players and/or future picks to the pool first.');
+        return;
+      }
+      setPreviewData(data);
+      // Wait two animation frames so React commits the offscreen card before we capture.
+      await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const el = poolCardRef.current;
+      if(!el){ alert('Preview card not ready — try again.'); return; }
+      const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2, useCORS:true });
+      const filename = `${data.draftName.replace(/[^a-z0-9]/gi,'_')}_pool.png`;
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      // Mobile: Web Share API (native share sheet → Save to Photos / Tweet / DM).
+      // Note: pass ONLY files — including a `text` param causes iOS Messages to render
+      // a duplicate URL preview alongside the file, looking like two screenshots.
+      if(blob && navigator.canShare){
+        const file = new File([blob], filename, { type:'image/png' });
+        if(navigator.canShare({ files:[file] })){
+          try{
+            await navigator.share({ files:[file], title:`${data.draftName} — pool` });
+            return;
+          }catch(e){ if(e && e.name==='AbortError') return; }
+        }
+      }
+      // Desktop / fallback: download
+      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if(isIOS && !navigator.canShare){
+        window.open(canvas.toDataURL('image/png'), '_blank');
+      }
+    }catch(e){ alert('Share pool failed: ' + (e.message||e)); }
+    finally{ setPoolShareBusy(false); }
+  };
 
   const inputStyle = {width:'100%',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'};
   const labelStyle = {fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6,display:'block'};
@@ -4590,7 +4712,11 @@ function DispersalSetup(){
             </div>
           </div>
           {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
-          <button onClick={createFromSleeper} disabled={creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2} style={{padding:'14px 24px',background:(creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2)?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:(creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2)?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{sleeperBuilding?'BUILDING POOL FROM SLEEPER…':creating?'CREATING…':'CREATE DRAFT'}</button>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <button onClick={sharePoolImage} disabled={poolShareBusy||!sleeperData||sleeperSelected.size===0} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft" style={{flex:'1 1 220px',padding:'14px 20px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1.5px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#FFD700'),borderRadius:8,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#FFD700',fontWeight:900,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13,letterSpacing:1.5}}>{poolShareBusy?'BUILDING IMAGE…':'📸 SHARE POOL IMAGE'}</button>
+            <button onClick={createFromSleeper} disabled={creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2} style={{flex:'2 1 280px',padding:'14px 24px',background:(creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2)?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:(creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2)?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{sleeperBuilding?'BUILDING POOL FROM SLEEPER…':creating?'CREATING…':'CREATE DRAFT'}</button>
+          </div>
+          <div style={{fontSize:11,color:'#666',textAlign:'center',marginTop:-6}}>💡 Tip: Use SHARE POOL IMAGE to advertise the league on Twitter/Discord and recruit managers BEFORE creating the draft.</div>
         </div>
       )}
 
@@ -4645,7 +4771,11 @@ function DispersalSetup(){
           </div>
         </div>
         {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
-        <button onClick={create} disabled={creating} style={{padding:'14px 24px',background:creating?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:creating?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{creating?'CREATING…':'CREATE DRAFT'}</button>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <button onClick={sharePoolImage} disabled={poolShareBusy||(!poolText.trim()&&!picksText.trim())} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft" style={{flex:'1 1 220px',padding:'14px 20px',background:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#222':'transparent',border:'1.5px solid '+((poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#444':'#FFD700'),borderRadius:8,color:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#666':'#FFD700',fontWeight:900,cursor:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'default':'pointer',fontSize:13,letterSpacing:1.5}}>{poolShareBusy?'BUILDING IMAGE…':'📸 SHARE POOL IMAGE'}</button>
+          <button onClick={create} disabled={creating} style={{flex:'2 1 280px',padding:'14px 24px',background:creating?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:creating?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{creating?'CREATING…':'CREATE DRAFT'}</button>
+        </div>
+        <div style={{fontSize:11,color:'#666',textAlign:'center',marginTop:-6}}>💡 Tip: Use SHARE POOL IMAGE to advertise the league on Twitter/Discord and recruit managers BEFORE creating the draft.</div>
       </div>
       )}
 
@@ -4698,6 +4828,93 @@ function DispersalSetup(){
           </div>
         );
       })()}
+
+      {/* Off-screen share-card — populated by sharePoolImage() then captured via html2canvas.
+          Painted at -99999px so the card renders correctly without ever being visible. */}
+      {previewData && (
+        <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
+          <div ref={poolCardRef} style={{width:900,background:'#080808',padding:'32px 36px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
+            <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
+              <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:64,height:64,objectFit:'contain'}} crossOrigin="anonymous"/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🎲 DISPERSAL DRAFT POOL</div>
+                <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:0.5,lineHeight:1.15,wordBreak:'break-word'}}>{previewData.draftName}</div>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.players.length}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PLAYERS</div>
+              </div>
+              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.picks.length}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PICKS</div>
+              </div>
+              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.teamCount||'?'}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS</div>
+              </div>
+              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.snake?'🐍':'↓'}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>{previewData.snake?'SNAKE':'LINEAR'}</div>
+              </div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns: previewData.picks.length ? '1.6fr 1fr' : '1fr',gap:20}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>📋 PLAYER POOL</div>
+                {[...previewData.posOrder, 'OTHER'].filter(p => previewData.playersByPos[p]?.length).map(pos => (
+                  <div key={pos} style={{marginBottom:14}}>
+                    <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{pos === 'OTHER' ? 'OTHER' : pos} <span style={{color:'#666',fontWeight:700}}>· {previewData.playersByPos[pos].length}</span></div>
+                    <div style={{display:'grid',gridTemplateColumns: previewData.playersByPos[pos].length > 8 ? '1fr 1fr' : '1fr',gap:'2px 14px'}}>
+                      {previewData.playersByPos[pos].map(it => (
+                        <div key={it.id} style={{fontSize:13,color:'#ddd',lineHeight:1.5,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                          {stripPosFromName(it.name)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {previewData.picks.length > 0 && (
+                <div>
+                  <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>🎟 ROOKIE PICKS</div>
+                  {(() => {
+                    const byYear = {};
+                    previewData.picks.forEach(p => {
+                      const yM = (p.name||'').match(/(\d{4})/);
+                      const y = yM ? yM[1] : '????';
+                      if(!byYear[y]) byYear[y] = [];
+                      byYear[y].push(p);
+                    });
+                    return Object.keys(byYear).sort().map(y => (
+                      <div key={y} style={{marginBottom:14}}>
+                        <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{y} <span style={{color:'#666',fontWeight:700}}>· {byYear[y].length}</span></div>
+                        <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                          {byYear[y].map(p => (
+                            <div key={p.id} style={{fontSize:12,color:'#ddd',lineHeight:1.5}}>
+                              {p.name.replace(/^\d{4}\s*/, '')}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+            <div style={{marginTop:22,paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>BUILD YOUR DYNASTY ROSTER AT</div>
+                <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>playforkeepsdynasty.com</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:10,color:'#666',fontWeight:800,letterSpacing:1.5}}>POWERED BY</div>
+                <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PLAY FOR KEEPS</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4744,8 +4961,6 @@ function DispersalDraft({draftId}){
   },[]);
   // Refs must be at top of component (before any conditional returns) per React Rules of Hooks.
   const rosterRefs = useRef({});
-  const poolCardRef = useRef(null);
-  const [poolShareBusy,setPoolShareBusy] = useState(false);
 
   // Initial load + Supabase realtime subscription. Falls back to polling every
   // 15s as a safety net in case the websocket drops.
@@ -4988,82 +5203,6 @@ function DispersalDraft({draftId}){
     }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
   };
 
-  // Capture the off-screen pool share-card and save/share it. Same Web Share API → download
-  // fallback pattern as the per-roster screenshot. Used by the commish to advertise the
-  // dispersal pool on Twitter/Discord.
-  const screenshotPool = async () => {
-    const el = poolCardRef.current;
-    if(!el || !window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
-    setPoolShareBusy(true);
-    try{
-      const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2 });
-      const filename = `${(draft.name||'dispersal').replace(/[^a-z0-9]/gi,'_')}_pool.png`;
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-      if(blob && navigator.canShare){
-        const file = new File([blob], filename, { type:'image/png' });
-        if(navigator.canShare({ files:[file] })){
-          try{
-            await navigator.share({ files:[file], title:`${draft.name} — dispersal pool`, text:`Join the ${draft.name} dispersal draft → ${window.location.origin}/dispersal/${draftId}` });
-            return;
-          }catch(e){ if(e && e.name==='AbortError') return; }
-        }
-      }
-      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      if(isIOS && !navigator.canShare){
-        window.open(canvas.toDataURL('image/png'), '_blank');
-      }
-    }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
-    finally{ setPoolShareBusy(false); }
-  };
-
-  // Build the share-card data: group players by position, sort by FC value;
-  // group picks by year, sort by round. Used by both the off-screen card render
-  // and (later) any preview UI.
-  const valueOf = (it) => {
-    if(!fcValues) return 0;
-    if(it?.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
-    const stripped = (it?.name || '').replace(/\s*\([^)]*\)\s*$/, '');
-    const k = normDraftName(stripped);
-    return fcValues.byName[k] != null ? fcValues.byName[k] : 0;
-  };
-  const extractPos = (name) => {
-    const m = (name || '').match(/\(([^)]+)\)\s*$/);
-    return (m ? m[1] : '').toUpperCase();
-  };
-  const stripPosFromName = (name) => (name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-  const POS_ORDER = ['QB','RB','WR','TE','K','DEF'];
-  const playerPoolItems = (pool||[]).filter(p => p.type !== 'pick');
-  const pickPoolItems   = (pool||[]).filter(p => p.type === 'pick');
-  const playersByPos = {};
-  POS_ORDER.forEach(p => { playersByPos[p] = []; });
-  playersByPos.OTHER = [];
-  playerPoolItems.forEach(it => {
-    const pos = extractPos(it.name);
-    const bucket = POS_ORDER.includes(pos) ? pos : 'OTHER';
-    playersByPos[bucket].push(it);
-  });
-  Object.keys(playersByPos).forEach(p => {
-    playersByPos[p].sort((a,b) => valueOf(b) - valueOf(a));
-  });
-  // Sort picks by year, then round (parses "2026 1st", "2026 1st via X")
-  const parsePick = (name) => {
-    const yearM = (name||'').match(/(\d{4})/);
-    const roundM = (name||'').match(/(\d)(st|nd|rd|th)/i);
-    return { year: yearM ? +yearM[1] : 9999, round: roundM ? +roundM[1] : 9, name };
-  };
-  const picksSorted = pickPoolItems.slice().sort((a,b) => {
-    const pa = parsePick(a.name), pb = parsePick(b.name);
-    return pa.year - pb.year || pa.round - pb.round;
-  });
-
   // status==='lobby' has no sticky rosters bar so no extra bottom padding needed.
   const stickyRostersActive = status==='live' || status==='complete';
   return (
@@ -5077,7 +5216,6 @@ function DispersalDraft({draftId}){
           setLinkCopied(true);
           setTimeout(()=>setLinkCopied(false), 2000);
         }} style={{padding:'5px 11px',background:linkCopied?'#10b981':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>{linkCopied?'✓ COPIED!':'🔗 COPY LINK'}</button>
-        <button onClick={screenshotPool} disabled={poolShareBusy} title="Save a PFK-branded image of the dispersal pool to share on Twitter/Discord" style={{padding:'5px 11px',background:poolShareBusy?'#444':'transparent',border:'1px solid #FFD700',borderRadius:6,color:poolShareBusy?'#888':'#FFD700',fontWeight:900,cursor:poolShareBusy?'default':'pointer',fontSize:12,letterSpacing:1}}>{poolShareBusy?'…':'📸 SHARE POOL'}</button>
         <div style={{flex:1}}/>
         {isSpectator && <div style={{padding:'4px 10px',background:'#1a1a3a',border:'1px solid #a78bfa',borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:'#a78bfa'}}>👀 SPECTATING</div>}
         {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
@@ -5336,96 +5474,6 @@ function DispersalDraft({draftId}){
           </div>
         </>
       )}
-
-      {/* Off-screen share card — captured via html2canvas when commish hits 📸 SHARE POOL.
-          Painted in the DOM at -99999px so it's render-correct without ever showing to the user. */}
-      <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
-        <div ref={poolCardRef} style={{width:900,background:'#080808',padding:'32px 36px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
-          {/* Header */}
-          <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
-            <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:64,height:64,objectFit:'contain'}} crossOrigin="anonymous"/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🎲 DISPERSAL DRAFT POOL</div>
-              <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:0.5,lineHeight:1.15,wordBreak:'break-word'}}>{draft.name}</div>
-            </div>
-          </div>
-          {/* Stat strip */}
-          <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
-            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{playerPoolItems.length}</div>
-              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PLAYERS</div>
-            </div>
-            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{pickPoolItems.length}</div>
-              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PICKS</div>
-            </div>
-            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teams.length}</div>
-              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS</div>
-            </div>
-            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{draft.snake?'🐍':'↓'}</div>
-              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>{draft.snake?'SNAKE':'LINEAR'}</div>
-            </div>
-          </div>
-          {/* Two-column body: players left, picks right */}
-          <div style={{display:'grid',gridTemplateColumns: pickPoolItems.length ? '1.6fr 1fr' : '1fr',gap:20}}>
-            {/* PLAYERS column */}
-            <div>
-              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>📋 PLAYER POOL</div>
-              {[...POS_ORDER, 'OTHER'].filter(p => playersByPos[p].length).map(pos => (
-                <div key={pos} style={{marginBottom:14}}>
-                  <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{pos === 'OTHER' ? 'OTHER' : pos} <span style={{color:'#666',fontWeight:700}}>· {playersByPos[pos].length}</span></div>
-                  <div style={{display:'grid',gridTemplateColumns: playersByPos[pos].length > 8 ? '1fr 1fr' : '1fr',gap:'2px 14px'}}>
-                    {playersByPos[pos].map(it => (
-                      <div key={it.id} style={{fontSize:13,color:'#ddd',lineHeight:1.5,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {stripPosFromName(it.name)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* PICKS column */}
-            {pickPoolItems.length > 0 && (
-              <div>
-                <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>🎟 ROOKIE PICKS</div>
-                {(() => {
-                  const byYear = {};
-                  picksSorted.forEach(p => {
-                    const y = parsePick(p.name).year;
-                    if(!byYear[y]) byYear[y] = [];
-                    byYear[y].push(p);
-                  });
-                  return Object.keys(byYear).sort().map(y => (
-                    <div key={y} style={{marginBottom:14}}>
-                      <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{y} <span style={{color:'#666',fontWeight:700}}>· {byYear[y].length}</span></div>
-                      <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                        {byYear[y].map(p => (
-                          <div key={p.id} style={{fontSize:12,color:'#ddd',lineHeight:1.5}}>
-                            {p.name.replace(/^\d{4}\s*/, '')}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            )}
-          </div>
-          {/* Footer */}
-          <div style={{marginTop:22,paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>JOIN THE DRAFT</div>
-              <div style={{fontSize:14,fontWeight:800,color:'#FFD700',fontFamily:'monospace',wordBreak:'break-all'}}>{(typeof window !== 'undefined' ? window.location.origin : 'playforkeepsdynasty.com')}/dispersal/{draftId}</div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontSize:10,color:'#666',fontWeight:800,letterSpacing:1.5}}>POWERED BY</div>
-              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PLAY FOR KEEPS</div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
