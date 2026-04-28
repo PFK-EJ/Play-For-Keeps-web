@@ -4236,6 +4236,29 @@ const sleeperPlayers = async () => {
   return data;
 };
 
+// FantasyCalc dynasty values — used to silently sort the dispersal pool by trade value.
+// Cached in module scope so the fetch only happens once per page load.
+// Returns a map: { bySleeperId: {sleeperId -> value}, byName: {normName -> value} }
+let _fcValuesCache = null;
+const fetchFcValues = async () => {
+  if(_fcValuesCache) return _fcValuesCache;
+  try{
+    const arr = await fetch('https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&numTeams=12&ppr=1').then(r=>r.json());
+    const bySleeperId = {}, byName = {};
+    (arr||[]).forEach(row => {
+      const v = row?.value ?? 0;
+      const sid = row?.player?.sleeperId;
+      const nm = row?.player?.name;
+      if(sid != null) bySleeperId[String(sid)] = v;
+      if(nm) byName[normDraftName(nm)] = v;
+    });
+    _fcValuesCache = { bySleeperId, byName };
+  }catch(e){
+    _fcValuesCache = { bySleeperId:{}, byName:{} }; // fail silently — pool just falls back to insertion order
+  }
+  return _fcValuesCache;
+};
+
 // ---------- Setup (commish creates a new draft) ----------
 function DispersalSetup(){
   const [name,setName] = useState('');
@@ -4309,7 +4332,7 @@ function DispersalSetup(){
           if(!p) return;
           const fullName = p.full_name || `${p.first_name||''} ${p.last_name||''}`.trim() || pid;
           const pos = p.position || '';
-          poolItems.push({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name: pos ? `${fullName} (${pos})` : fullName });
+          poolItems.push({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name: pos ? `${fullName} (${pos})` : fullName, sleeperId:String(pid) });
         });
       });
       // Append manual future picks
@@ -4715,6 +4738,8 @@ function DispersalDraft({draftId}){
   const [poolFilter,setPoolFilter] = useState('');
   const [poolTab,setPoolTab] = useState('players'); // 'players' | 'picks'
   const [pickConfirm,setPickConfirm] = useState(null); // pool item awaiting Yes/No
+  const [fcValues,setFcValues] = useState(null); // {bySleeperId, byName} from FantasyCalc — silent sort
+  useEffect(()=>{ fetchFcValues().then(setFcValues); },[]);
   // 1-second tick for the live timer countdown (only ticks when live + deadline set)
   const [now,setNow] = useState(()=>Date.now());
   useEffect(()=>{
@@ -5066,7 +5091,22 @@ function DispersalDraft({draftId}){
               {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
-              {pool.filter(p=>!p.drafted).filter(p=>poolTab==='picks'?p.type==='pick':p.type!=='pick').filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).map(item=>{
+              {(()=>{
+                // Sort player tab by FantasyCalc dynasty value (silent — no value shown).
+                // Match by sleeperId first, fall back to normalized name; missing values sort to bottom.
+                let items = pool.filter(p=>!p.drafted).filter(p=>poolTab==='picks'?p.type==='pick':p.type!=='pick').filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase()));
+                if(poolTab !== 'picks' && fcValues){
+                  const valueOf = (it) => {
+                    if(it.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
+                    // Strip "(POS)" suffix from name before normalizing
+                    const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
+                    const k = normDraftName(stripped);
+                    return fcValues.byName[k] != null ? fcValues.byName[k] : -1;
+                  };
+                  items = items.slice().sort((a,b) => valueOf(b) - valueOf(a));
+                }
+                return items;
+              })().map(item=>{
                 const clickable = myTurn && status==='live';
                 return (
                   <div key={item.id} className="pfk-disp-pool-item"
