@@ -3200,6 +3200,7 @@ function App(){
             {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ Customize My Rankings"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
+            <a href="/dispersal" style={{padding:"8px 14px",borderRadius:8,border:"2px solid #2a2a2a",background:"transparent",color:"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🎲 Dispersal Draft</a>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
