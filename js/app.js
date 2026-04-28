@@ -4672,6 +4672,7 @@ function DispersalDraft({draftId}){
   const [claimErr,setClaimErr] = useState('');
   const [pickErr,setPickErr] = useState('');
   const [poolFilter,setPoolFilter] = useState('');
+  const [poolTab,setPoolTab] = useState('players'); // 'players' | 'picks'
   const [pickConfirm,setPickConfirm] = useState(null); // pool item awaiting Yes/No
   // 1-second tick for the live timer countdown (only ticks when live + deadline set)
   const [now,setNow] = useState(()=>Date.now());
@@ -4873,9 +4874,18 @@ function DispersalDraft({draftId}){
             {isCommish ? <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to take the draft live…</div>}
           </div>
           {!me && !isSpectator && !isCommish && (
-            <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 18px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <div style={{fontSize:13,color:'#888'}}>Set up this draft and not playing in it?</div>
-              <button onClick={declareCommish} style={{padding:'8px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>👑 I AM THE COMMISSIONER</button>
+            <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'18px 22px',marginBottom:12,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:4}}>👑 RUNNING THIS DRAFT?</div>
+                <div style={{fontSize:13,color:'#aaa'}}>If you set this draft up and aren't drafting, click here to enter as commissioner. No passcode needed — you'll get start/randomize/undo controls.</div>
+              </div>
+              <button onClick={declareCommish} style={{padding:'12px 20px',background:'#FFD700',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>I AM THE COMMISSIONER</button>
+            </div>
+          )}
+          {!me && isCommish && (
+            <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'10px 16px',marginBottom:12,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontSize:13,fontWeight:900,color:'#FFD700',letterSpacing:1}}>👑 COMMISSIONER MODE</span>
+              <span style={{fontSize:12,color:'#888'}}>You're not drafting — you'll run the lobby + start the draft. Claim a team below if you do want to draft.</span>
             </div>
           )}
           {!me && !isSpectator && (
@@ -4992,13 +5002,23 @@ function DispersalDraft({draftId}){
 
           {/* Pool — flows in normal page scroll, has padding-bottom so it isn't hidden by the sticky-bottom rosters bar */}
           <div className="pfk-disp-pool-block" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,paddingBottom:14}}>
+            {(()=>{
+              const playersAvail = pool.filter(p=>!p.drafted && p.type!=='pick').length;
+              const picksAvail = pool.filter(p=>!p.drafted && p.type==='pick').length;
+              return (
+                <div style={{display:'flex',gap:6,marginBottom:10,padding:4,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8}}>
+                  <button onClick={()=>setPoolTab('players')} style={{flex:1,padding:'9px 12px',background:poolTab==='players'?'#FFD700':'transparent',border:'none',borderRadius:6,color:poolTab==='players'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>👥 PLAYERS · {playersAvail}</button>
+                  <button onClick={()=>setPoolTab('picks')} style={{flex:1,padding:'9px 12px',background:poolTab==='picks'?'#a78bfa':'transparent',border:'none',borderRadius:6,color:poolTab==='picks'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎟 DRAFT PICKS · {picksAvail}</button>
+                </div>
+              );
+            })()}
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>AVAILABLE · {pool.filter(p=>!p.drafted).length} of {pool.length}</div>
-              <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder="Search pool…" style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>AVAILABLE · {pool.filter(p=>!p.drafted && (poolTab==='picks'?p.type==='pick':p.type!=='pick')).length}</div>
+              <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder={poolTab==='picks'?'Search picks…':'Search players…'} style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
               {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
-              {pool.filter(p=>!p.drafted).filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).map(item=>{
+              {pool.filter(p=>!p.drafted).filter(p=>poolTab==='picks'?p.type==='pick':p.type!=='pick').filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).map(item=>{
                 const clickable = myTurn && status==='live';
                 return (
                   <div key={item.id} className="pfk-disp-pool-item"
@@ -5009,7 +5029,7 @@ function DispersalDraft({draftId}){
                   </div>
                 );
               })}
-              {pool.filter(p=>!p.drafted).length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>Pool is empty.</div>}
+              {pool.filter(p=>!p.drafted).filter(p=>poolTab==='picks'?p.type==='pick':p.type!=='pick').length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>{poolTab==='picks' ? 'No draft picks left.' : 'No players left.'}</div>}
             </div>
           </div>
 
