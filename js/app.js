@@ -3211,6 +3211,11 @@ function App(){
               <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
               <span>@PlayForKeepsFF</span>
             </a>
+            <a href="mailto:ej@playforkeepsdynasty.com?subject=Play%20For%20Keeps%20feedback"
+               title="Email Play For Keeps with feedback or bug reports"
+               style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 11px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:20,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:13,letterSpacing:0.3}}>
+              📧 CONTACT
+            </a>
             {session?(
               <>
                 {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
@@ -5232,6 +5237,11 @@ function DispersalApp({draftId}){
           <a href="/" style={{textDecoration:'none'}}>
             <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:2}}>PLAY FOR KEEPS</div>
             <div style={{fontSize:10,color:'#8B6914',letterSpacing:2,fontWeight:600,textTransform:'uppercase'}}>Dispersal Draft</div>
+          </a>
+          <span style={{flex:1}}/>
+          <a href="mailto:ej@playforkeepsdynasty.com?subject=Play%20For%20Keeps%20feedback" title="Email Play For Keeps with feedback or bug reports"
+             style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 11px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:20,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:13,letterSpacing:0.3}}>
+            📧 CONTACT
           </a>
         </div>
       </div>
