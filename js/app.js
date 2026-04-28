@@ -4484,7 +4484,11 @@ function DispersalSetup(){
     const draftName = name.trim() || 'Dispersal Draft';
     const pickLines = picksText.split('\n').map(s=>s.trim()).filter(Boolean);
     let players = [];
-    let teamCount = 0;
+    // managersNeeded = how many of the selected rosters actually need a new manager.
+    // Sleeper mode: count of selected rosters where original owner_id is null/undefined
+    //   (same orphan signal we use for auto-selection on FETCH).
+    // Custom mode: total team count — there's no orphan distinction so all are "needed".
+    let managersNeeded = 0;
     if(setupMode === 'sleeper'){
       if(!sleeperData || sleeperSelected.size === 0) return null;
       const playersDb = await sleeperPlayers();
@@ -4500,7 +4504,7 @@ function DispersalSetup(){
           players.push({ id:'p_'+pid, name: pos ? `${fullName} (${pos})` : fullName, sleeperId:String(pid), pos });
         });
       });
-      teamCount = sleeperSelected.size;
+      managersNeeded = selectedRosters.filter(r => !r.owner_id).length;
     } else {
       const lines = poolText.split('\n').map(s=>s.trim()).filter(Boolean);
       players = lines.map((n,i) => {
@@ -4508,7 +4512,7 @@ function DispersalSetup(){
         const pos = m ? m[1].toUpperCase() : '';
         return { id:'p_c_'+i, name:n, pos };
       });
-      teamCount = teamsText.split('\n').map(s=>s.trim()).filter(Boolean).length;
+      managersNeeded = teamsText.split('\n').map(s=>s.trim()).filter(Boolean).length;
     }
     if(players.length === 0 && pickLines.length === 0) return null;
     // Sort players by FantasyCalc value within position
@@ -4552,7 +4556,7 @@ function DispersalSetup(){
     if(leaguePPC && parseFloat(leaguePPC) > 0) settingsParts.push(`${leaguePPC} PPC`);
     const settingsLine = settingsParts.filter(Boolean).join(' · ');
     return {
-      draftName, players, playersByPos, picks, teamCount, posOrder: POS_ORDER,
+      draftName, players, playersByPos, picks, managersNeeded, posOrder: POS_ORDER,
       buyIn: (buyIn||'').trim(), settingsLine,
     };
   };
@@ -5041,8 +5045,8 @@ function DispersalSetup(){
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TOTAL ASSETS</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.teamCount||'?'}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.managersNeeded||0}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>MANAGERS NEEDED</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0a1f10',border:'1px solid #10b981',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:22,fontWeight:900,color:'#10b981',lineHeight:1}}>{(() => {
