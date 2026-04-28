@@ -4984,8 +4984,15 @@ function DispersalDraft({draftId}){
             );
           })()}
           {status === 'complete' && (
-            <div style={{background:'#1a1a3a',border:'2px solid #a78bfa',borderRadius:10,padding:'14px 18px',marginBottom:14}}>
-              <div style={{fontSize:14,fontWeight:900,color:'#a78bfa',letterSpacing:1.5}}>🏆 DRAFT COMPLETE — {picks.length} picks made</div>
+            <div style={{background:'linear-gradient(135deg,#1a1a3a 0%, #0f0a00 100%)',border:'2px solid #FFD700',borderRadius:10,padding:'18px 22px',marginBottom:14,textAlign:'center'}}>
+              <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:6}}>🏆 DRAFT COMPLETE</div>
+              <div style={{fontSize:13,color:'#a78bfa',marginBottom:14,letterSpacing:1}}>{picks.length} picks made · 📸 download each roster from the bar below</div>
+              <div style={{fontSize:14,color:'#eee',marginBottom:6,fontWeight:700}}>Thanks for drafting with Play For Keeps!</div>
+              <div style={{fontSize:12,color:'#aaa',marginBottom:14,maxWidth:420,marginLeft:'auto',marginRight:'auto',lineHeight:1.5}}>If this saved your league a Google Sheets disaster, follow @PlayForKeepsFF on X for more dynasty tools — built by one fan, free for the community.</div>
+              <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'#FFD700',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#000" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+                FOLLOW @PlayForKeepsFF
+              </a>
             </div>
           )}
           {pickErr && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{pickErr}</div>}
