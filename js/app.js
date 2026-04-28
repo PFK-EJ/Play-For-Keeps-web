@@ -4349,7 +4349,7 @@ function DispersalSetup(){
         joined:false,
       }));
       const order = teams.map((_,i)=>i);
-      const timerSeconds = timer==='30s' ? 30 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+      const timerSeconds = timer==='30m' ? 30*60 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
       setCreating(true);
       const { data, error } = await dispCreate({
         name:name.trim(), snake, timer_seconds:timerSeconds, auto_pick:autoPick,
@@ -4409,7 +4409,7 @@ function DispersalSetup(){
     // Pick order = order in the textarea (commish controls this — see Randomize button).
     const order = usernames.map((_,i)=>i);
     const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:dispGenPasscode(), joined:false }));
-    const timerSeconds = timer==='30s' ? 30 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+    const timerSeconds = timer==='30m' ? 30*60 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
     setCreating(true);
     const { data, error } = await dispCreate({
       name:name.trim(), snake, timer_seconds:timerSeconds,
@@ -4593,7 +4593,7 @@ function DispersalSetup(){
               <label style={labelStyle}>TIMER PER PICK</label>
               <select value={timer} onChange={e=>setTimer(e.target.value)} style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:800,cursor:'pointer',minWidth:160}}>
                 <option value="off">None (no clock)</option>
-                <option value="30s">30 seconds (TEST)</option>
+                <option value="30m">30 minutes</option>
                 <option value="1h">1 hour</option>
                 <option value="2h">2 hours</option>
                 <option value="4h">4 hours</option>
@@ -4913,6 +4913,14 @@ function DispersalDraft({draftId}){
     const newDeadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
     await dispUpdate(draftId, { status:'live', pick_deadline:newDeadline });
   };
+  // Pause = drop back to 'ready' phase. The existing START DRAFT button in that
+  // banner becomes the resume button. Clears the pick deadline so the timer doesn't
+  // tick down while paused.
+  const pauseDraft = async () => {
+    if((draft.status||'lobby')!=='live'){ alert('Draft not live.'); return; }
+    if(!confirm('Pause the draft? The clock stops and the on-clock manager waits until you resume.')) return;
+    await dispUpdate(draftId, { status:'ready', pick_deadline:null });
+  };
   const randomizeOrder = async () => {
     if(!confirm('Randomize the pick order?')) return;
     const order = (draft.pick_order||[]).slice();
@@ -5130,6 +5138,7 @@ function DispersalDraft({draftId}){
             <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
               <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginRight:6}}>COMMISH:</div>
               <button onClick={undoLastPick} disabled={!picks.length} style={{padding:'6px 12px',background:'transparent',border:'1px solid '+(picks.length?'#FFD700':'#333'),borderRadius:6,color:picks.length?'#FFD700':'#444',fontSize:12,fontWeight:800,cursor:picks.length?'pointer':'default'}}>↩ Undo last pick</button>
+              {status==='live' && <button onClick={pauseDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #a78bfa',borderRadius:6,color:'#a78bfa',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏸ Pause draft</button>}
               {status==='live' && <button onClick={forceSkip} style={{padding:'6px 12px',background:'transparent',border:'1px solid #f59e0b',borderRadius:6,color:'#f59e0b',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏭ Force skip</button>}
               {status==='live' && <button onClick={endDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏹ End draft</button>}
               {status==='complete' && <button onClick={reopenDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #10b981',borderRadius:6,color:'#10b981',fontSize:12,fontWeight:800,cursor:'pointer'}}>▶ Reopen draft</button>}
