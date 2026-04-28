@@ -4298,6 +4298,15 @@ function DispersalSetup(){
   const poolCardRef = useRef(null);
   const [poolShareBusy,setPoolShareBusy] = useState(false);
   const [previewData,setPreviewData] = useState(null);
+  // League-meta state — surfaced on the share card. Auto-detected from Sleeper in
+  // sleeper mode; manually entered in custom mode. Buy-in is always manual.
+  const [buyIn,setBuyIn] = useState('');
+  const [leagueType,setLeagueType] = useState('Dynasty');         // Dynasty | Redraft
+  const [leagueQB,setLeagueQB] = useState('Superflex');           // Superflex | 1QB
+  const [leaguePPR,setLeaguePPR] = useState('1.0');               // 0 | 0.5 | 1.0
+  const [leagueTEP,setLeagueTEP] = useState('0.5');               // 0 | 0.5 | 0.75 | 1.0
+  const [leagueStarters,setLeagueStarters] = useState('');        // free text — "10", "11", etc.
+  const [leaguePPC,setLeaguePPC] = useState('');                  // point-per-carry (rare); blank → hide
 
   const fetchSleeperLeague = async () => {
     setSleeperErr(''); setSleeperData(null);
@@ -4320,6 +4329,27 @@ function DispersalSetup(){
       setSleeperUsernames(defaults);
       // Auto-populate the draft name from the Sleeper league name (only if commish hasn't typed one yet)
       if(data.league?.name && !name.trim()) setName(`${data.league.name} Dispersal`);
+      // Auto-detect league settings for the share card (commish can override via UI)
+      const lg = data.league || {};
+      const ss = lg.scoring_settings || {};
+      const rp = lg.roster_positions || [];
+      const settings = lg.settings || {};
+      // type: 0=redraft, 1=keeper, 2=dynasty
+      setLeagueType(settings.type === 2 ? 'Dynasty' : settings.type === 1 ? 'Keeper' : 'Redraft');
+      setLeagueQB(rp.includes('SUPER_FLEX') ? 'Superflex' : '1QB');
+      // PPR comes from rec value
+      const pprVal = ss.rec ?? 0;
+      setLeaguePPR(String(pprVal));
+      // TEP = bonus_rec_te
+      const tepVal = ss.bonus_rec_te ?? 0;
+      setLeagueTEP(String(tepVal));
+      // Starters = roster slots not in BN/IR/TAXI
+      const skip = new Set(['BN','IR','TAXI']);
+      const starters = rp.filter(p => !skip.has(p)).length;
+      if(starters > 0) setLeagueStarters(String(starters));
+      // Point per carry (rare): rush_att in scoring_settings
+      const ppc = ss.rush_att ?? 0;
+      setLeaguePPC(ppc ? String(ppc) : '');
     }catch(e){ setSleeperErr(e.message || 'Fetch failed'); }
     finally{ setSleeperLoading(false); }
   };
@@ -4497,7 +4527,22 @@ function DispersalSetup(){
       const pa = parsePick(a.name), pb = parsePick(b.name);
       return pa.year - pb.year || pa.round - pb.round;
     });
-    return { draftName, players, playersByPos, picks, teamCount, snake, posOrder: POS_ORDER };
+    // Build the settings string for the share card. Format example:
+    //   "DYNASTY · SUPERFLEX · 1.0 PPR · 0.5 TEP · START 10"
+    // PPC is appended only when present (rare scoring rule).
+    const settingsParts = [
+      (leagueType||'').toUpperCase(),
+      (leagueQB||'').toUpperCase(),
+      `${leaguePPR||0} PPR`,
+      `${leagueTEP||0} TEP`,
+    ];
+    if(leagueStarters && leagueStarters.trim()) settingsParts.push(`START ${leagueStarters.trim()}`);
+    if(leaguePPC && parseFloat(leaguePPC) > 0) settingsParts.push(`${leaguePPC} PPC`);
+    const settingsLine = settingsParts.filter(Boolean).join(' · ');
+    return {
+      draftName, players, playersByPos, picks, teamCount, posOrder: POS_ORDER,
+      buyIn: (buyIn||'').trim(), settingsLine,
+    };
   };
 
   const stripPosFromName = (n) => (n || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
@@ -4523,10 +4568,11 @@ function DispersalSetup(){
       const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2, useCORS:true });
       const filename = `${data.draftName.replace(/[^a-z0-9]/gi,'_')}_pool.png`;
       const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-      // Mobile: Web Share API (native share sheet → Save to Photos / Tweet / DM).
-      // Note: pass ONLY files — including a `text` param causes iOS Messages to render
-      // a duplicate URL preview alongside the file, looking like two screenshots.
-      if(blob && navigator.canShare){
+      // Detect mobile — only mobile gets the Web Share API path. On desktop, Chrome
+      // sometimes calls the OS share dialog AND duplicates the image, so we skip it
+      // entirely and just download the file.
+      const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+      if(isMobile && blob && navigator.canShare){
         const file = new File([blob], filename, { type:'image/png' });
         if(navigator.canShare({ files:[file] })){
           try{
@@ -4535,7 +4581,7 @@ function DispersalSetup(){
           }catch(e){ if(e && e.name==='AbortError') return; }
         }
       }
-      // Desktop / fallback: download
+      // Desktop (and mobile fallback when Web Share isn't supported): download via anchor.
       const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = filename;
@@ -4544,6 +4590,7 @@ function DispersalSetup(){
       link.click();
       document.body.removeChild(link);
       if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      // iOS Safari before Web Share API support → open in new tab so user can long-press to save.
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
       if(isIOS && !navigator.canShare){
         window.open(canvas.toDataURL('image/png'), '_blank');
@@ -4554,6 +4601,54 @@ function DispersalSetup(){
 
   const inputStyle = {width:'100%',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'};
   const labelStyle = {fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6,display:'block'};
+  const selectStyle = {flex:'1 1 110px',padding:'8px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'};
+
+  // Shared "league info on share image" block — shown in both Sleeper and Custom modes.
+  // In Sleeper mode the dropdowns auto-fill on FETCH but can still be overridden;
+  // in Custom mode they start at sensible defaults and the commish edits.
+  const LeagueInfoInputs = () => (
+    <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:1.5}}>📸 SHOWN ON THE SHARE IMAGE</div>
+      <div>
+        <label style={{...labelStyle,marginBottom:5}}>LEAGUE BUY-IN</label>
+        <input value={buyIn} onChange={e=>setBuyIn(e.target.value)} placeholder="e.g. $250  /  FREE  /  $50 + entry trade" style={inputStyle}/>
+      </div>
+      <div>
+        <label style={{...labelStyle,marginBottom:5}}>LEAGUE SETTINGS{setupMode==='sleeper' && sleeperData && <span style={{color:'#10b981',fontWeight:700,marginLeft:8,letterSpacing:0.5,textTransform:'none'}}>· auto-filled, edit if needed</span>}</label>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          <select value={leagueType} onChange={e=>setLeagueType(e.target.value)} style={selectStyle}>
+            <option value="Dynasty">Dynasty</option>
+            <option value="Keeper">Keeper</option>
+            <option value="Redraft">Redraft</option>
+          </select>
+          <select value={leagueQB} onChange={e=>setLeagueQB(e.target.value)} style={selectStyle}>
+            <option value="Superflex">Superflex</option>
+            <option value="1QB">1QB</option>
+          </select>
+          <select value={leaguePPR} onChange={e=>setLeaguePPR(e.target.value)} style={selectStyle}>
+            <option value="0">0 PPR</option>
+            <option value="0.5">0.5 PPR</option>
+            <option value="1.0">1.0 PPR</option>
+          </select>
+          <select value={leagueTEP} onChange={e=>setLeagueTEP(e.target.value)} style={selectStyle}>
+            <option value="0">0 TEP</option>
+            <option value="0.5">0.5 TEP</option>
+            <option value="0.75">0.75 TEP</option>
+            <option value="1.0">1.0 TEP</option>
+            <option value="1.5">1.5 TEP</option>
+          </select>
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
+          <div style={{flex:'1 1 130px'}}>
+            <input value={leagueStarters} onChange={e=>setLeagueStarters(e.target.value)} placeholder="Start (e.g. 10)" style={inputStyle}/>
+          </div>
+          <div style={{flex:'1 1 130px'}}>
+            <input value={leaguePPC} onChange={e=>setLeaguePPC(e.target.value)} placeholder="Point per carry (rare — leave blank if none)" style={inputStyle}/>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Year-pick dropdowns above the future picks textarea. In Sleeper mode the
   // options include "via {username}" for every Sleeper user; in Custom mode the
@@ -4619,6 +4714,7 @@ function DispersalSetup(){
 
       {setupMode==='sleeper' && (
         <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
+          <LeagueInfoInputs/>
           <div>
             <label style={labelStyle}>DRAFT NAME</label>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
@@ -4722,6 +4818,7 @@ function DispersalSetup(){
 
       {setupMode==='custom' && (
       <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
+        <LeagueInfoInputs/>
         <div>
           <label style={labelStyle}>DRAFT NAME</label>
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
@@ -4835,13 +4932,16 @@ function DispersalSetup(){
         <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
           <div ref={poolCardRef} style={{width:900,background:'#080808',padding:'32px 36px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
             <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
-              <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:64,height:64,objectFit:'contain'}} crossOrigin="anonymous"/>
+              {/* Local logo (1500x500 actual) — display at fixed height respecting aspect ratio.
+                  Hosted on the same origin so html2canvas captures it cleanly (no CORS). */}
+              <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:60,width:'auto',objectFit:'contain',flexShrink:0}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🎲 DISPERSAL DRAFT POOL</div>
                 <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:0.5,lineHeight:1.15,wordBreak:'break-word'}}>{previewData.draftName}</div>
               </div>
             </div>
-            <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+            {/* Stats row — 4 cards: PLAYERS, PICKS, NEW MANAGERS, BUY-IN. SNAKE removed per Evan's feedback. */}
+            <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.players.length}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PLAYERS</div>
@@ -4854,11 +4954,17 @@ function DispersalSetup(){
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.teamCount||'?'}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS</div>
               </div>
-              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.snake?'🐍':'↓'}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>{previewData.snake?'SNAKE':'LINEAR'}</div>
+              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0a1f10',border:'1px solid #10b981',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:22,fontWeight:900,color:'#10b981',lineHeight:1}}>{previewData.buyIn ? previewData.buyIn : 'TBD'}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>BUY-IN</div>
               </div>
             </div>
+            {/* Settings strip — auto-detected from Sleeper or commish-entered for Custom mode. */}
+            {previewData.settingsLine && (
+              <div style={{padding:'10px 14px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:18,textAlign:'center',fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>
+                {previewData.settingsLine}
+              </div>
+            )}
             <div style={{display:'grid',gridTemplateColumns: previewData.picks.length ? '1.6fr 1fr' : '1fr',gap:20}}>
               <div>
                 <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>📋 PLAYER POOL</div>
@@ -4904,12 +5010,12 @@ function DispersalSetup(){
             </div>
             <div style={{marginTop:22,paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>BUILD YOUR DYNASTY ROSTER AT</div>
+                <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>CREATE YOUR OWN DISPERSAL DRAFT AT</div>
                 <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>playforkeepsdynasty.com</div>
               </div>
               <div style={{textAlign:'right'}}>
-                <div style={{fontSize:10,color:'#666',fontWeight:800,letterSpacing:1.5}}>POWERED BY</div>
-                <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PLAY FOR KEEPS</div>
+                <div style={{fontSize:10,color:'#666',fontWeight:800,letterSpacing:1.5}}>FOLLOW</div>
+                <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>@PlayforkeepsFF</div>
               </div>
             </div>
           </div>
