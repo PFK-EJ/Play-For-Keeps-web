@@ -4744,6 +4744,8 @@ function DispersalDraft({draftId}){
   },[]);
   // Refs must be at top of component (before any conditional returns) per React Rules of Hooks.
   const rosterRefs = useRef({});
+  const poolCardRef = useRef(null);
+  const [poolShareBusy,setPoolShareBusy] = useState(false);
 
   // Initial load + Supabase realtime subscription. Falls back to polling every
   // 15s as a safety net in case the websocket drops.
@@ -4986,6 +4988,82 @@ function DispersalDraft({draftId}){
     }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
   };
 
+  // Capture the off-screen pool share-card and save/share it. Same Web Share API → download
+  // fallback pattern as the per-roster screenshot. Used by the commish to advertise the
+  // dispersal pool on Twitter/Discord.
+  const screenshotPool = async () => {
+    const el = poolCardRef.current;
+    if(!el || !window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
+    setPoolShareBusy(true);
+    try{
+      const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2 });
+      const filename = `${(draft.name||'dispersal').replace(/[^a-z0-9]/gi,'_')}_pool.png`;
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      if(blob && navigator.canShare){
+        const file = new File([blob], filename, { type:'image/png' });
+        if(navigator.canShare({ files:[file] })){
+          try{
+            await navigator.share({ files:[file], title:`${draft.name} — dispersal pool`, text:`Join the ${draft.name} dispersal draft → ${window.location.origin}/dispersal/${draftId}` });
+            return;
+          }catch(e){ if(e && e.name==='AbortError') return; }
+        }
+      }
+      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if(isIOS && !navigator.canShare){
+        window.open(canvas.toDataURL('image/png'), '_blank');
+      }
+    }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
+    finally{ setPoolShareBusy(false); }
+  };
+
+  // Build the share-card data: group players by position, sort by FC value;
+  // group picks by year, sort by round. Used by both the off-screen card render
+  // and (later) any preview UI.
+  const valueOf = (it) => {
+    if(!fcValues) return 0;
+    if(it?.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
+    const stripped = (it?.name || '').replace(/\s*\([^)]*\)\s*$/, '');
+    const k = normDraftName(stripped);
+    return fcValues.byName[k] != null ? fcValues.byName[k] : 0;
+  };
+  const extractPos = (name) => {
+    const m = (name || '').match(/\(([^)]+)\)\s*$/);
+    return (m ? m[1] : '').toUpperCase();
+  };
+  const stripPosFromName = (name) => (name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const POS_ORDER = ['QB','RB','WR','TE','K','DEF'];
+  const playerPoolItems = (pool||[]).filter(p => p.type !== 'pick');
+  const pickPoolItems   = (pool||[]).filter(p => p.type === 'pick');
+  const playersByPos = {};
+  POS_ORDER.forEach(p => { playersByPos[p] = []; });
+  playersByPos.OTHER = [];
+  playerPoolItems.forEach(it => {
+    const pos = extractPos(it.name);
+    const bucket = POS_ORDER.includes(pos) ? pos : 'OTHER';
+    playersByPos[bucket].push(it);
+  });
+  Object.keys(playersByPos).forEach(p => {
+    playersByPos[p].sort((a,b) => valueOf(b) - valueOf(a));
+  });
+  // Sort picks by year, then round (parses "2026 1st", "2026 1st via X")
+  const parsePick = (name) => {
+    const yearM = (name||'').match(/(\d{4})/);
+    const roundM = (name||'').match(/(\d)(st|nd|rd|th)/i);
+    return { year: yearM ? +yearM[1] : 9999, round: roundM ? +roundM[1] : 9, name };
+  };
+  const picksSorted = pickPoolItems.slice().sort((a,b) => {
+    const pa = parsePick(a.name), pb = parsePick(b.name);
+    return pa.year - pb.year || pa.round - pb.round;
+  });
+
   // status==='lobby' has no sticky rosters bar so no extra bottom padding needed.
   const stickyRostersActive = status==='live' || status==='complete';
   return (
@@ -4999,6 +5077,7 @@ function DispersalDraft({draftId}){
           setLinkCopied(true);
           setTimeout(()=>setLinkCopied(false), 2000);
         }} style={{padding:'5px 11px',background:linkCopied?'#10b981':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>{linkCopied?'✓ COPIED!':'🔗 COPY LINK'}</button>
+        <button onClick={screenshotPool} disabled={poolShareBusy} title="Save a PFK-branded image of the dispersal pool to share on Twitter/Discord" style={{padding:'5px 11px',background:poolShareBusy?'#444':'transparent',border:'1px solid #FFD700',borderRadius:6,color:poolShareBusy?'#888':'#FFD700',fontWeight:900,cursor:poolShareBusy?'default':'pointer',fontSize:12,letterSpacing:1}}>{poolShareBusy?'…':'📸 SHARE POOL'}</button>
         <div style={{flex:1}}/>
         {isSpectator && <div style={{padding:'4px 10px',background:'#1a1a3a',border:'1px solid #a78bfa',borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:'#a78bfa'}}>👀 SPECTATING</div>}
         {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
@@ -5257,6 +5336,96 @@ function DispersalDraft({draftId}){
           </div>
         </>
       )}
+
+      {/* Off-screen share card — captured via html2canvas when commish hits 📸 SHARE POOL.
+          Painted in the DOM at -99999px so it's render-correct without ever showing to the user. */}
+      <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
+        <div ref={poolCardRef} style={{width:900,background:'#080808',padding:'32px 36px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
+          {/* Header */}
+          <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
+            <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:64,height:64,objectFit:'contain'}} crossOrigin="anonymous"/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🎲 DISPERSAL DRAFT POOL</div>
+              <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:0.5,lineHeight:1.15,wordBreak:'break-word'}}>{draft.name}</div>
+            </div>
+          </div>
+          {/* Stat strip */}
+          <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{playerPoolItems.length}</div>
+              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PLAYERS</div>
+            </div>
+            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{pickPoolItems.length}</div>
+              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PICKS</div>
+            </div>
+            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teams.length}</div>
+              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS</div>
+            </div>
+            <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{draft.snake?'🐍':'↓'}</div>
+              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>{draft.snake?'SNAKE':'LINEAR'}</div>
+            </div>
+          </div>
+          {/* Two-column body: players left, picks right */}
+          <div style={{display:'grid',gridTemplateColumns: pickPoolItems.length ? '1.6fr 1fr' : '1fr',gap:20}}>
+            {/* PLAYERS column */}
+            <div>
+              <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>📋 PLAYER POOL</div>
+              {[...POS_ORDER, 'OTHER'].filter(p => playersByPos[p].length).map(pos => (
+                <div key={pos} style={{marginBottom:14}}>
+                  <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{pos === 'OTHER' ? 'OTHER' : pos} <span style={{color:'#666',fontWeight:700}}>· {playersByPos[pos].length}</span></div>
+                  <div style={{display:'grid',gridTemplateColumns: playersByPos[pos].length > 8 ? '1fr 1fr' : '1fr',gap:'2px 14px'}}>
+                    {playersByPos[pos].map(it => (
+                      <div key={it.id} style={{fontSize:13,color:'#ddd',lineHeight:1.5,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {stripPosFromName(it.name)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* PICKS column */}
+            {pickPoolItems.length > 0 && (
+              <div>
+                <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>🎟 ROOKIE PICKS</div>
+                {(() => {
+                  const byYear = {};
+                  picksSorted.forEach(p => {
+                    const y = parsePick(p.name).year;
+                    if(!byYear[y]) byYear[y] = [];
+                    byYear[y].push(p);
+                  });
+                  return Object.keys(byYear).sort().map(y => (
+                    <div key={y} style={{marginBottom:14}}>
+                      <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{y} <span style={{color:'#666',fontWeight:700}}>· {byYear[y].length}</span></div>
+                      <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                        {byYear[y].map(p => (
+                          <div key={p.id} style={{fontSize:12,color:'#ddd',lineHeight:1.5}}>
+                            {p.name.replace(/^\d{4}\s*/, '')}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
+          </div>
+          {/* Footer */}
+          <div style={{marginTop:22,paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>JOIN THE DRAFT</div>
+              <div style={{fontSize:14,fontWeight:800,color:'#FFD700',fontFamily:'monospace',wordBreak:'break-all'}}>{(typeof window !== 'undefined' ? window.location.origin : 'playforkeepsdynasty.com')}/dispersal/{draftId}</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:10,color:'#666',fontWeight:800,letterSpacing:1.5}}>POWERED BY</div>
+              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PLAY FOR KEEPS</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
