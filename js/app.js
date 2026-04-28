@@ -4345,7 +4345,7 @@ function DispersalSetup(){
       const teams = selectedRosters.map((r,i)=>({
         slot:i,
         username:(sleeperUsernames[r.roster_id] || `Team ${r.roster_id}`).trim(),
-        passcode:dispGenPasscode(),
+        passcode:'',
         joined:false,
       }));
       const order = teams.map((_,i)=>i);
@@ -4359,7 +4359,7 @@ function DispersalSetup(){
       setCreating(false);
       if(error){ setErr(error.message || 'Create failed'); return; }
       try{ localStorage.setItem('pfk_disp_creator_'+data.id, '1'); }catch(e){}
-      setCreatedDraft(data);
+      window.location.href = '/dispersal/' + data.id;
     }catch(e){ setErr(e.message || 'Build failed'); }
     finally{ setSleeperBuilding(false); }
   };
@@ -4408,7 +4408,7 @@ function DispersalSetup(){
     ];
     // Pick order = order in the textarea (commish controls this — see Randomize button).
     const order = usernames.map((_,i)=>i);
-    const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:dispGenPasscode(), joined:false }));
+    const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:'', joined:false }));
     const timerSeconds = timer==='30m' ? 30*60 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
     setCreating(true);
     const { data, error } = await dispCreate({
@@ -4418,40 +4418,12 @@ function DispersalSetup(){
     });
     setCreating(false);
     if(error){ setErr(error.message || 'Create failed'); return; }
-    // Mark creator as commish in localStorage so they have commish controls in the draft view
+    // Mark creator as commish in localStorage and drop them into the draft room
     try{ localStorage.setItem('pfk_disp_creator_'+data.id, '1'); }catch(e){}
-    setCreatedDraft(data);
+    window.location.href = '/dispersal/' + data.id;
   };
 
-  if(createdDraft){
-    const url = `${window.location.origin}/dispersal/${createdDraft.id}`;
-    return (
-      <div style={{maxWidth:760,margin:'24px auto',padding:'20px',color:'#eee'}}>
-        <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:12,padding:'18px 22px',marginBottom:18}}>
-          <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:4}}>✓ DRAFT CREATED</div>
-          <div style={{fontSize:18,fontWeight:800,marginBottom:12}}>{createdDraft.name}</div>
-          <div style={{fontSize:12,color:'#888',marginBottom:6}}>SHARE THIS LINK WITH ALL MANAGERS:</div>
-          <input readOnly value={url} onFocus={e=>e.target.select()} style={{width:'100%',padding:'10px 12px',background:'#000',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontWeight:700,fontSize:14,fontFamily:'monospace'}}/>
-          <div style={{fontSize:12,color:'#888',marginTop:10,marginBottom:6}}>👀 SPECTATOR LINK (anyone in your league can watch but not participate):</div>
-          <input readOnly value={url+'?spectate=1'} onFocus={e=>e.target.select()} style={{width:'100%',padding:'10px 12px',background:'#000',border:'1px solid #a78bfa',borderRadius:6,color:'#a78bfa',fontWeight:700,fontSize:14,fontFamily:'monospace'}}/>
-          <div style={{fontSize:12,color:'#888',marginTop:14,marginBottom:6}}>EACH MANAGER NEEDS THEIR PASSCODE TO CLAIM THEIR TEAM (text/Discord these to them):</div>
-          <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:14,lineHeight:1.9}}>
-            {createdDraft.teams.map(t=>(
-              <div key={t.slot}><span style={{color:'#FFD700',fontWeight:700}}>{t.username}</span> <span style={{color:'#666'}}>passcode:</span> <span style={{color:'#10b981',fontWeight:800}}>{t.passcode}</span></div>
-            ))}
-          </div>
-          <div style={{marginTop:16,display:'flex',gap:8}}>
-            <button onClick={()=>{ navigator.clipboard.writeText(url); }} style={{padding:'10px 16px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>COPY LINK</button>
-            <button onClick={()=>{
-              const lines = createdDraft.teams.map(t=>`${t.username}: ${t.passcode}`).join('\n');
-              navigator.clipboard.writeText(`Dispersal Draft: ${createdDraft.name}\n${url}\n\n${lines}`);
-            }} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>COPY ALL DETAILS</button>
-            <a href={`/dispersal/${createdDraft.id}`} style={{padding:'10px 16px',background:'#10b981',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1,textDecoration:'none'}}>OPEN DRAFT →</a>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // (success screen removed — commish is redirected straight to /dispersal/[id] after create)
 
   const inputStyle = {width:'100%',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'};
   const labelStyle = {fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6,display:'block'};
@@ -4539,7 +4511,7 @@ function DispersalSetup(){
                 </div>
                 {showTeamsHelp && (
                   <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
-                    Every team you check below will be part of the dispersal. Their entire current roster goes into the draft pool. Each manager gets an auto-generated 4-digit passcode to claim their team.
+                    Every team you check below will be part of the dispersal. Their entire current roster goes into the draft pool. After you create the draft, share the link with the league and each manager clicks CLAIM next to their team.
                   </div>
                 )}
                 <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:340,overflowY:'auto',border:'1px solid #222',borderRadius:8,padding:8}}>
@@ -4642,8 +4614,8 @@ function DispersalSetup(){
         </div>
         <div>
           <label style={labelStyle}>NEW MANAGER USERNAMES (one per line)</label>
-          <textarea value={teamsText} onChange={e=>setTeamsText(e.target.value)} placeholder={`evan\nmike\nsteve`} rows={5} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
-          <div style={{fontSize:11,color:'#666',marginTop:5}}>Each manager gets an auto-generated 4-digit passcode. Pick order can be randomized in the lobby once everyone joins.</div>
+          <textarea value={teamsText} onChange={e=>setTeamsText(e.target.value)} placeholder={`user1\nuser2\nuser3`} rows={5} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
+          <div style={{fontSize:11,color:'#666',marginTop:5}}>After creating the draft, share the link with your league. Each manager clicks CLAIM next to their team. Pick order can be randomized in the lobby.</div>
         </div>
         <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
           <div>
@@ -4750,6 +4722,7 @@ function DispersalDraft({draftId}){
   const [poolFilter,setPoolFilter] = useState('');
   const [poolTab,setPoolTab] = useState('players'); // 'players' | 'picks'
   const [pickConfirm,setPickConfirm] = useState(null); // pool item awaiting Yes/No
+  const [linkCopied,setLinkCopied] = useState(false);
   const [fcValues,setFcValues] = useState(null); // {bySleeperId, byName} from FantasyCalc — silent sort
   useEffect(()=>{ fetchFcValues().then(setFcValues); },[]);
   // Track in-flight auto-pick attempts so we don't double-fire on the same pick index.
@@ -4784,23 +4757,27 @@ function DispersalDraft({draftId}){
     return ()=>{ cancelled = true; clearInterval(t); if(channel && sb?.removeChannel) sb.removeChannel(channel); };
   },[draftId]);
 
-  const claim = async () => {
+  const claimSlot = async (slot) => {
     setClaimErr('');
-    const u = claimUser.trim().toLowerCase();
-    const p = claimPass.trim();
-    const team = draft.teams.find(t => t.username.toLowerCase() === u);
-    if(!team){ setClaimErr('Username not found in this draft'); return; }
-    if(team.passcode !== p){ setClaimErr('Wrong passcode'); return; }
-    if(team.joined && (!me || me.slot !== team.slot)){
-      // already claimed by someone else; allow re-claim if same passcode (shared device)
-    }
-    const newTeams = draft.teams.map(t => t.slot===team.slot ? {...t, joined:true} : t);
+    const team = draft.teams.find(t => t.slot===slot);
+    if(!team){ setClaimErr('Team not found'); return; }
+    if(team.joined){ setClaimErr('Already claimed — pick another team'); return; }
+    const newTeams = draft.teams.map(t => t.slot===slot ? {...t, joined:true} : t);
     const { error } = await dispUpdate(draftId, { teams:newTeams });
     if(error){ setClaimErr(error.message || 'Claim failed'); return; }
-    const meNew = { slot:team.slot, username:team.username, passcode:team.passcode };
-    localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew));
+    const meNew = { slot:team.slot, username:team.username };
+    try{ localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew)); }catch(e){}
     setMe(meNew);
-    setClaimUser(''); setClaimPass('');
+  };
+  const releaseSlot = async (slot) => {
+    if(!confirm('Release this team so someone else can claim it?')) return;
+    const newTeams = draft.teams.map(t => t.slot===slot ? {...t, joined:false} : t);
+    await dispUpdate(draftId, { teams:newTeams });
+    // If the released team is "me" on this device, clear local identity
+    if(me && me.slot === slot){
+      try{ localStorage.removeItem('pfk_disp_'+draftId); }catch(e){}
+      setMe(null);
+    }
   };
 
   // Two-step start: lobby → ready (commish + everyone now in the draft view) → live (picks begin)
@@ -4974,6 +4951,11 @@ function DispersalDraft({draftId}){
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
         <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
         <div style={{padding:'4px 10px',background:status==='live'?'#0a2a1a':status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'}}>{status.toUpperCase()}</div>
+        <button onClick={()=>{
+          try{ navigator.clipboard.writeText(window.location.origin + '/dispersal/' + draftId); }catch(e){}
+          setLinkCopied(true);
+          setTimeout(()=>setLinkCopied(false), 2000);
+        }} style={{padding:'5px 11px',background:linkCopied?'#10b981':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>{linkCopied?'✓ COPIED!':'🔗 COPY LINK'}</button>
         <div style={{flex:1}}/>
         {isSpectator && <div style={{padding:'4px 10px',background:'#1a1a3a',border:'1px solid #a78bfa',borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:'#a78bfa'}}>👀 SPECTATING</div>}
         {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
@@ -4987,21 +4969,26 @@ function DispersalDraft({draftId}){
               <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>WAITING FOR MANAGERS · {teams.filter(t=>t.joined).length} of {teams.length} joined · DRAFT ORDER:</div>
               {isCommish && <button onClick={randomizeOrder} style={{marginLeft:'auto',padding:'5px 11px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>🎲 RANDOMIZE ORDER</button>}
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
               {pickOrder.map((slotIdx,i)=>{
                 const t = teams.find(x=>x.slot===slotIdx);
                 if(!t) return null;
+                const isMine = me && me.slot===t.slot;
+                const canClaim = !t.joined && !me && !isSpectator;
                 return (
                   <div key={t.slot} style={{padding:'10px 12px',background:t.joined?'#0a2a1a':'#0a0a0a',border:'1px solid '+(t.joined?'#10b981':'#222'),borderRadius:8,display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{color:t.joined?'#10b981':'#666',fontSize:18}}>{t.joined?'✓':'○'}</span>
-                    <div>
-                      <div style={{fontWeight:800,fontSize:14}}>{t.username}</div>
+                    <span style={{color:t.joined?'#10b981':'#666',fontSize:18,flexShrink:0}}>{t.joined?'✓':'○'}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:800,fontSize:14,wordBreak:'break-word'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11}}>(you)</span>}</div>
                       <div style={{fontSize:11,color:'#666'}}>Pick #{i+1}</div>
                     </div>
+                    {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'5px 11px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:11,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                    {t.joined && isCommish && !isMine && <button onClick={()=>releaseSlot(t.slot)} title="Release this claim" style={{padding:'3px 7px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11,flexShrink:0}}>✕</button>}
                   </div>
                 );
               })}
             </div>
+            {claimErr && <div style={{marginTop:8,color:'#ef4444',fontSize:12}}>{claimErr}</div>}
             {isCommish ? <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to take the draft live…</div>}
           </div>
           {!me && !isSpectator && !isCommish && (
@@ -5019,26 +5006,9 @@ function DispersalDraft({draftId}){
               <span style={{fontSize:12,color:'#888'}}>You're not drafting — you'll run the lobby + start the draft. Claim a team below if you do want to draft.</span>
             </div>
           )}
-          {!me && !isSpectator && (
-            <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'16px 18px'}}>
-              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:10,letterSpacing:1}}>CLAIM YOUR TEAM</div>
-              <div style={{fontSize:12,color:'#888',marginBottom:10}}>Type your 4-digit passcode — your username will fill in automatically.</div>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <input value={claimPass} onChange={e=>{
-                  const v = e.target.value;
-                  setClaimPass(v);
-                  // Auto-fill username when 4-digit passcode matches a team
-                  if(v.length === 4){
-                    const team = teams.find(t => t.passcode === v);
-                    if(team){ setClaimUser(team.username); setClaimErr(''); }
-                  } else if(claimUser){
-                    setClaimUser('');
-                  }
-                }} onKeyDown={e=>e.key==='Enter'&&claim()} placeholder="4-digit passcode" autoFocus inputMode="numeric" maxLength={4} style={{flex:'1 1 140px',padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:18,fontFamily:'monospace',letterSpacing:4,textAlign:'center'}}/>
-                <input value={claimUser} readOnly placeholder="Your username will appear here" style={{flex:'1 1 200px',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:claimUser?'#FFD700':'#666',fontSize:14,fontWeight:claimUser?800:400,cursor:'default'}}/>
-                <button onClick={claim} disabled={!claimUser} style={{padding:'10px 18px',background:claimUser?'#FFD700':'#333',border:'none',borderRadius:6,color:claimUser?'#000':'#666',fontWeight:900,cursor:claimUser?'pointer':'default',fontSize:13,letterSpacing:1}}>CLAIM</button>
-              </div>
-              {claimErr && <div style={{marginTop:8,color:'#ef4444',fontSize:12}}>{claimErr}</div>}
+          {!me && !isSpectator && !isCommish && (
+            <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#aaa'}}>
+              👆 Click <strong style={{color:'#FFD700'}}>CLAIM</strong> next to your username above. If your team isn't listed, you're a spectator (view-only).
             </div>
           )}
         </>
