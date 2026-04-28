@@ -4354,7 +4354,7 @@ function DispersalSetup(){
       const { data, error } = await dispCreate({
         name:name.trim(), snake, timer_seconds:timerSeconds, auto_pick:autoPick,
         pool:poolItems, teams, pick_order:order, picks:[],
-        current_pick_idx:0, status:'lobby',
+        current_pick_idx:0, status:'ready',
       });
       setCreating(false);
       if(error){ setErr(error.message || 'Create failed'); return; }
@@ -4414,7 +4414,7 @@ function DispersalSetup(){
     const { data, error } = await dispCreate({
       name:name.trim(), snake, timer_seconds:timerSeconds,
       pool, teams, pick_order:order, picks:[],
-      current_pick_idx:0, status:'lobby',
+      current_pick_idx:0, status:'ready',
     });
     setCreating(false);
     if(error){ setErr(error.message || 'Create failed'); return; }
@@ -5189,12 +5189,16 @@ function DispersalDraft({draftId}){
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
                 {rosters.map(t=>{
                   const isOnClock = onClockSlot === t.slot;
+                  const isMine = me && me.slot === t.slot;
+                  const canClaim = !t.joined && !me && !isSpectator;
                   return (
-                    <div key={t.slot} ref={el=>{ if(el) rosterRefs.current[t.slot]=el; }} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':'#222'),borderRadius:8,padding:'10px 12px',overflow:'hidden'}}>
+                    <div key={t.slot} ref={el=>{ if(el) rosterRefs.current[t.slot]=el; }} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':isMine?'#FFD70066':'#222'),borderRadius:8,padding:'10px 12px',overflow:'hidden'}}>
                       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap'}}>
                         <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24,flexShrink:0}}>#{pickOrder.indexOf(t.slot)+1}</span>
-                        <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0}}>{t.username}</span>
+                        <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0,color:t.joined?'#eee':'#888'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11,fontWeight:700}}>(you)</span>}</span>
                         {isOnClock && <span style={{fontSize:9,color:'#10b981',fontWeight:800,padding:'2px 5px',background:'#0a2a1a',borderRadius:3,letterSpacing:0.5,flexShrink:0}}>ON CLOCK</span>}
+                        {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'4px 9px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:10,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                        {t.joined && isCommish && !isMine && <button onClick={()=>releaseSlot(t.slot)} title="Release this claim" style={{padding:'2px 6px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11,flexShrink:0}}>✕</button>}
                         <span style={{fontSize:11,color:'#666',flexShrink:0}}>{t.picks.length}p</span>
                         {status==='complete' && <button onClick={()=>screenshotRoster(t.slot, t.username)} title={`Download ${t.username}'s roster as PNG`} style={{padding:'2px 6px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11,flexShrink:0}}>📸</button>}
                       </div>
