@@ -4349,7 +4349,7 @@ function DispersalSetup(){
         joined:false,
       }));
       const order = teams.map((_,i)=>i);
-      const timerSeconds = timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+      const timerSeconds = timer==='30s' ? 30 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
       setCreating(true);
       const { data, error } = await dispCreate({
         name:name.trim(), snake, timer_seconds:timerSeconds, auto_pick:autoPick,
@@ -4409,7 +4409,7 @@ function DispersalSetup(){
     // Pick order = order in the textarea (commish controls this — see Randomize button).
     const order = usernames.map((_,i)=>i);
     const teams = usernames.map((u,i)=>({ slot:i, username:u, passcode:dispGenPasscode(), joined:false }));
-    const timerSeconds = timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
+    const timerSeconds = timer==='30s' ? 30 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
     setCreating(true);
     const { data, error } = await dispCreate({
       name:name.trim(), snake, timer_seconds:timerSeconds,
@@ -4593,6 +4593,7 @@ function DispersalSetup(){
               <label style={labelStyle}>TIMER PER PICK</label>
               <select value={timer} onChange={e=>setTimer(e.target.value)} style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:800,cursor:'pointer',minWidth:160}}>
                 <option value="off">None (no clock)</option>
+                <option value="30s">30 seconds (TEST)</option>
                 <option value="1h">1 hour</option>
                 <option value="2h">2 hours</option>
                 <option value="4h">4 hours</option>
