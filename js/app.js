@@ -4763,21 +4763,22 @@ function DispersalDraft({draftId}){
     if(!team){ setClaimErr('Team not found'); return; }
     if(team.joined){ setClaimErr('Already claimed — pick another team'); return; }
     const newTeams = draft.teams.map(t => t.slot===slot ? {...t, joined:true} : t);
-    const { error } = await dispUpdate(draftId, { teams:newTeams });
-    if(error){ setClaimErr(error.message || 'Claim failed'); return; }
     const meNew = { slot:team.slot, username:team.username };
+    setDraft(d => d ? {...d, teams:newTeams} : d); // optimistic
     try{ localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew)); }catch(e){}
     setMe(meNew);
+    const { error } = await dispUpdate(draftId, { teams:newTeams });
+    if(error){ setClaimErr(error.message || 'Claim failed'); return; }
   };
   const releaseSlot = async (slot) => {
     if(!confirm('Release this team so someone else can claim it?')) return;
     const newTeams = draft.teams.map(t => t.slot===slot ? {...t, joined:false} : t);
-    await dispUpdate(draftId, { teams:newTeams });
-    // If the released team is "me" on this device, clear local identity
+    setDraft(d => d ? {...d, teams:newTeams} : d); // optimistic
     if(me && me.slot === slot){
       try{ localStorage.removeItem('pfk_disp_'+draftId); }catch(e){}
       setMe(null);
     }
+    await dispUpdate(draftId, { teams:newTeams });
   };
 
   // Two-step start: lobby → ready (commish + everyone now in the draft view) → live (picks begin)
@@ -4789,6 +4790,7 @@ function DispersalDraft({draftId}){
   };
   const startDraft = async () => {
     const deadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    setDraft(d => d ? {...d, status:'live', pick_deadline:deadline} : d); // optimistic
     await dispUpdate(draftId, { status:'live', pick_deadline:deadline });
   };
 
@@ -4805,6 +4807,7 @@ function DispersalDraft({draftId}){
     const totalPicks = draft.pool.length;
     const newStatus = newIdx >= totalPicks ? 'complete' : 'live';
     const newDeadline = (newStatus==='live' && draft.timer_seconds) ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
+    setDraft(d => d ? {...d, pool:newPool, picks:newPicks, current_pick_idx:newIdx, status:newStatus, pick_deadline:newDeadline} : d); // optimistic
     const { error } = await dispUpdate(draftId, {
       pool:newPool, picks:newPicks, current_pick_idx:newIdx,
       status:newStatus, pick_deadline:newDeadline,
@@ -4902,6 +4905,7 @@ function DispersalDraft({draftId}){
     if(!confirm('Randomize the pick order?')) return;
     const order = (draft.pick_order||[]).slice();
     for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    setDraft(d => d ? {...d, pick_order:order} : d); // optimistic
     await dispUpdate(draftId, { pick_order:order });
   };
 
@@ -4989,7 +4993,7 @@ function DispersalDraft({draftId}){
               })}
             </div>
             {claimErr && <div style={{marginTop:8,color:'#ef4444',fontSize:12}}>{claimErr}</div>}
-            {isCommish ? <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to take the draft live…</div>}
+            <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button>
           </div>
           {!me && !isSpectator && !isCommish && (
             <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'18px 22px',marginBottom:12,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
@@ -5027,11 +5031,8 @@ function DispersalDraft({draftId}){
                   <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order. Hit START DRAFT when everyone's ready.</div>
                 </div>
                 <span style={{flex:1}}/>
-                {isCommish && <>
-                  <button onClick={randomizeOrder} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎲 RANDOMIZE ORDER</button>
-                  <button onClick={startDraft} style={{padding:'12px 20px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
-                </>}
-                {!isCommish && <div style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Waiting for commissioner to start…</div>}
+                <button onClick={randomizeOrder} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎲 RANDOMIZE ORDER</button>
+                <button onClick={startDraft} style={{padding:'12px 20px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
               </div>
               {/* Pick order strip — visible right under the READY banner so RANDOMIZE shows the reorder live */}
               <div style={{background:'#0a0a0a',border:'2px solid #FFD700',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'8px 12px',display:'flex',gap:6,overflowX:'auto'}}>
