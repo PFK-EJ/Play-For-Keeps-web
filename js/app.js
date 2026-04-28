@@ -4945,10 +4945,32 @@ function DispersalDraft({draftId}){
     if(!el || !window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
     try{
       const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2 });
+      const filename = `${draft.name.replace(/[^a-z0-9]/gi,'_')}_${username}.png`;
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      // Mobile: try Web Share API (opens native share sheet → Save to Photos / Files / Messages)
+      if(blob && navigator.canShare){
+        const file = new File([blob], filename, { type:'image/png' });
+        if(navigator.canShare({ files:[file] })){
+          try{
+            await navigator.share({ files:[file], title:`${username} — ${draft.name}` });
+            return;
+          }catch(e){ if(e && e.name==='AbortError') return; /* fall through to download */ }
+        }
+      }
+      // Desktop: download via anchor
+      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `${draft.name.replace(/[^a-z0-9]/gi,'_')}_${username}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      // iOS Safari fallback: if download attr was ignored, open in new tab so user can long-press → Save Image
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if(isIOS && !navigator.canShare){
+        window.open(canvas.toDataURL('image/png'), '_blank');
+      }
     }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
   };
 
