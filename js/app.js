@@ -4652,9 +4652,17 @@ function DispersalDraft({draftId}){
   // Spectator mode: ?spectate=1 in URL hides claim/pick UI; the user can watch
   // but never interact. Useful for league mates not in the disperse pool.
   const isSpectator = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('spectate')==='1';
-  // Commissioner = the browser that created the draft (flagged in localStorage on create).
-  // The Sleeper league commish almost always IS the setup user, so this single check covers both.
-  const isCommish = !isSpectator && (()=>{ try{ return localStorage.getItem('pfk_disp_creator_'+draftId)==='1'; }catch(e){ return false; } })();
+  // Commissioner = the browser that created the draft (flagged in localStorage on create) OR
+  // anyone who clicked "I AM THE COMMISSIONER" in the lobby. Stored in localStorage so the
+  // flag survives reloads. Held in state so toggling re-renders immediately.
+  const [commishFlag,setCommishFlag] = useState(()=>{
+    try{ return localStorage.getItem('pfk_disp_creator_'+draftId)==='1'; }catch(e){ return false; }
+  });
+  const isCommish = !isSpectator && commishFlag;
+  const declareCommish = () => {
+    try{ localStorage.setItem('pfk_disp_creator_'+draftId, '1'); }catch(e){}
+    setCommishFlag(true);
+  };
   const [me,setMe] = useState(()=>{
     if(isSpectator) return null;
     try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch(e){ return null; }
@@ -4864,6 +4872,12 @@ function DispersalDraft({draftId}){
             </div>
             {isCommish ? <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to take the draft live…</div>}
           </div>
+          {!me && !isSpectator && !isCommish && (
+            <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 18px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <div style={{fontSize:13,color:'#888'}}>Set up this draft and not playing in it?</div>
+              <button onClick={declareCommish} style={{padding:'8px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>👑 I AM THE COMMISSIONER</button>
+            </div>
+          )}
           {!me && !isSpectator && (
             <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'16px 18px'}}>
               <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:10,letterSpacing:1}}>CLAIM YOUR TEAM</div>
@@ -4895,17 +4909,31 @@ function DispersalDraft({draftId}){
       {(status === 'ready' || status === 'live' || status === 'complete') && (
         <>
           {status === 'ready' && (
-            <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-              <div>
-                <div style={{fontSize:11,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>READY TO DRAFT</div>
-                <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order below. Hit START DRAFT when everyone's ready.</div>
+            <div style={{marginBottom:14}}>
+              <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:'10px 10px 0 0',padding:'14px 18px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',borderBottom:'none'}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>READY TO DRAFT</div>
+                  <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order. Hit START DRAFT when everyone's ready.</div>
+                </div>
+                <span style={{flex:1}}/>
+                {isCommish && <>
+                  <button onClick={randomizeOrder} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎲 RANDOMIZE ORDER</button>
+                  <button onClick={startDraft} style={{padding:'12px 20px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
+                </>}
+                {!isCommish && <div style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Waiting for commissioner to start…</div>}
               </div>
-              <span style={{flex:1}}/>
-              {isCommish && <>
-                <button onClick={randomizeOrder} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎲 RANDOMIZE ORDER</button>
-                <button onClick={startDraft} style={{padding:'12px 20px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
-              </>}
-              {!isCommish && <div style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Waiting for commissioner to start…</div>}
+              {/* Pick order strip — visible right under the READY banner so RANDOMIZE shows the reorder live */}
+              <div style={{background:'#0a0a0a',border:'2px solid #FFD700',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'8px 12px',display:'flex',gap:6,overflowX:'auto'}}>
+                {pickOrder.map((slotIdx,i)=>{
+                  const team = teams.find(t=>t.slot===slotIdx);
+                  const isMine = me && slotIdx === me.slot;
+                  return (
+                    <div key={i} style={{flexShrink:0,padding:'4px 10px',borderRadius:14,fontSize:11,fontWeight:800,letterSpacing:0.5,background:isMine?'#0a2a1a':'#111',color:isMine?'#10b981':'#888',border:'1px solid '+(isMine?'#10b981':'#222')}}>
+                      <span style={{opacity:0.65,marginRight:5}}>{i+1}.</span>{team?.username||'?'}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
           {status === 'live' && onClockTeam && (()=>{
