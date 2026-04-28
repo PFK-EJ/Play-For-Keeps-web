@@ -4333,7 +4333,19 @@ function DispersalSetup(){
       setSleeperUsernames(defaults);
       // Auto-populate the draft name from the Sleeper league name (only if commish hasn't typed one yet)
       if(data.league?.name && !name.trim()) setName(`${data.league.name} Dispersal`);
-      // Auto-detect league settings for the share card (commish can override via UI)
+      // Auto-detect league settings for the share card (commish can override via UI).
+      // IMPORTANT: dropdown <option> values use "1.0" / "0.5" string format. Sleeper
+      // returns scoring values as JS numbers — JSON.parse turns 1.0 into 1 (integer)
+      // since they're numerically equal. So String(1) === "1" wouldn't match the
+      // "1.0" option → dropdown silently falls back to first option ("0 PPR").
+      // normalizeNumStr forces integer values to render as "X.0" so they match.
+      const normalizeNumStr = (n) => {
+        const num = parseFloat(n);
+        if(isNaN(num)) return '0';
+        if(num === 0) return '0';
+        if(Number.isInteger(num)) return num + '.0';
+        return String(num);
+      };
       const lg = data.league || {};
       const ss = lg.scoring_settings || {};
       const rp = lg.roster_positions || [];
@@ -4341,17 +4353,13 @@ function DispersalSetup(){
       // type: 0=redraft, 1=keeper, 2=dynasty
       setLeagueType(settings.type === 2 ? 'Dynasty' : settings.type === 1 ? 'Keeper' : 'Redraft');
       setLeagueQB(rp.includes('SUPER_FLEX') ? 'Superflex' : '1QB');
-      // PPR comes from rec value
-      const pprVal = ss.rec ?? 0;
-      setLeaguePPR(String(pprVal));
-      // TEP = bonus_rec_te
-      const tepVal = ss.bonus_rec_te ?? 0;
-      setLeagueTEP(String(tepVal));
+      setLeaguePPR(normalizeNumStr(ss.rec ?? 0));
+      setLeagueTEP(normalizeNumStr(ss.bonus_rec_te ?? 0));
       // Starters = roster slots not in BN/IR/TAXI
       const skip = new Set(['BN','IR','TAXI']);
       const starters = rp.filter(p => !skip.has(p)).length;
       if(starters > 0) setLeagueStarters(String(starters));
-      // Point per carry (rare): rush_att in scoring_settings
+      // Point per carry: rush_att in scoring_settings (rare scoring rule)
       const ppc = ss.rush_att ?? 0;
       setLeaguePPC(ppc ? String(ppc) : '');
     }catch(e){ setSleeperErr(e.message || 'Fetch failed'); }
@@ -4651,10 +4659,12 @@ function DispersalSetup(){
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
           <div style={{flex:'1 1 130px'}}>
-            <input value={leagueStarters} onChange={e=>setLeagueStarters(e.target.value)} placeholder="Starting lineup size (e.g. 10)" style={inputStyle}/>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:4}}>STARTING LINEUP SIZE</div>
+            <input value={leagueStarters} onChange={e=>setLeagueStarters(e.target.value)} placeholder="e.g. 10" style={inputStyle}/>
           </div>
           <div style={{flex:'1 1 130px'}}>
-            <input value={leaguePPC} onChange={e=>setLeaguePPC(e.target.value)} placeholder="Point per carry (leave blank if none)" style={inputStyle}/>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:4}}>POINT PER CARRY</div>
+            <input value={leaguePPC} onChange={e=>setLeaguePPC(e.target.value)} placeholder="leave blank if none" style={inputStyle}/>
           </div>
         </div>
       </div>
@@ -5024,15 +5034,11 @@ function DispersalSetup(){
                 <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:0.5,lineHeight:1.15,wordBreak:'break-word'}}>{previewData.draftName}</div>
               </div>
             </div>
-            {/* Stats row — 4 cards: PLAYERS, PICKS, NEW MANAGERS, BUY-IN. SNAKE removed per Evan's feedback. */}
+            {/* Stats row — 3 cards: TOTAL ASSETS (players+picks), NEW MANAGERS, BUY-IN. */}
             <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.players.length}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PLAYERS</div>
-              </div>
-              <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.picks.length}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>PICKS</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.players.length + previewData.picks.length}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TOTAL ASSETS</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.teamCount||'?'}</div>
