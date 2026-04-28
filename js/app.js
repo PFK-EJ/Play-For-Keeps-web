@@ -4222,11 +4222,12 @@ const dispUpdate = async (id, patch) => {
 // session don't re-fetch.
 let _sleeperPlayersCache = null;
 const sleeperLeague = async (id) => {
-  const [users, rosters] = await Promise.all([
-    fetch(`https://api.sleeper.app/v1/league/${id}/users`).then(r=>{ if(!r.ok) throw new Error('Sleeper league not found'); return r.json(); }),
+  const [league, users, rosters] = await Promise.all([
+    fetch(`https://api.sleeper.app/v1/league/${id}`).then(r=>{ if(!r.ok) throw new Error('Sleeper league not found'); return r.json(); }),
+    fetch(`https://api.sleeper.app/v1/league/${id}/users`).then(r=>r.json()),
     fetch(`https://api.sleeper.app/v1/league/${id}/rosters`).then(r=>r.json()),
   ]);
-  return { users, rosters };
+  return { league, users, rosters };
 };
 const sleeperPlayers = async () => {
   if(_sleeperPlayersCache) return _sleeperPlayersCache;
@@ -4279,6 +4280,8 @@ function DispersalSetup(){
         defaults[r.roster_id] = u?.display_name || u?.username || `Team ${r.roster_id}`;
       });
       setSleeperUsernames(defaults);
+      // Auto-populate the draft name from the Sleeper league name (only if commish hasn't typed one yet)
+      if(data.league?.name && !name.trim()) setName(`${data.league.name} Dispersal`);
     }catch(e){ setSleeperErr(e.message || 'Fetch failed'); }
     finally{ setSleeperLoading(false); }
   };
@@ -4711,10 +4714,14 @@ function DispersalDraft({draftId}){
     setClaimUser(''); setClaimPass('');
   };
 
-  const startDraft = async () => {
+  // Two-step start: lobby → ready (commish + everyone now in the draft view) → live (picks begin)
+  const goToDraft = async () => {
     if(draft.teams.some(t=>!t.joined)){
-      if(!confirm('Some managers haven\'t joined yet. Start anyway?')) return;
+      if(!confirm('Some managers haven\'t joined yet. Move to draft anyway?')) return;
     }
+    await dispUpdate(draftId, { status:'ready' });
+  };
+  const startDraft = async () => {
     const deadline = draft.timer_seconds ? new Date(Date.now() + draft.timer_seconds*1000).toISOString() : null;
     await dispUpdate(draftId, { status:'live', pick_deadline:deadline });
   };
@@ -4855,15 +4862,26 @@ function DispersalDraft({draftId}){
                 );
               })}
             </div>
-            {isCommish ? <button onClick={startDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to start the draft…</div>}
+            {isCommish ? <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button> : <div style={{marginTop:14,fontSize:12,color:'#666',fontStyle:'italic'}}>Waiting for commissioner to take the draft live…</div>}
           </div>
           {!me && !isSpectator && (
             <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'16px 18px'}}>
               <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:10,letterSpacing:1}}>CLAIM YOUR TEAM</div>
+              <div style={{fontSize:12,color:'#888',marginBottom:10}}>Type your 4-digit passcode — your username will fill in automatically.</div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <input value={claimUser} onChange={e=>setClaimUser(e.target.value)} placeholder="Username" style={{flex:'1 1 160px',padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14}}/>
-                <input value={claimPass} onChange={e=>setClaimPass(e.target.value)} onKeyDown={e=>e.key==='Enter'&&claim()} placeholder="4-digit passcode" style={{flex:'1 1 140px',padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'monospace'}}/>
-                <button onClick={claim} style={{padding:'10px 18px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>CLAIM</button>
+                <input value={claimPass} onChange={e=>{
+                  const v = e.target.value;
+                  setClaimPass(v);
+                  // Auto-fill username when 4-digit passcode matches a team
+                  if(v.length === 4){
+                    const team = teams.find(t => t.passcode === v);
+                    if(team){ setClaimUser(team.username); setClaimErr(''); }
+                  } else if(claimUser){
+                    setClaimUser('');
+                  }
+                }} onKeyDown={e=>e.key==='Enter'&&claim()} placeholder="4-digit passcode" autoFocus inputMode="numeric" maxLength={4} style={{flex:'1 1 140px',padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:18,fontFamily:'monospace',letterSpacing:4,textAlign:'center'}}/>
+                <input value={claimUser} readOnly placeholder="Your username will appear here" style={{flex:'1 1 200px',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:claimUser?'#FFD700':'#666',fontSize:14,fontWeight:claimUser?800:400,cursor:'default'}}/>
+                <button onClick={claim} disabled={!claimUser} style={{padding:'10px 18px',background:claimUser?'#FFD700':'#333',border:'none',borderRadius:6,color:claimUser?'#000':'#666',fontWeight:900,cursor:claimUser?'pointer':'default',fontSize:13,letterSpacing:1}}>CLAIM</button>
               </div>
               {claimErr && <div style={{marginTop:8,color:'#ef4444',fontSize:12}}>{claimErr}</div>}
             </div>
@@ -4871,9 +4889,25 @@ function DispersalDraft({draftId}){
         </>
       )}
 
-      {/* Live or complete: show on-clock + pool + rosters */}
-      {(status === 'live' || status === 'complete') && (
+      {/* Ready / Live / Complete all share the draft view (pool + rosters). 'ready' adds a
+          pre-start banner with START DRAFT + RANDOMIZE; 'live' has the on-clock card + timer;
+          'complete' has the trophy banner. */}
+      {(status === 'ready' || status === 'live' || status === 'complete') && (
         <>
+          {status === 'ready' && (
+            <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>READY TO DRAFT</div>
+                <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order below. Hit START DRAFT when everyone's ready.</div>
+              </div>
+              <span style={{flex:1}}/>
+              {isCommish && <>
+                <button onClick={randomizeOrder} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎲 RANDOMIZE ORDER</button>
+                <button onClick={startDraft} style={{padding:'12px 20px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
+              </>}
+              {!isCommish && <div style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Waiting for commissioner to start…</div>}
+            </div>
+          )}
           {status === 'live' && onClockTeam && (()=>{
             const deadlineMs = draft.pick_deadline ? new Date(draft.pick_deadline).getTime() : null;
             const remaining = deadlineMs ? Math.max(0, deadlineMs - now) : null;
