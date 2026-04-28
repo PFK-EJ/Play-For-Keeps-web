@@ -4298,6 +4298,10 @@ function DispersalSetup(){
   const poolCardRef = useRef(null);
   const [poolShareBusy,setPoolShareBusy] = useState(false);
   const [previewData,setPreviewData] = useState(null);
+  // Desktop share modal — appears after image generation on desktop (mobile uses native share sheet).
+  // Holds {blob, filename}; null = modal hidden. Three actions: download / copy to clipboard / share to X.
+  const [desktopShare,setDesktopShare] = useState(null);
+  const [shareToast,setShareToast] = useState(''); // transient feedback in modal ("Copied!" etc.)
   // League-meta state — surfaced on the share card. Auto-detected from Sleeper in
   // sleeper mode; manually entered in custom mode. Buy-in is always manual.
   const [buyIn,setBuyIn] = useState('');
@@ -4568,9 +4572,8 @@ function DispersalSetup(){
       const canvas = await window.html2canvas(el, { backgroundColor:'#080808', scale:2, useCORS:true });
       const filename = `${data.draftName.replace(/[^a-z0-9]/gi,'_')}_pool.png`;
       const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-      // Detect mobile — only mobile gets the Web Share API path. On desktop, Chrome
-      // sometimes calls the OS share dialog AND duplicates the image, so we skip it
-      // entirely and just download the file.
+      // Mobile: native share sheet (Photos, Messages, X, Discord, etc.) — works perfectly.
+      // Desktop: pop a small modal with three options (download / copy / share to X).
       const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
       if(isMobile && blob && navigator.canShare){
         const file = new File([blob], filename, { type:'image/png' });
@@ -4581,19 +4584,26 @@ function DispersalSetup(){
           }catch(e){ if(e && e.name==='AbortError') return; }
         }
       }
-      // Desktop (and mobile fallback when Web Share isn't supported): download via anchor.
-      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
-      // iOS Safari before Web Share API support → open in new tab so user can long-press to save.
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      if(isIOS && !navigator.canShare){
-        window.open(canvas.toDataURL('image/png'), '_blank');
+      // Mobile fallback (no Web Share API): download via anchor.
+      if(isMobile){
+        const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if(isIOS && !navigator.canShare){
+          window.open(canvas.toDataURL('image/png'), '_blank');
+        }
+        return;
+      }
+      // Desktop: stash blob + filename and show the share modal so user picks an action.
+      if(blob){
+        setShareToast('');
+        setDesktopShare({ blob, filename, draftName: data.draftName });
       }
     }catch(e){ alert('Share pool failed: ' + (e.message||e)); }
     finally{ setPoolShareBusy(false); }
@@ -4604,14 +4614,15 @@ function DispersalSetup(){
   const selectStyle = {flex:'1 1 110px',padding:'8px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'};
 
   // Shared "league info on share image" block — shown in both Sleeper and Custom modes.
-  // In Sleeper mode the dropdowns auto-fill on FETCH but can still be overridden;
-  // in Custom mode they start at sensible defaults and the commish edits.
-  const LeagueInfoInputs = () => (
+  // Defined as a JSX value (NOT a child component) so React reconciles it instead of
+  // remounting on every parent render — that remount was unmounting the buy-in input
+  // mid-keystroke and stealing focus after every character.
+  const leagueInfoInputs = (
     <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',display:'flex',flexDirection:'column',gap:12}}>
       <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:1.5}}>📸 SHOWN ON THE SHARE IMAGE</div>
       <div>
         <label style={{...labelStyle,marginBottom:5}}>LEAGUE BUY-IN</label>
-        <input value={buyIn} onChange={e=>setBuyIn(e.target.value)} placeholder="e.g. $250  /  FREE  /  $50 + entry trade" style={inputStyle}/>
+        <input value={buyIn} onChange={e=>setBuyIn(e.target.value)} placeholder="e.g. 250  /  FREE  /  $50 + entry trade" style={inputStyle}/>
       </div>
       <div>
         <label style={{...labelStyle,marginBottom:5}}>LEAGUE SETTINGS{setupMode==='sleeper' && sleeperData && <span style={{color:'#10b981',fontWeight:700,marginLeft:8,letterSpacing:0.5,textTransform:'none'}}>· auto-filled, edit if needed</span>}</label>
@@ -4640,10 +4651,10 @@ function DispersalSetup(){
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
           <div style={{flex:'1 1 130px'}}>
-            <input value={leagueStarters} onChange={e=>setLeagueStarters(e.target.value)} placeholder="Start (e.g. 10)" style={inputStyle}/>
+            <input value={leagueStarters} onChange={e=>setLeagueStarters(e.target.value)} placeholder="Starting lineup size (e.g. 10)" style={inputStyle}/>
           </div>
           <div style={{flex:'1 1 130px'}}>
-            <input value={leaguePPC} onChange={e=>setLeaguePPC(e.target.value)} placeholder="Point per carry (rare — leave blank if none)" style={inputStyle}/>
+            <input value={leaguePPC} onChange={e=>setLeaguePPC(e.target.value)} placeholder="Point per carry (leave blank if none)" style={inputStyle}/>
           </div>
         </div>
       </div>
@@ -4714,7 +4725,7 @@ function DispersalSetup(){
 
       {setupMode==='sleeper' && (
         <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
-          <LeagueInfoInputs/>
+          {leagueInfoInputs}
           <div>
             <label style={labelStyle}>DRAFT NAME</label>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
@@ -4818,7 +4829,7 @@ function DispersalSetup(){
 
       {setupMode==='custom' && (
       <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
-        <LeagueInfoInputs/>
+        {leagueInfoInputs}
         <div>
           <label style={labelStyle}>DRAFT NAME</label>
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
@@ -4926,6 +4937,79 @@ function DispersalSetup(){
         );
       })()}
 
+      {/* Desktop share modal — shown after image is generated on PC.
+          Three actions: download / copy to clipboard / share to X (with image already copied). */}
+      {desktopShare && (() => {
+        const closeModal = () => { setDesktopShare(null); setShareToast(''); setPreviewData(null); };
+        const doDownload = () => {
+          const url = URL.createObjectURL(desktopShare.blob);
+          const link = document.createElement('a');
+          link.download = desktopShare.filename;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(()=>URL.revokeObjectURL(url), 1000);
+          setShareToast('Downloaded ✓');
+          setTimeout(closeModal, 900);
+        };
+        const doCopy = async () => {
+          try{
+            // ClipboardItem is supported in modern Chrome/Edge/Firefox 127+/Safari 13.1+.
+            // Writes the PNG to the system clipboard so the user can paste in iMessage,
+            // Slack, X compose box, Photos, etc.
+            if(!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write){
+              setShareToast('Copy not supported in this browser — use Download instead');
+              return;
+            }
+            const item = new window.ClipboardItem({ 'image/png': desktopShare.blob });
+            await navigator.clipboard.write([item]);
+            setShareToast('Copied to clipboard ✓ — paste anywhere');
+            setTimeout(closeModal, 1400);
+          }catch(e){ setShareToast('Copy failed: ' + (e.message||e)); }
+        };
+        const doShareToX = async () => {
+          // Twitter web intents don't accept image attachments via URL — best we can do is
+          // copy the image to the clipboard, then open the X compose window with prefilled
+          // text. The user pastes the image into the tweet (Cmd/Ctrl+V).
+          let copied = false;
+          try{
+            if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+              const item = new window.ClipboardItem({ 'image/png': desktopShare.blob });
+              await navigator.clipboard.write([item]);
+              copied = true;
+            }
+          }catch(e){}
+          const tweetText = `Dispersal draft alert ⚠️ — ${desktopShare.draftName}. Looking for new managers. DM me to join. (built with @PlayforkeepsFF)`;
+          const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+          window.open(intentUrl, '_blank');
+          setShareToast(copied ? 'Image copied — paste it into the tweet (Cmd/Ctrl+V)' : 'Tweet opened — image not auto-copied (use Copy first)');
+          setTimeout(closeModal, 2400);
+        };
+        return (
+          <div onClick={closeModal} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:99999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:440,background:'#0f0f0f',border:'2px solid #FFD700',borderRadius:12,padding:'22px 24px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                <div style={{fontWeight:900,fontSize:15,letterSpacing:1.5,color:'#FFD700'}}>📸 SHARE POOL IMAGE</div>
+                <button onClick={closeModal} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
+              </div>
+              <div style={{fontSize:13,color:'#aaa',marginBottom:14,lineHeight:1.5}}>Image is ready. Pick what to do with it:</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                <button onClick={doDownload} style={{padding:'12px 16px',background:'#0a1f10',border:'1.5px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📥 &nbsp;DOWNLOAD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· save .png to your computer</span></button>
+                <button onClick={doCopy} style={{padding:'12px 16px',background:'transparent',border:'1.5px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📋 &nbsp;COPY TO CLIPBOARD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· paste into iMessage, Slack, etc.</span></button>
+                <button onClick={doShareToX} style={{padding:'12px 16px',background:'#000',border:'1.5px solid #fff',borderRadius:7,color:'#fff',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left',display:'flex',alignItems:'center',gap:8}}>
+                  <svg viewBox="0 0 24 24" style={{width:16,height:16}}>
+                    <path fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  &nbsp;SHARE TO X &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· copies image + opens tweet</span>
+                </button>
+              </div>
+              {shareToast && <div style={{marginTop:14,padding:'10px 12px',background:'#0a2a1a',border:'1px solid #10b981',borderRadius:7,color:'#10b981',fontSize:12,fontWeight:700,textAlign:'center'}}>{shareToast}</div>}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Off-screen share-card — populated by sharePoolImage() then captured via html2canvas.
           Painted at -99999px so the card renders correctly without ever being visible. */}
       {previewData && (
@@ -4955,7 +5039,13 @@ function DispersalSetup(){
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0a1f10',border:'1px solid #10b981',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:22,fontWeight:900,color:'#10b981',lineHeight:1}}>{previewData.buyIn ? previewData.buyIn : 'TBD'}</div>
+                <div style={{fontSize:22,fontWeight:900,color:'#10b981',lineHeight:1}}>{(() => {
+                  const raw = (previewData.buyIn||'').trim();
+                  if(!raw) return 'TBD';
+                  // Auto-prepend $ if buy-in starts with a digit (e.g., "250" → "$250").
+                  // Leave alone if already has $ or starts with text (e.g., "FREE", "$50 + trade").
+                  return /^\d/.test(raw) ? '$' + raw : raw;
+                })()}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>BUY-IN</div>
               </div>
             </div>
@@ -5013,9 +5103,12 @@ function DispersalSetup(){
                 <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>CREATE YOUR OWN DISPERSAL DRAFT AT</div>
                 <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>playforkeepsdynasty.com</div>
               </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontSize:10,color:'#666',fontWeight:800,letterSpacing:1.5}}>FOLLOW</div>
-                <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>@PlayforkeepsFF</div>
+              {/* X (Twitter) icon + handle. Inline SVG so html2canvas captures it cleanly. */}
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <svg viewBox="0 0 24 24" style={{width:22,height:22,flexShrink:0}}>
+                  <path fill="#FFD700" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>@PlayforkeepsFF</div>
               </div>
             </div>
           </div>
