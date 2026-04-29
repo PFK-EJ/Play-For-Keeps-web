@@ -7016,8 +7016,10 @@ function LookupApp({ identifier }){
 // Cache rich asset arrays per FC format key so swapping leagues only re-fetches
 // once per unique format combo (most users have 2-4 distinct formats max).
 const _tfRichByFormat = {};
-// Default format when no league is linked: Superflex / 1.0 PPR / no TEP / 12 teams.
-const TF_DEFAULT_FORMAT = { numQbs: 2, ppr: 1, tepLevel: 0, numTeams: 12, key: '2q-1p-0t-12n' };
+// Default format when no league is linked, per Evan: Superflex / 1.0 PPR / 0.5 TEP / 12 teams.
+// Pass TD baseline (5pt) is implicit — ptdAdjust treats 5 as no-op, and the chip
+// shows "5pt PT" via formatLabel's pass-TD fallback.
+const TF_DEFAULT_FORMAT = { numQbs: 2, ppr: 1, tepLevel: 1, numTeams: 12, key: '2q-1p-1t-12n' };
 const fetchTradeFinderAssets = async (fmt = TF_DEFAULT_FORMAT) => {
   if(_tfRichByFormat[fmt.key]) return _tfRichByFormat[fmt.key];
   try{
@@ -7061,17 +7063,17 @@ const ptdAdjust = (value, pos, passTd) => {
   return pos === 'QB' ? value * m : value;
 };
 
-// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 6pt PT · 12-team").
-// Optional `league` arg surfaces scoring fields FC doesn't take as params (pass TD)
-// — and the PTD multiplier above is what makes that field actually affect values.
+// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 5pt PT · 12-team").
+// Optional `league` arg surfaces scoring fields FC doesn't take as params (pass TD).
+// When no league is provided we fall back to PFK's baseline pass TD (5pt) so the
+// default chip is fully transparent about what's being shown.
 const formatLabel = (fmt, league = null) => {
   const qb = fmt.numQbs === 2 ? 'SF' : '1QB';
   const ppr = fmt.ppr === 1 ? '1.0 PPR' : fmt.ppr === 0.5 ? '0.5 PPR' : '0 PPR';
   // tepLevel uses FC's int convention: 0=none, 1=0.5 TEP, 2=1.0 TEP
   const tep = fmt.tepLevel === 2 ? ' · 1.0 TEP' : fmt.tepLevel === 1 ? ' · 0.5 TEP' : '';
-  const ptd = league?.scoring_settings?.pass_td;
-  const ptdStr = (ptd != null && ptd !== 4) ? ` · ${ptd}pt PT` : (ptd === 4 ? ' · 4pt PT' : '');
-  return `${qb} · ${ppr}${tep}${ptdStr} · ${fmt.numTeams}-team`;
+  const ptd = league?.scoring_settings?.pass_td ?? 5;
+  return `${qb} · ${ppr}${tep} · ${ptd}pt PT · ${fmt.numTeams}-team`;
 };
 
 // Normalize free-text pick input. Accepts "1.03", "2026 1.03", "1.3", "26 1.03"
