@@ -5994,9 +5994,6 @@ function LookupProfile({ identifier }){
           <div style={{fontSize:32,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
           <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
         </div>
-        <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>
-          Sleeper doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase via Sleeper partnership or alternate signals.
-        </div>
       </div>
 
       {/* Orphan history — dynasty leagues only */}
