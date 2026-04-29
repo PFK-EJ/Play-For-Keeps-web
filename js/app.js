@@ -2730,14 +2730,15 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
     if(onSignInClick){ e.preventDefault(); onSignInClick(); }
     // else let the link navigate to /?signin=1
   };
-  // Tab definitions — Power Rankings is dev-only.
+  // Tab definitions — Power Rankings is dev-only and parked at the end.
   // Each tab: [id, label, descriptionForTooltip, href, isInPageOnMainPage]
+  // Order locked by Evan: Rookie Ranks → Dispersal → Sleeper Snapshot → Trade Polls
   const tabs = [
     ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
-    ["team","📊 Power Rankings","Power Rankings (in development)","/?tab=team",true],
-    ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
     ["dispersal","🎲 Dispersal Draft","The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
     ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
+    ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
+    ["team","📊 Power Rankings","Power Rankings (in development)","/?tab=team",true],
   ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(window.location.hostname));
   const handleTabClick = (e, id, isInPage) => {
     if(isInPage && onSetTab){
