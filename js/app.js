@@ -5782,7 +5782,17 @@ function DispersalApp({draftId}){
 // Facts only — never judgments. Carfax model, not "snitch site."
 // ============================================================================
 
-const SEASONS_TO_SCAN = ['2025','2024','2023','2022','2021'];
+// Seasons to scan are computed at page load — the current NFL season is the
+// current calendar year (dynasty leagues roll over to the next year in offseason).
+// Same approach the Power Rankings tool uses, which has been proven correct.
+const LOOKUP_CURRENT_YEAR = new Date().getFullYear();
+const SEASONS_TO_SCAN = [
+  String(LOOKUP_CURRENT_YEAR),
+  String(LOOKUP_CURRENT_YEAR-1),
+  String(LOOKUP_CURRENT_YEAR-2),
+  String(LOOKUP_CURRENT_YEAR-3),
+  String(LOOKUP_CURRENT_YEAR-4),
+];
 
 // Resolve a Sleeper user (accepts username OR numeric user_id)
 const lookupResolveUser = async (input) => {
@@ -5796,12 +5806,14 @@ const lookupResolveUser = async (input) => {
 };
 
 // Pull all leagues for a user across the seasons we scan. Used for activity +
-// orphan history. Each league row carries .season so we can walk back.
+// orphan history. Each league row carries ._season so we can walk back.
+// cache:'no-store' bypasses HTTP caching — same approach Power Rankings uses,
+// since stale league lists were one source of the undercount bug.
 const lookupAllLeagues = async (userId) => {
   const all = [];
   await Promise.all(SEASONS_TO_SCAN.map(async (s) => {
     try{
-      const lgs = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${s}`).then(r=>r.json());
+      const lgs = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${s}`, {cache:'no-store'}).then(r=>r.json());
       (lgs||[]).forEach(lg => all.push({...lg, _season:s}));
     }catch(e){}
   }));
@@ -5940,8 +5952,21 @@ function LookupProfile({ identifier }){
 
   // Stats — dynasty-focused since that's PFK's audience.
   // Sleeper league.settings.type: 0=redraft, 1=keeper, 2=dynasty
+  // Use dynamic current year (we're in 2026 now — not all leagues have 2025 listings).
   const lgs = leagues || [];
-  const activeLeagues = lgs.filter(l => l._season === '2025');
+  const activeYear = String(LOOKUP_CURRENT_YEAR);
+  let activeLeagues = lgs.filter(l => l._season === activeYear);
+  let displayedActiveYear = activeYear;
+  // Fallback: if current year has no leagues at all (very early offseason before
+  // anyone's rolled over), show prior year so we still display something useful.
+  if(activeLeagues.length === 0){
+    const prior = String(LOOKUP_CURRENT_YEAR - 1);
+    const priorLeagues = lgs.filter(l => l._season === prior);
+    if(priorLeagues.length > 0){
+      activeLeagues = priorLeagues;
+      displayedActiveYear = prior;
+    }
+  }
   const dynastyActive = activeLeagues.filter(l => (l.settings||{}).type === 2);
   const otherActive = activeLeagues.filter(l => (l.settings||{}).type !== 2);
   const dynastyAllTime = new Set(lgs.filter(l => (l.settings||{}).type === 2).map(l => String(l.league_id))).size;
@@ -5970,7 +5995,7 @@ function LookupProfile({ identifier }){
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
           <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
             <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES (2025)</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
           </div>
           <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
             <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyAllTime}</div>
@@ -5978,7 +6003,7 @@ function LookupProfile({ identifier }){
           </div>
           <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
             <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{otherActive.length}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>OTHER ACTIVE (REDRAFT/KEEPER)</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>OTHER ACTIVE ({displayedActiveYear})</div>
           </div>
         </div>
         <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>
