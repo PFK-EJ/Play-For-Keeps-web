@@ -6298,7 +6298,8 @@ function LookupProfile({ identifier }){
 
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
       <div style={card}>
-        <div style={sectionHdr}>💪 TEAM STRENGTH (AVG POWER RANK)</div>
+        <div style={sectionHdr}>💪 AVG POWER RANK STANDINGS</div>
+        <div style={{fontSize:11,color:'#888',marginTop:-6,marginBottom:12,fontStyle:'italic'}}>(Dynasty Value via fantasycalc.com)</div>
         {strengthLoading && !teamStrength && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Calculating roster ranks across leagues…</div>
         )}
@@ -6321,7 +6322,7 @@ function LookupProfile({ identifier }){
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES RANKED</div>
               </div>
             </div>
-            <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Based on FantasyCalc dynasty values. Lower avg rank = stronger roster relative to leaguemates. Useful both ways — competitive leagues hunting for active talent, or casual leagues looking for a fair match.</div>
+            <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Co-managed leagues where this user isn't the primary manager aren't factored in.</div>
           </>
         )}
       </div>
