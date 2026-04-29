@@ -6970,7 +6970,10 @@ function TradeFinderApp(){
     const lo = anchor.value * (1 - tolerance/100);
     const hi = anchor.value * (1 + tolerance/100);
     const matches = assets.filter(a => a.name !== anchor.name && a.value >= lo && a.value <= hi);
+    // When anchoring on a pick, suppress other picks — users want vets, not "1.09 → 1.08".
+    // The filter row also hides in this case so the UI doesn't offer a useless "Picks Only".
     const filtered = matches.filter(a => {
+      if(anchor.isPick) return !a.isPick;
       if(filter === 'players') return !a.isPick;
       if(filter === 'picks') return a.isPick;
       return true;
@@ -7063,11 +7066,13 @@ function TradeFinderApp(){
                        style={{width:'100%',accentColor:'#FFD700'}}/>
                 <div style={{fontSize:11,color:'#666'}}>Range: {Math.round(anchor.value*(1-tolerance/100)).toLocaleString()} – {Math.round(anchor.value*(1+tolerance/100)).toLocaleString()}</div>
               </div>
-              <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                {[['all','All'],['players','Players'],['picks','Picks']].map(([k,label])=>(
-                  <button key={k} onClick={()=>setFilter(k)} style={{padding:'7px 14px',borderRadius:6,border:filter===k?'1.5px solid #FFD700':'1.5px solid #1e1e1e',background:filter===k?'#FFD700':'transparent',color:filter===k?'#000':'#aaa',fontWeight:800,fontSize:12,cursor:'pointer',letterSpacing:0.5}}>{label}</button>
-                ))}
-              </div>
+              {!anchor.isPick && (
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  {[['all','All'],['players','Players'],['picks','Picks']].map(([k,label])=>(
+                    <button key={k} onClick={()=>setFilter(k)} style={{padding:'7px 14px',borderRadius:6,border:filter===k?'1.5px solid #FFD700':'1.5px solid #1e1e1e',background:filter===k?'#FFD700':'transparent',color:filter===k?'#000':'#aaa',fontWeight:800,fontSize:12,cursor:'pointer',letterSpacing:0.5}}>{label}</button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {equivalents && equivalents.total === 0 && (
