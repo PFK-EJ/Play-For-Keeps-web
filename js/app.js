@@ -6935,7 +6935,7 @@ function TradeFinderApp(){
   const [assets, setAssets] = useState(null); // null=loading, []=failed, [...]=loaded
   const [query, setQuery] = useState('');
   const [anchor, setAnchor] = useState(null);
-  const [tolerance, setTolerance] = useState(7); // percent
+  const [tolerance, setTolerance] = useState(3); // percent
   const [filter, setFilter] = useState('all'); // 'all' | 'players' | 'picks'
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef(null);
@@ -7113,8 +7113,8 @@ function TradeFinderApp(){
         {!anchor && assets && assets.length > 0 && (
           <div style={{textAlign:'center',padding:'40px 20px',color:'#666',fontSize:14,lineHeight:1.7}}>
             <div style={{fontSize:34,marginBottom:8}}>💡</div>
-            Pick anything to anchor on — we'll show every player and pick within ±7% of its value by default.<br/>
-            <span style={{fontSize:12,color:'#555'}}>Use the slider to widen the range up to ±25% or tighten it to ±3%.</span>
+            Pick anything to anchor on — we'll show every player and pick within ±3% of its value by default.<br/>
+            <span style={{fontSize:12,color:'#555'}}>Use the slider to widen the range up to ±25%.</span>
           </div>
         )}
       </div>
