@@ -6964,7 +6964,14 @@ function TradeFinderApp(){
   const [assets, setAssets] = useState(null); // null=loading, []=failed, [...]=loaded
   const [query, setQuery] = useState('');
   const [anchor, setAnchor] = useState(null);
-  const [tolerance, setTolerance] = useState(3); // percent
+  // Tolerance persists across visits — once a user finds their preferred range
+  // they shouldn't have to re-set it every time. Clamp on read so stale or
+  // tampered values can't break the slider.
+  const [tolerance, setTolerance] = useState(() => {
+    const saved = parseInt(localStorage.getItem('pfk_tf_tolerance') || '', 10);
+    return (saved >= 3 && saved <= 25) ? saved : 3;
+  });
+  useEffect(() => { localStorage.setItem('pfk_tf_tolerance', String(tolerance)); }, [tolerance]);
   const [filter, setFilter] = useState('all'); // 'all' | 'players' | 'picks'
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef(null);
