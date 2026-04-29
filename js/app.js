@@ -7024,6 +7024,7 @@ function TradeFinderApp(){
               onChange={e=>{ setQuery(e.target.value); setShowSuggestions(true); if(anchor) setAnchor(null); }}
               onFocus={()=>setShowSuggestions(true)}
               onBlur={()=>setTimeout(()=>setShowSuggestions(false), 150)}
+              onKeyDown={e=>{ if(e.key==='Enter' && suggestions.length>0){ e.preventDefault(); selectAsset(suggestions[0]); } }}
               placeholder={assets===null ? 'Loading values…' : 'Try "1.03" or "Ja\'Marr Chase"'}
               disabled={assets===null}
               style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
