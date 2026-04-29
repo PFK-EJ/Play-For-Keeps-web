@@ -5853,7 +5853,37 @@ const lookupOrphanHistory = async (userId, allLeagues) => {
   const nowYear = new Date().getFullYear();
   const last12 = details.filter(d => +d.season_left >= nowYear - 1).length;
   const last24 = details.filter(d => +d.season_left >= nowYear - 2).length;
-  return { last12mo: last12, last24mo: last24, all: details.length, details };
+
+  // Total UNIQUE dynasty leagues this user has joined (chain-root deduped).
+  // Each dynasty league gets a new league_id per season chained via
+  // previous_league_id. Walk the chain back to find the root for each league;
+  // distinct roots = unique leagues for the orphan-rate denominator.
+  const allIds = new Set(dynastyOnly.map(l => String(l.league_id)));
+  const roots = new Set();
+  dynastyOnly.forEach(lg => {
+    let cur = lg, depth = 0;
+    while(cur && depth < 10){
+      const prev = cur.previous_league_id;
+      // If prev isn't in our scanned data, treat current as the root we have visibility into.
+      if(!prev || String(prev) === '0' || !allIds.has(String(prev))){
+        roots.add(String(cur.league_id));
+        break;
+      }
+      cur = dynastyOnly.find(d => String(d.league_id) === String(prev));
+      depth++;
+    }
+  });
+  const uniqueLeagues = roots.size;
+  const orphanRatePct = uniqueLeagues > 0 ? (details.length / uniqueLeagues) * 100 : 0;
+
+  return {
+    last12mo: last12,
+    last24mo: last24,
+    all: details.length,
+    uniqueLeagues,
+    orphanRatePct,
+    details,
+  };
 };
 
 // Compute trade stats for a single season's dynasty leagues. Helper used by
@@ -5907,18 +5937,20 @@ const lookupTradesForSeason = async (userId, allLeagues, season) => {
   };
 };
 
-// Trade activity snapshot — fetches CURRENT season + PRIOR season in parallel.
-// Showing both gives commish more data points early in a season when the current
-// year has limited activity. Heavy (~400 API calls for a 12-league user) — runs
-// in background so page doesn't feel slow.
+// Trade activity snapshot — fetches CURRENT + 2 PRIOR seasons in parallel.
+// Showing 3 years gives commish a fuller picture early in a season. Heavy
+// (~600 API calls for a 12-league user) — runs in background so page doesn't
+// feel slow.
 const lookupTradeActivity = async (userId, allLeagues) => {
-  const currentSeason = String(LOOKUP_CURRENT_YEAR);
-  const priorSeason = String(LOOKUP_CURRENT_YEAR - 1);
-  const [current, prior] = await Promise.all([
-    lookupTradesForSeason(userId, allLeagues, currentSeason),
-    lookupTradesForSeason(userId, allLeagues, priorSeason),
-  ]);
-  return { current, prior };
+  const seasons = [
+    String(LOOKUP_CURRENT_YEAR),
+    String(LOOKUP_CURRENT_YEAR - 1),
+    String(LOOKUP_CURRENT_YEAR - 2),
+  ];
+  const [current, prior, prior2] = await Promise.all(
+    seasons.map(s => lookupTradesForSeason(userId, allLeagues, s))
+  );
+  return { current, prior, prior2 };
 };
 
 // FantasyCalc value cache, keyed by format string. Each format = different value set
@@ -6392,8 +6424,11 @@ function LookupProfile({ identifier }){
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Counting trades across leagues…</div>
         )}
         {tradeActivity && (() => {
-          // Inline sub-section renderer — same layout for current and prior.
-          const renderSeason = (data, label) => {
+          // Inline sub-section renderer. Current year shows TOTAL / AVG / LAST TRADE
+          // (LAST TRADE is the live "is this person trading now" signal).
+          // Prior years drop LAST TRADE since it's always "X months ago" by definition
+          // (always end-of-playoffs-ish) — useless info per Evan.
+          const renderSeason = (data, label, showLastTrade) => {
             if(!data || data.leaguesCount === 0){
               return (
                 <div style={{marginBottom:12}}>
@@ -6414,10 +6449,12 @@ function LookupProfile({ identifier }){
                     <div style={{fontSize:22,fontWeight:900,color:'#FFD700'}}>{data.avgPerLeague.toFixed(1)}</div>
                     <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>AVG PER LEAGUE</div>
                   </div>
-                  <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                    <div style={{fontSize:16,fontWeight:900,color:'#FFD700',lineHeight:1.2}}>{data.lastTradeDate ? lookupTimeAgo(data.lastTradeDate) : 'none'}</div>
-                    <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
-                  </div>
+                  {showLastTrade && (
+                    <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                      <div style={{fontSize:16,fontWeight:900,color:'#FFD700',lineHeight:1.2}}>{data.lastTradeDate ? lookupTimeAgo(data.lastTradeDate) : 'none'}</div>
+                      <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
+                    </div>
+                  )}
                 </div>
                 <div style={{fontSize:11,color:'#555',marginTop:6,fontStyle:'italic'}}>Across {data.leaguesCount} dynasty {data.leaguesCount===1?'league':'leagues'}.</div>
               </div>
@@ -6425,8 +6462,9 @@ function LookupProfile({ identifier }){
           };
           return (
             <>
-              {renderSeason(tradeActivity.current, `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`)}
-              {renderSeason(tradeActivity.prior, `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`)}
+              {renderSeason(tradeActivity.current, `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`, true)}
+              {renderSeason(tradeActivity.prior, `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`, false)}
+              {renderSeason(tradeActivity.prior2, `${tradeActivity.prior2?.season || LOOKUP_CURRENT_YEAR-2} SEASON`, false)}
             </>
           );
         })()}
@@ -6470,6 +6508,9 @@ function LookupProfile({ identifier }){
         <div style={{display:'flex',gap:14,marginTop:10,flexWrap:'wrap'}}>
           <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 12 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last12mo ?? 0}</strong></div>
           <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 24 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last24mo ?? 0}</strong></div>
+          {orphan && orphan.uniqueLeagues > 0 && (
+            <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Orphan rate: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan.orphanRatePct.toFixed(1)}%</strong> <span style={{color:'#666',marginLeft:4,fontSize:11}}>({orphan.all} of {orphan.uniqueLeagues})</span></div>
+          )}
         </div>
         {orphan?.details && orphan.details.length > 0 && (
           <details style={{marginTop:12}}>
@@ -6561,27 +6602,25 @@ function LookupProfile({ identifier }){
           the layout is correct without ever being visible to the user. */}
       <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
         <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'30px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
-          {/* Card header */}
-          <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
-            <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:54,width:'auto',objectFit:'contain',flexShrink:0}}/>
+          {/* Card header — PFK brand + logo on top, user info below */}
+          <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,paddingBottom:14,borderBottom:'2px solid #FFD70044'}}>
+            <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:48,width:'auto',objectFit:'contain',flexShrink:0}}/>
+            <div style={{fontSize:22,fontWeight:900,color:'#FFD700',letterSpacing:2.5}}>PLAY FOR KEEPS</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
+            {/* Real Sleeper avatar — proxied through /api/avatar/{id} so it's
+                same-origin (sleepercdn.com doesn't send CORS headers; html2canvas
+                couldn't read the pixels otherwise). Falls back to an initial-
+                letter placeholder if the proxy fetch fails for any reason. */}
+            {user.avatar
+              ? <img src={`/api/avatar/${user.avatar}`} alt="" style={{width:54,height:54,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e',flexShrink:0}} onError={e=>{e.target.style.display='none'; const fb = e.target.nextElementSibling; if(fb) fb.style.display='flex';}}/>
+              : null}
+            <div style={{width:54,height:54,borderRadius:'50%',background:'#FFD700',display: user.avatar ? 'none' : 'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:24,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+              {((user.display_name || user.username || '?')[0] || '?').toUpperCase()}
+            </div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🔍 PFK SLEEPER PROFILE</div>
-              <div style={{display:'flex',alignItems:'center',gap:14}}>
-                {/* Real Sleeper avatar — proxied through /api/avatar/{id} so it's
-                    same-origin (sleepercdn.com doesn't send CORS headers; html2canvas
-                    couldn't read the pixels otherwise). Falls back to an initial-
-                    letter placeholder if the proxy fetch fails for any reason. */}
-                {user.avatar
-                  ? <img src={`/api/avatar/${user.avatar}`} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e',flexShrink:0}} onError={e=>{e.target.style.display='none'; const fb = e.target.nextElementSibling; if(fb) fb.style.display='flex';}}/>
-                  : null}
-                <div style={{width:48,height:48,borderRadius:'50%',background:'#FFD700',display: user.avatar ? 'none' : 'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:22,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-                  {((user.display_name || user.username || '?')[0] || '?').toUpperCase()}
-                </div>
-                <div>
-                  <div style={{fontSize:24,fontWeight:900,color:'#fff',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
-                  {createdDate && <div style={{fontSize:12,color:'#888',marginTop:2}}>Account {lookupTimeAgo(createdDate)}</div>}
-                </div>
-              </div>
+              <div style={{fontSize:24,fontWeight:900,color:'#fff',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
+              {createdDate && <div style={{fontSize:12,color:'#888',marginTop:2}}>Account {lookupTimeAgo(createdDate)}</div>}
             </div>
           </div>
 
@@ -6606,17 +6645,18 @@ function LookupProfile({ identifier }){
             </div>
           )}
 
-          {/* Trade activity */}
+          {/* Trade activity — current shows LAST TRADE; prior years drop it (always stale) */}
           {tradeActivity && (
             <div style={{marginBottom:16}}>
               <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>🤝 TRADE ACTIVITY</div>
               {[
-                { label: `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`, data: tradeActivity.current },
-                { label: `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`, data: tradeActivity.prior },
+                { label: `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`, data: tradeActivity.current, showLast: true },
+                { label: `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`, data: tradeActivity.prior, showLast: false },
+                { label: `${tradeActivity.prior2?.season || LOOKUP_CURRENT_YEAR-2} SEASON`, data: tradeActivity.prior2, showLast: false },
               ].map((s, idx) => s.data && s.data.leaguesCount > 0 && (
                 <div key={idx} style={{marginBottom:8}}>
                   <div style={{fontSize:10,color:'#a78bfa',fontWeight:800,letterSpacing:1.5,marginBottom:5}}>{s.label}</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                  <div style={{display:'grid',gridTemplateColumns: s.showLast ? '1fr 1fr 1fr' : '1fr 1fr',gap:8}}>
                     <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                       <div style={{fontSize:20,fontWeight:900,color:'#FFD700'}}>{s.data.totalTrades}</div>
                       <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>TOTAL TRADES</div>
@@ -6625,17 +6665,19 @@ function LookupProfile({ identifier }){
                       <div style={{fontSize:20,fontWeight:900,color:'#FFD700'}}>{s.data.avgPerLeague.toFixed(1)}</div>
                       <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>AVG / LEAGUE</div>
                     </div>
-                    <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                      <div style={{fontSize:14,fontWeight:900,color:'#FFD700',lineHeight:1.3}}>{s.data.lastTradeDate ? lookupTimeAgo(s.data.lastTradeDate) : 'none'}</div>
-                      <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
-                    </div>
+                    {s.showLast && (
+                      <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                        <div style={{fontSize:14,fontWeight:900,color:'#FFD700',lineHeight:1.3}}>{s.data.lastTradeDate ? lookupTimeAgo(s.data.lastTradeDate) : 'none'}</div>
+                        <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Orphan history */}
+          {/* Orphan history — last 12mo / 24mo + overall orphan rate % */}
           <div style={{marginBottom:18}}>
             <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>🪦 DYNASTY ORPHAN HISTORY</div>
             <div style={{display:'flex',gap:10}}>
@@ -6647,6 +6689,12 @@ function LookupProfile({ identifier }){
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan?.last24mo ?? 0}</div>
                 <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST 24 MONTHS</div>
               </div>
+              {orphan && orphan.uniqueLeagues > 0 && (
+                <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan.orphanRatePct.toFixed(1)}%</div>
+                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>ORPHAN RATE</div>
+                </div>
+              )}
             </div>
           </div>
 
