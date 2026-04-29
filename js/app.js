@@ -7107,9 +7107,12 @@ function TradeFinderApp(){
   // Tolerance persists across visits — once a user finds their preferred range
   // they shouldn't have to re-set it every time. Clamp on read so stale or
   // tampered values can't break the slider.
+  // Default 10% — tighter defaults like 3% returned zero matches for many anchors
+  // and made the tool feel broken. The red delta color on lower-value results
+  // already discourages overpaying.
   const [tolerance, setTolerance] = useState(() => {
     const saved = parseInt(localStorage.getItem('pfk_tf_tolerance') || '', 10);
-    return (saved >= 3 && saved <= 25) ? saved : 3;
+    return (saved >= 3 && saved <= 25) ? saved : 10;
   });
   useEffect(() => { localStorage.setItem('pfk_tf_tolerance', String(tolerance)); }, [tolerance]);
   const [filter, setFilter] = useState('all'); // 'all' | 'players' | 'picks'
@@ -7386,8 +7389,8 @@ function TradeFinderApp(){
         {!anchor && assets && assets.length > 0 && (
           <div style={{textAlign:'center',padding:'40px 20px',color:'#666',fontSize:14,lineHeight:1.7}}>
             <div style={{fontSize:34,marginBottom:8}}>💡</div>
-            Pick anything to anchor on — we'll show every player and pick within ±3% of its value by default.<br/>
-            <span style={{fontSize:12,color:'#555'}}>Use the slider to widen the range up to ±25%.</span>
+            Pick anything to anchor on — we'll show every player and pick within ±10% of its value by default.<br/>
+            <span style={{fontSize:12,color:'#555'}}>Use the slider to tighten the range down to ±3% or widen up to ±25%.</span>
           </div>
         )}
       </div>
