@@ -5968,8 +5968,6 @@ function LookupProfile({ identifier }){
     }
   }
   const dynastyActive = activeLeagues.filter(l => (l.settings||{}).type === 2);
-  const otherActive = activeLeagues.filter(l => (l.settings||{}).type !== 2);
-  const dynastyAllTime = new Set(lgs.filter(l => (l.settings||{}).type === 2).map(l => String(l.league_id))).size;
   // Sleeper user object: created may be a unix ms timestamp
   const createdMs = user.metadata?.created || user.created;
   const createdDate = createdMs ? new Date(Number(createdMs)) : null;
@@ -5992,15 +5990,9 @@ function LookupProfile({ identifier }){
       {/* Activity snapshot — dynasty-focused */}
       <div style={card}>
         <div style={sectionHdr}>📊 ACTIVITY SNAPSHOT</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
-          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
-          </div>
-          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyAllTime}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY (5-YR UNIQUE)</div>
-          </div>
+        <div style={{padding:'14px 16px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+          <div style={{fontSize:32,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
+          <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
         </div>
         <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>
           Sleeper doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase via Sleeper partnership or alternate signals.
@@ -6023,7 +6015,6 @@ function LookupProfile({ identifier }){
             </div>
           </details>
         )}
-        <div style={{fontSize:11,color:'#555',marginTop:14,fontStyle:'italic'}}>Phase 1 will distinguish "left as orphan" from "found own replacement" — currently shown as a raw count. Some entries here may have been responsibly handed off.</div>
       </div>
 
       {/* Share + opt-out */}
