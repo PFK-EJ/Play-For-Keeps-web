@@ -6602,8 +6602,8 @@ function LookupProfile({ identifier }){
           the layout is correct without ever being visible to the user. */}
       <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
         <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'30px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
-          {/* Card header — PFK brand + logo on top, user info below */}
-          <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,paddingBottom:14,borderBottom:'2px solid #FFD70044'}}>
+          {/* Card header — PFK brand + logo centered on top, user info below */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:14,paddingBottom:14,borderBottom:'2px solid #FFD70044'}}>
             <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:48,width:'auto',objectFit:'contain',flexShrink:0}}/>
             <div style={{fontSize:22,fontWeight:900,color:'#FFD700',letterSpacing:2.5}}>PLAY FOR KEEPS</div>
           </div>
@@ -6741,13 +6741,19 @@ function LookupApp({ identifier }){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
-        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-          <a href="/" style={{textDecoration:'none'}}><img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/></a>
-          <a href="/" style={{textDecoration:'none',color:'#FFD700',fontWeight:900,letterSpacing:2.5,fontSize:14}}>PLAY FOR KEEPS</a>
-          <div style={{flex:1}}/>
-          {/* Quick-search input only on profile pages — search page already has the big input */}
-          {identifier && <LookupHeaderSearch/>}
-          <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1}}>🎲 DISPERSAL</a>
+        {/* 3-column grid keeps the PFK brand truly centered while search + dispersal
+            stay anchored right. Empty left column balances the right column's width. */}
+        <div style={{maxWidth:1240,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr auto 1fr',alignItems:'center',gap:14}}>
+          <div></div>
+          <a href="/" style={{textDecoration:'none',display:'flex',alignItems:'center',gap:12}}>
+            <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/>
+            <span style={{color:'#FFD700',fontWeight:900,letterSpacing:2.5,fontSize:14,whiteSpace:'nowrap'}}>PLAY FOR KEEPS</span>
+          </a>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:10,flexWrap:'wrap'}}>
+            {/* Quick-search input only on profile pages — search page already has the big input */}
+            {identifier && <LookupHeaderSearch/>}
+            <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1,whiteSpace:'nowrap'}}>🎲 DISPERSAL</a>
+          </div>
         </div>
       </div>
       {identifier ? <LookupProfile identifier={identifier}/> : <LookupSearch/>}
