@@ -5911,6 +5911,65 @@ const lookupTradeActivity = async (userId, allLeagues) => {
   };
 };
 
+// Team strength snapshot: for each CURRENT-season dynasty league the user is in,
+// fetch rosters, sum each team's FantasyCalc dynasty value, rank teams within the
+// league, and find where the user lands. Then average those ranks across leagues.
+//
+// Per Evan: framed as a "matching signal" not a judgment — commissioners can use
+// this both to find competitive players AND to find casual managers, depending on
+// what they want for their league. Same data, two markets.
+//
+// Caveat: we use the SF/1.0PPR FantasyCalc dataset for all leagues even if some
+// are 1QB or 0.5PPR. Within a single league the relative rank is preserved (same
+// yardstick applied to everyone), so AVG RANK is sound. Absolute roster value
+// across formats would need per-format FC fetches — Phase 1+ work.
+const lookupTeamStrength = async (userId, allLeagues) => {
+  const targetSeason = String(LOOKUP_CURRENT_YEAR);
+  let dynastyTarget = (allLeagues||[]).filter(lg =>
+    (lg.settings||{}).type === 2 && lg._season === targetSeason
+  );
+  if(dynastyTarget.length === 0){
+    const prior = String(LOOKUP_CURRENT_YEAR - 1);
+    dynastyTarget = (allLeagues||[]).filter(lg =>
+      (lg.settings||{}).type === 2 && lg._season === prior
+    );
+  }
+  if(dynastyTarget.length === 0){
+    return { leaguesCount: 0, avgRank: null, avgTeams: 0, ranks: [] };
+  }
+  const fc = await fetchFcValues();
+  const valueOf = (pid) => fc.bySleeperId[String(pid)] || 0;
+  const ranks = [];
+  await Promise.all(dynastyTarget.map(async (lg) => {
+    try{
+      const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
+      const rosterValues = (rosters||[]).map(r => ({
+        roster_id: r.roster_id,
+        owner_id: r.owner_id,
+        co_owners: r.co_owners || [],
+        totalValue: (r.players||[]).reduce((sum, pid) => sum + valueOf(pid), 0),
+      }));
+      rosterValues.sort((a,b) => b.totalValue - a.totalValue);
+      const userIndex = rosterValues.findIndex(r =>
+        r.owner_id === userId || r.co_owners.includes(userId)
+      );
+      if(userIndex >= 0){
+        ranks.push({
+          league_name: lg.name,
+          rank: userIndex + 1,
+          total_teams: rosterValues.length,
+        });
+      }
+    }catch(e){}
+  }));
+  if(ranks.length === 0){
+    return { leaguesCount: 0, avgRank: null, avgTeams: 0, ranks: [] };
+  }
+  const avgRank = ranks.reduce((s, r) => s + r.rank, 0) / ranks.length;
+  const avgTeams = ranks.reduce((s, r) => s + r.total_teams, 0) / ranks.length;
+  return { leaguesCount: ranks.length, avgRank, avgTeams, ranks };
+};
+
 // Format a date as "X time ago" (e.g. "2 hours ago", "3 days ago", "5 yrs ago")
 const lookupTimeAgo = (date) => {
   if(!date) return null;
@@ -5964,6 +6023,9 @@ function LookupProfile({ identifier }){
   // (it's heavy — ~200 API calls for an active user). null = not yet loaded.
   const [tradeActivity,setTradeActivity] = useState(null);
   const [tradeLoading,setTradeLoading] = useState(false);
+  // Team strength (avg power-rank across current dynasty leagues) — also background.
+  const [teamStrength,setTeamStrength] = useState(null);
+  const [strengthLoading,setStrengthLoading] = useState(false);
 
   useEffect(()=>{
     let cancelled = false;
@@ -5996,6 +6058,21 @@ function LookupProfile({ identifier }){
         if(!cancelled) setTradeActivity(ta);
       }catch(e){}
       finally{ if(!cancelled) setTradeLoading(false); }
+    })();
+    return ()=>{ cancelled = true; };
+  },[user, leagues]);
+
+  // Background load: team strength (avg power rank). Runs in parallel with trade activity.
+  useEffect(()=>{
+    if(!user || !leagues) return;
+    let cancelled = false;
+    (async () => {
+      setStrengthLoading(true);
+      try{
+        const ts = await lookupTeamStrength(user.user_id, leagues);
+        if(!cancelled) setTeamStrength(ts);
+      }catch(e){}
+      finally{ if(!cancelled) setStrengthLoading(false); }
     })();
     return ()=>{ cancelled = true; };
   },[user, leagues]);
@@ -6090,6 +6167,36 @@ function LookupProfile({ identifier }){
               </div>
             </div>
             <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic'}}>Across {tradeActivity.leaguesCount} dynasty {tradeActivity.leaguesCount===1?'league':'leagues'} this user was in last season.</div>
+          </>
+        )}
+      </div>
+
+      {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
+      <div style={card}>
+        <div style={sectionHdr}>💪 TEAM STRENGTH (AVG POWER RANK)</div>
+        {strengthLoading && !teamStrength && (
+          <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Calculating roster ranks across leagues…</div>
+        )}
+        {teamStrength && teamStrength.leaguesCount === 0 && (
+          <div style={{padding:'14px',color:'#888',fontSize:13,textAlign:'center'}}>No current dynasty leagues to rank.</div>
+        )}
+        {teamStrength && teamStrength.leaguesCount > 0 && (
+          <>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
+              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.avgRank.toFixed(1)}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG POWER RANK</div>
+              </div>
+              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.avgTeams.toFixed(0)}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
+              </div>
+              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.leaguesCount}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES RANKED</div>
+              </div>
+            </div>
+            <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Based on FantasyCalc dynasty values. Lower avg rank = stronger roster relative to leaguemates. Useful both ways — competitive leagues hunting for active talent, or casual leagues looking for a fair match.</div>
           </>
         )}
       </div>
