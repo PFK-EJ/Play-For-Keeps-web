@@ -3197,8 +3197,11 @@ function App(){
           </div>
           {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
           <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:4,flexWrap:"wrap"}}>
-            {[["pfk","👑 Rookie Ranks"],["custom","✏️ Customize"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
-              <button key={t} onClick={()=>setTab(t)} style={{padding:"5px 10px",borderRadius:6,border:tab===t?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
+            {/* "Customize" was its own tab. It's now a sub-toggle inside "Rookie Ranks"
+                (View Official | Edit Mine), so we keep both 'pfk' and 'custom' as valid
+                tab states but only show ONE nav button — active when EITHER state is set. */}
+            {[["pfk","👑 Rookie Ranks",["pfk","custom"]],["team","📊 Power Rankings",["team"]],["polls","🗳️ Trade Polls",["polls"]]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l,states])=>(
+              <button key={t} onClick={()=>setTab(t)} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
             ))}
             <a href="/dispersal" style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
             <a href="/lookup" style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
@@ -3229,6 +3232,27 @@ function App(){
         </div>
       </div>
       <div className="pfk-content" style={{maxWidth:1140,margin:"0 auto",padding:"20px 14px"}}>
+        {/* Dispersal hero CTA — front-and-center on the main page since dispersal
+            is currently PFK's most differentiated tool. Sits above the tab content. */}
+        <a href="/dispersal" style={{display:"block",textDecoration:"none",marginBottom:18,background:"linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)",border:"2px solid #FFD700",borderRadius:14,padding:"18px 22px",boxShadow:"0 0 24px #FFD70022",transition:"all .15s"}}
+           onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,#251c00 0%,#1a1a1a 100%)";e.currentTarget.style.boxShadow="0 0 32px #FFD70044";}}
+           onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)";e.currentTarget.style.boxShadow="0 0 24px #FFD70022";}}>
+          <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"}}>
+            <div style={{fontSize:38,flexShrink:0}}>🎲</div>
+            <div style={{flex:1,minWidth:240}}>
+              <div style={{fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
+              <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>The only fully-featured dispersal draft tool on the market. Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
+            </div>
+            <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
+          </div>
+        </a>
+
+        {(tab==="pfk"||tab==="custom") && (
+          <div style={{display:"inline-flex",gap:4,padding:4,background:"#0a0a0a",border:"1px solid #1e1e1e",borderRadius:8,marginBottom:14}}>
+            <button onClick={()=>setTab("pfk")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="pfk"?"#FFD700":"transparent",color:tab==="pfk"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>👑 View Official</button>
+            <button onClick={()=>setTab("custom")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="custom"?"#FFD700":"transparent",color:tab==="custom"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>✏️ Edit Mine</button>
+          </div>
+        )}
         {tab==="pfk"&&(
           <div>
             <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
