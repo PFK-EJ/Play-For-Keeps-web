@@ -7361,7 +7361,10 @@ function TradeFinderApp(){
                       {equivalents.groups[k].map(a => {
                         const delta = ((a.value - liveAnchor.value) / liveAnchor.value) * 100;
                         const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(1) + '%';
-                        const deltaColor = Math.abs(delta) < 3 ? '#10b981' : delta > 0 ? '#FFD700' : '#888';
+                        // Green = the equivalent is worth MORE than the anchor (good return for the seller)
+                        // Red = worth LESS (you'd be giving up value)
+                        // Neutral gray for a near-perfect match (within 0.1%).
+                        const deltaColor = Math.abs(delta) < 0.1 ? '#888' : delta > 0 ? '#10b981' : '#ef4444';
                         return (
                           <div key={a.name} style={{padding:'9px 14px',borderBottom:'1px solid #131313',display:'flex',alignItems:'center',gap:8,fontSize:13}}>
                             <span style={{flex:1,color:'#eee',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.name}</span>
