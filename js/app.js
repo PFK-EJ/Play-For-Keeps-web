@@ -5972,11 +5972,83 @@ const fetchFcForFormat = async (fmt) => {
     return {};
   }
 };
-// Look up a generic future pick value (e.g. valueOfPick(2026, 1) → "2026 1st" → $3214)
+// Look up a GENERIC future pick value (e.g. fcPickValue("...", 2026, 1) → "2026 1st" → $3214).
+// Used as the fallback when we can't determine the slot.
 const fcPickValue = (formatKey, year, round) => {
   const map = _fcPicksByFormat[formatKey] || {};
   const suffix = round === 1 ? '1st' : round === 2 ? '2nd' : round === 3 ? '3rd' : `${round}th`;
   return map[`${year} ${suffix}`] || 0;
+};
+// Look up a SLOT-SPECIFIC pick value (e.g. fcPickSlotValue("...", 2026, 1, 5) → "2026 Pick 1.05" → $3811).
+// Slot is the position WITHIN the round (snake-aware computation done by caller).
+// Falls back to the generic value if FC doesn't have the specific slot.
+const fcPickSlotValue = (formatKey, year, round, slotInRound) => {
+  const map = _fcPicksByFormat[formatKey] || {};
+  const padded = String(slotInRound).padStart(2, '0');
+  const specific = map[`${year} Pick ${round}.${padded}`];
+  if(specific != null) return specific;
+  return fcPickValue(formatKey, year, round);
+};
+// Compute the slot a pick lands at WITHIN its round, given the original owner's
+// R1 slot. Snake reverses every other round; linear stays the same.
+const slotInRoundFor = (originalR1Slot, round, draftType, leagueSize) => {
+  if(draftType === 'snake'){
+    // R1 = slot, R2 = N-slot+1, R3 = slot, R4 = N-slot+1, ...
+    return round % 2 === 1 ? originalR1Slot : (leagueSize - originalR1Slot + 1);
+  }
+  // 'linear' or anything else: slot stays the same every round
+  return originalR1Slot;
+};
+// Build map: roster_id → R1 slot for this league's CURRENT-season rookie draft.
+// Returns null if we can't determine slots (no draft, auction draft, etc.).
+// Tries draft.slot_to_roster_id first (post-draft), falls back to draft.draft_order
+// (which is keyed by user_id and needs roster mapping).
+const lookupDraftSlots = async (lid, rosters) => {
+  let drafts;
+  try{ drafts = await fetch(`https://api.sleeper.app/v1/league/${lid}/drafts`, {cache:'no-store'}).then(r=>r.json()); }
+  catch(e){ return null; }
+  if(!Array.isArray(drafts) || drafts.length === 0) return null;
+  // Pick the most recent rookie-style draft: typically rounds 4-6 for dynasty.
+  // (Startup drafts have 15+ rounds; we don't want those for slot inference.)
+  const rookieDrafts = drafts.filter(d => {
+    const rounds = (d.settings || {}).rounds || 0;
+    return rounds > 0 && rounds <= 6;
+  });
+  if(rookieDrafts.length === 0) return null;
+  rookieDrafts.sort((a,b) => (b.start_time || 0) - (a.start_time || 0));
+  const draft = rookieDrafts[0];
+  const draftType = draft.type; // 'snake' | 'linear' | 'auction'
+  if(draftType === 'auction') return null;
+  const slotByRoster = {};
+  // Path 1: slot_to_roster_id is populated (after draft is set up)
+  const sToR = draft.slot_to_roster_id || {};
+  if(Object.keys(sToR).length > 0){
+    Object.entries(sToR).forEach(([slot, rid]) => {
+      if(rid != null) slotByRoster[rid] = parseInt(slot);
+    });
+    return { slotByRoster, draftType, leagueSize: (rosters||[]).length };
+  }
+  // Path 2: fallback to draft_order (user_id → slot). Map via roster.owner_id.
+  const draftOrder = draft.draft_order || {};
+  if(Object.keys(draftOrder).length === 0) return null;
+  const usedSlots = new Set();
+  (rosters||[]).forEach(r => {
+    if(r.owner_id && draftOrder[r.owner_id] != null){
+      const s = parseInt(draftOrder[r.owner_id]);
+      slotByRoster[r.roster_id] = s;
+      usedSlots.add(s);
+    }
+  });
+  // For orphaned rosters (no owner_id, so no draft_order entry), assign the
+  // remaining slot(s). If exactly one orphan + one missing slot, easy match.
+  const N = (rosters||[]).length;
+  const unmapped = (rosters||[]).filter(r => slotByRoster[r.roster_id] == null);
+  const missingSlots = [];
+  for(let s=1; s<=N; s++) if(!usedSlots.has(s)) missingSlots.push(s);
+  if(unmapped.length === missingSlots.length){
+    unmapped.forEach((r, i) => { slotByRoster[r.roster_id] = missingSlots[i]; });
+  }
+  return { slotByRoster, draftType, leagueSize: N };
 };
 
 // Team strength snapshot: for each CURRENT-season dynasty league the user is in,
@@ -6018,6 +6090,12 @@ const lookupTeamStrength = async (userId, allLeagues) => {
         fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json()),
         fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/traded_picks`, {cache:'no-store'}).then(r=>r.json()).catch(()=>[]),
       ]);
+      // Now that we have rosters, fetch draft slots for the current-year rookie
+      // draft. This lets us use SLOT-SPECIFIC FC pick values for 2026 picks
+      // ("2026 Pick 1.05" = $3,811 vs generic "2026 1st" = $3,214). Closes the
+      // accuracy gap with FantasyCalc's website rankings for current-year picks.
+      // For 2027/2028 we don't know slot order yet → use generic.
+      const draftSlots = await lookupDraftSlots(lg.league_id, rosters);
       // Build pick ownership map: each roster starts owning their own picks for
       // PICK_YEARS × PICK_ROUNDS. Then apply traded_picks to redirect ownership.
       // Sleeper traded_picks entries: roster_id = original owner, owner_id = current owner.
@@ -6042,9 +6120,21 @@ const lookupTeamStrength = async (userId, allLeagues) => {
       // Aggregate pick value per current-owner roster
       const pickValByRoster = {};
       Object.keys(pickOwner).forEach(key => {
-        const [y, round] = key.split('-');
+        const [yStr, roundStr, origStr] = key.split('-');
+        const y = parseInt(yStr);
+        const round = parseInt(roundStr);
+        const origRosterId = parseInt(origStr);
         const owner = pickOwner[key];
-        pickValByRoster[owner] = (pickValByRoster[owner] || 0) + fcPickValue(fmt.key, parseInt(y), parseInt(round));
+        // Slot-specific value for current year, generic for future years
+        let val;
+        if(y === LOOKUP_CURRENT_YEAR && draftSlots && draftSlots.slotByRoster[origRosterId]){
+          const r1Slot = draftSlots.slotByRoster[origRosterId];
+          const slotInRound = slotInRoundFor(r1Slot, round, draftSlots.draftType, draftSlots.leagueSize);
+          val = fcPickSlotValue(fmt.key, y, round, slotInRound);
+        } else {
+          val = fcPickValue(fmt.key, y, round);
+        }
+        pickValByRoster[owner] = (pickValByRoster[owner] || 0) + val;
       });
       const rosterValues = (rosters||[]).map(r => {
         const playerVal = (r.players||[]).reduce((sum, pid) => sum + valueOfPlayer(pid), 0);
