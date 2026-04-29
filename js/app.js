@@ -6298,7 +6298,7 @@ function LookupProfile({ identifier }){
 
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
       <div style={card}>
-        <div style={sectionHdr}>💪 AVG POWER RANK STANDINGS</div>
+        <div style={sectionHdr}>💪 PLAYER STRENGTH</div>
         <div style={{fontSize:11,color:'#888',marginTop:-6,marginBottom:12,fontStyle:'italic'}}>(Dynasty Value via fantasycalc.com)</div>
         {strengthLoading && !teamStrength && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Calculating roster ranks across leagues…</div>
@@ -6311,7 +6311,7 @@ function LookupProfile({ identifier }){
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.avgRank.toFixed(1)}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG POWER RANK</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG RANK</div>
               </div>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.avgTeams.toFixed(0)}</div>
@@ -6319,7 +6319,7 @@ function LookupProfile({ identifier }){
               </div>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.leaguesCount}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES RANKED</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES</div>
               </div>
             </div>
             <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Co-managed leagues where this user isn't the primary manager aren't factored in.</div>
