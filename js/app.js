@@ -5856,26 +5856,38 @@ const lookupOrphanHistory = async (userId, allLeagues) => {
   return { last12mo: last12, last24mo: last24, all: details.length, details };
 };
 
-// Trade activity snapshot: for the most recent COMPLETED season (current year - 1),
-// walk each dynasty league the user is in, find their roster_id, fetch all weekly
-// transactions, and count completed trades they were part of. Returns:
+// Trade activity snapshot: walks the user's CURRENT-season dynasty leagues,
+// finds their roster_id in each, fetches weekly transactions, and counts
+// completed trades they were part of. Returns:
 //   { season, leaguesCount, totalTrades, avgPerLeague, lastTradeDate }
-// This is heavy (~200 API calls for a 12-league user) — call AFTER the rest of the
-// profile renders so the page never feels slow.
+//
+// IMPORTANT lesson learned: dynasty trades happen YEAR-ROUND, but Sleeper
+// stores them under whichever league_id is active for that season. In April
+// 2026 (now), most active trading lives in 2026 league_ids. Earlier version
+// scanned the prior season → "last trade today" showed as "3 months ago"
+// because the prior-season league's last trade was end-of-playoffs in Jan.
+// Fall back to prior year only if user has no current-year dynasty leagues.
+//
+// This is heavy (~200 API calls for a 12-league user) — call AFTER the rest
+// of the profile renders so the page never feels slow.
 const lookupTradeActivity = async (userId, allLeagues) => {
-  // Most-recent COMPLETED NFL season = current calendar year - 1.
-  // (We're in 2026 in the offseason → 2025 was the last completed season.)
-  const targetSeason = String(LOOKUP_CURRENT_YEAR - 1);
-  const dynastyLastSeason = (allLeagues||[]).filter(lg =>
+  let targetSeason = String(LOOKUP_CURRENT_YEAR);
+  let dynastyTarget = (allLeagues||[]).filter(lg =>
     (lg.settings||{}).type === 2 && lg._season === targetSeason
   );
-  if(dynastyLastSeason.length === 0){
+  if(dynastyTarget.length === 0){
+    targetSeason = String(LOOKUP_CURRENT_YEAR - 1);
+    dynastyTarget = (allLeagues||[]).filter(lg =>
+      (lg.settings||{}).type === 2 && lg._season === targetSeason
+    );
+  }
+  if(dynastyTarget.length === 0){
     return { season: targetSeason, leaguesCount: 0, totalTrades: 0, avgPerLeague: 0, lastTradeDate: null };
   }
   let totalTrades = 0;
   let lastTradeDate = null;
   let leaguesWithUser = 0;
-  await Promise.all(dynastyLastSeason.map(async (lg) => {
+  await Promise.all(dynastyTarget.map(async (lg) => {
     try{
       const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
       const userRoster = (rosters||[]).find(r => r.owner_id === userId || (r.co_owners||[]).includes(userId));
@@ -6143,7 +6155,7 @@ function LookupProfile({ identifier }){
 
       {/* Trade activity — last completed season. Loads in background. */}
       <div style={card}>
-        <div style={sectionHdr}>🤝 TRADE ACTIVITY ({tradeActivity?.season || (LOOKUP_CURRENT_YEAR-1)} SEASON)</div>
+        <div style={sectionHdr}>🤝 TRADE ACTIVITY ({tradeActivity?.season || LOOKUP_CURRENT_YEAR} DYNASTY LEAGUES)</div>
         {tradeLoading && !tradeActivity && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Counting trades across leagues…</div>
         )}
@@ -6166,7 +6178,7 @@ function LookupProfile({ identifier }){
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST TRADE</div>
               </div>
             </div>
-            <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic'}}>Across {tradeActivity.leaguesCount} dynasty {tradeActivity.leaguesCount===1?'league':'leagues'} this user was in last season.</div>
+            <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic'}}>Across {tradeActivity.leaguesCount} of this user's current dynasty {tradeActivity.leaguesCount===1?'league':'leagues'}. Includes offseason trades — dynasty trading happens year-round.</div>
           </>
         )}
       </div>
