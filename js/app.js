@@ -6042,10 +6042,28 @@ const lookupAllLeagues = async (userId) => {
 // Redraft leagues (settings.type !== 2) are never counted as orphans — they
 // inherently end after one season, so missing in season N+1 is normal, not a
 // red flag. Same logic for keeper leagues.
-// Phase 0: simple raw count. Phase 1 will distinguish "found own replacement."
+//
+// Conversion-year leniency: if a dynasty league's immediate predecessor was
+// REDRAFT (settings.type === 0), the user's first dynasty year was forced on
+// them by a commish converting the league. Leaving after that conversion year
+// isn't really "abandoning a dynasty team" — they signed up for redraft.
+// (Reported by whiskeyyankee 2026-04-29: his "Lets Go Brandon" league was
+// redraft in 2022, commish converted it to dynasty in 2023, he left after.)
 const lookupOrphanHistory = async (userId, allLeagues) => {
   // Restrict to dynasty leagues only (settings.type === 2)
   const dynastyOnly = (allLeagues||[]).filter(lg => (lg.settings||{}).type === 2);
+  // Map of ALL leagues (any type) by id — used to detect redraft→dynasty
+  // conversions when a dynasty league's previous_league_id points to a
+  // redraft league we have visibility into.
+  const allById = {};
+  (allLeagues||[]).forEach(lg => { allById[String(lg.league_id)] = lg; });
+  const wasConvertedFromRedraft = (lg) => {
+    const prevId = lg.previous_league_id;
+    if(!prevId || String(prevId) === '0') return false;
+    const prev = allById[String(prevId)];
+    if(!prev) return false;
+    return (prev.settings||{}).type === 0;
+  };
   const heldBySeason = {};
   dynastyOnly.forEach(lg => {
     if(!heldBySeason[lg._season]) heldBySeason[lg._season] = new Set();
@@ -6061,6 +6079,9 @@ const lookupOrphanHistory = async (userId, allLeagues) => {
     cur.forEach(lid => {
       const lg = dynastyOnly.find(x => String(x.league_id) === lid && x._season === sCur);
       if(!lg) return;
+      // Conversion-year leniency: if THIS dynasty year was forced by a
+      // redraft→dynasty conversion, don't flag the user for leaving after it.
+      if(wasConvertedFromRedraft(lg)) return;
       const descendants = dynastyOnly.filter(x => x._season === sNext && String(x.previous_league_id||'') === lid);
       if(descendants.length === 0 && !next.has(lid)){
         details.push({ league_name: lg.name || `League #${lid}`, league_id: lid, season_left: sCur });
