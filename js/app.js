@@ -5992,7 +5992,7 @@ function LookupProfile({ identifier }){
       {/* Activity snapshot — dynasty-focused */}
       <div style={card}>
         <div style={sectionHdr}>📊 ACTIVITY SNAPSHOT</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
           <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
             <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
             <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
@@ -6001,14 +6001,9 @@ function LookupProfile({ identifier }){
             <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyAllTime}</div>
             <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY (5-YR UNIQUE)</div>
           </div>
-          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{otherActive.length}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>OTHER ACTIVE ({displayedActiveYear})</div>
-          </div>
         </div>
         <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>
-          Sleeper's public API may not always include leagues where this user is a co-manager rather than primary owner — co-managed leagues can be undercounted. Phase 1 will add a roster scan to catch those.
-          <br/>Sleeper also doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase.
+          Sleeper doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase via Sleeper partnership or alternate signals.
         </div>
       </div>
 
