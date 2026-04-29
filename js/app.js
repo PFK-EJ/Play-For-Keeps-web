@@ -2820,6 +2820,9 @@ function SleeperLink(){
 // ============================================================================
 function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName }){
   const [session, setSession] = useState(null);
+  // Read the linked Sleeper user so the Sleeper Snapshot tab can deep-link to
+  // YOUR OWN profile instead of the empty search page when you're linked.
+  const [sleeperLinked] = useSleeperUser();
   useEffect(()=>{
     if(!sb) return;
     sb.auth.getSession().then(({data}) => setSession(data?.session || null));
@@ -2831,6 +2834,10 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
     if(onSignInClick){ e.preventDefault(); onSignInClick(); }
     // else let the link navigate to /?signin=1
   };
+  // Sleeper Snapshot tab gets a smart href: linked → land on YOUR snapshot
+  // (with the in-page search bar below the yellow line for looking up others);
+  // not linked → go to the regular search page.
+  const lookupHref = sleeperLinked?.username ? `/lookup/${encodeURIComponent(sleeperLinked.username)}` : '/lookup';
   // Tab definitions — Power Rankings has been moved out of the public nav
   // and into the admin panel; we'll work on it there until it's ready to ship.
   // Each tab: [id, label, descriptionForTooltip, href, isInPageOnMainPage]
@@ -2838,7 +2845,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
   const tabs = [
     ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
     ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
-    ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
+    ["lookup","🔍 Sleeper Snapshot",sleeperLinked?.username?"Open your own Sleeper Snapshot — search any other username from inside":"Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in",lookupHref,false],
     ["trade","⚖️ Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
     ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
   ];
@@ -6949,6 +6956,17 @@ function LookupHeaderSearch(){
 }
 
 function LookupApp({ identifier }){
+  // Safety-net redirect: if someone hits /lookup directly (typed URL, bookmark,
+  // old browser back) AND has a Sleeper account linked, send them straight to
+  // their own snapshot. The toolbar's smart href handles the click case; this
+  // catches everything else. Use replace() so back-button doesn't bounce them
+  // back into a redirect loop.
+  const [linkedUser] = useSleeperUser();
+  useEffect(() => {
+    if(!identifier && linkedUser?.username){
+      window.location.replace('/lookup/' + encodeURIComponent(linkedUser.username));
+    }
+  },[identifier, linkedUser?.username]);
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <MasterToolbar currentTab="lookup"/>
