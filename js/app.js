@@ -2736,7 +2736,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
   // Order locked by Evan: Rookie Ranks → Dispersal → Sleeper Snapshot → Trade Polls
   const tabs = [
     ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
-    ["dispersal","🎲 Dispersal Draft","The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
+    ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
     ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
     ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
   ];
@@ -3333,7 +3333,7 @@ function App(){
               <div style={{fontSize:38,flexShrink:0}}>🎲</div>
               <div style={{flex:1,minWidth:240}}>
                 <div style={{fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
-                <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>The only fully-featured dispersal draft tool on the market. Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
+                <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                 <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
