@@ -2706,8 +2706,108 @@ function DevAuthGate({mode, doAuth, authEmail, setAuthEmail, authPassword, setAu
   );
 }
 
+// ============================================================================
+// MasterToolbar — shared header across every PFK page (App, DispersalApp, LookupApp).
+// Above the yellow line: brand + all 5 nav tabs (left) + X + Email Support + Sign in/out (right).
+// Used so users can jump between tools from any page without going home first.
+//
+// Props:
+//   currentTab      — only set on the main App; one of 'pfk'|'team'|'polls' to highlight tab
+//   onSetTab        — only set on the main App; intercepts in-page tab clicks (no navigation)
+//   onSignInClick   — only set on the main App; opens its full auth modal
+//                     when not provided, "Sign In" navigates to /?signin=1 instead
+// ============================================================================
+function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName }){
+  const [session, setSession] = useState(null);
+  useEffect(()=>{
+    if(!sb) return;
+    sb.auth.getSession().then(({data}) => setSession(data?.session || null));
+    const { data: sub } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  },[]);
+  const doLogout = async () => { if(sb) await sb.auth.signOut(); };
+  const doSignIn = (e) => {
+    if(onSignInClick){ e.preventDefault(); onSignInClick(); }
+    // else let the link navigate to /?signin=1
+  };
+  // Tab definitions — Power Rankings is dev-only.
+  // Each tab: [id, label, descriptionForTooltip, href, isInPageOnMainPage]
+  const tabs = [
+    ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
+    ["team","📊 Power Rankings","Power Rankings (in development)","/?tab=team",true],
+    ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
+    ["dispersal","🎲 Dispersal Draft","The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
+    ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
+  ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(window.location.hostname));
+  const handleTabClick = (e, id, isInPage) => {
+    if(isInPage && onSetTab){
+      e.preventDefault();
+      onSetTab(id);
+    }
+    // else: let it navigate
+  };
+  const isActiveTab = (id) => {
+    if(id === 'pfk') return currentTab === 'pfk' || currentTab === 'custom';
+    return currentTab === id;
+  };
+  return (
+    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
+      <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:10}}>
+        {/* Top row: brand on left, account controls on right */}
+        <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+          <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none"}}>
+            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <div>
+              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
+              <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
+            </div>
+          </a>
+          <div style={{flex:1}}/>
+          <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
+             aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayforkeepsFF on X"
+             style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
+             onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
+             onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+            <span>@PlayforkeepsFF</span>
+          </a>
+          <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
+             aria-label="Email PFK support with feedback or bug reports"
+             data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
+             style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
+            📧 Email Support
+          </a>
+          {session ? (
+            <>
+              {userSleeperName && <div style={{fontSize:11,color:"#888"}}>Sleeper: {userSleeperName}</div>}
+              <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
+            </>
+          ) : (
+            <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
+          )}
+        </div>
+        {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line */}
+        <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-start"}}>
+          {tabs.map(([id,label,desc,href,isInPage])=>{
+            const active = isActiveTab(id);
+            return (
+              <a key={id} href={href} onClick={e=>handleTabClick(e,id,isInPage)} aria-label={desc} data-tooltip={desc}
+                 style={{padding:"5px 10px",borderRadius:6,border:active?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:active?"#FFD700":"transparent",color:active?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4,transition:"all .15s"}}>{label}</a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App(){
-  const [tab,setTab]=useState("pfk");
+  const [tab,setTab]=useState(()=>{
+    // Read ?tab=xxx from URL on mount so cross-page nav lands on the right tab
+    if(typeof window === 'undefined') return 'pfk';
+    const p = new URLSearchParams(window.location.search).get('tab');
+    return (p && ['pfk','custom','team','polls'].includes(p)) ? p : 'pfk';
+  });
   // Dev-only: count of completed dispersal drafts (live query on mount).
   // Hidden on production (gated by the existing global isDevHost() helper).
   // Cheap query — moves slowly.
@@ -2802,6 +2902,17 @@ function App(){
     sb.auth.getSession().then(({data})=>setSession(data.session));
     const { data:sub } = sb.auth.onAuthStateChange((_e,s)=>setSession(s));
     return ()=>sub?.subscription?.unsubscribe?.();
+  },[]);
+
+  // Open sign-in modal automatically when arriving from /?signin=1 (sent by
+  // MasterToolbar Sign In links on Dispersal/Lookup pages).
+  useEffect(()=>{
+    if(typeof window === 'undefined') return;
+    const p = new URLSearchParams(window.location.search);
+    if(p.get('signin') === '1'){
+      setAuthMode('signin');
+      setAuthOpen(true);
+    }
   },[]);
 
   useEffect(()=>{
@@ -3208,62 +3319,8 @@ function App(){
           </div>
         </div>
       )}
-      <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:10}}>
-          {/* Top row: brand on left, email-support + sign-out (or sign-in) on the right */}
-          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
-            <div>
-              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
-              <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
-            </div>
-            {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
-            <div style={{flex:1}}/>
-            {/* Right cluster: X follow + smaller Email Support + Sign in/out */}
-            <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
-               aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayForKeepsFF on X"
-               style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
-               onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
-               onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
-              <span>@PlayforkeepsFF</span>
-            </a>
-            <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
-               aria-label="Email PFK support with feedback or bug reports"
-               data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
-               style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
-              📧 Email Support
-            </a>
-            {session?(
-              <>
-                {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
-                <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
-              </>
-            ):(
-              <button onClick={()=>{setAuthMode('signin');setAuthOpen(true);}} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1}}>SIGN IN</button>
-            )}
-          </div>
-          {/* Bottom row: nav tabs sit just above the yellow border line */}
-          <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
-            {/* "Customize" was its own tab. It's now a sub-toggle inside "Rookie Ranks"
-                (View Official | Edit Mine), so we keep both 'pfk' and 'custom' as valid
-                tab states but only show ONE nav button — active when EITHER state is set. */}
-            {[
-              ["pfk","👑 Rookie Ranks",["pfk","custom"],"PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own"],
-              ["team","📊 Power Rankings",["team"],"Power Rankings (in development)"],
-              ["polls","🗳️ Trade Polls",["polls"],"Create a dynasty trade poll, share the link, and get votes from the community"],
-            ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l,states,desc])=>(
-              <button key={t} onClick={()=>setTab(t)} aria-label={desc} data-tooltip={desc} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
-            ))}
-            <a href="/dispersal" aria-label="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
-               data-tooltip="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
-               style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
-            <a href="/lookup" aria-label="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
-               data-tooltip="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
-               style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
-          </div>
-        </div>
-      </div>
+      <MasterToolbar currentTab={tab} onSetTab={setTab} onSignInClick={()=>{setAuthMode('signin');setAuthOpen(true);}} userSleeperName={userRow?.sleeper_username}/>
+      {saved && <div style={{position:'fixed',top:14,right:14,zIndex:200,padding:"6px 14px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700,boxShadow:"0 4px 12px rgba(0,0,0,0.5)"}}>✓ Saved</div>}
       <div className="pfk-content" style={{maxWidth:1140,margin:"0 auto",padding:"20px 14px"}}>
         {/* Dispersal hero CTA — front-and-center on the main page since dispersal
             is currently PFK's most differentiated tool. Sits above the tab content. */}
@@ -5819,20 +5876,7 @@ function DispersalDraft({draftId}){
 function DispersalApp({draftId}){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
-        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14}}>
-          <a href="/" style={{textDecoration:'none'}}><img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/></a>
-          <a href="/" style={{textDecoration:'none'}}>
-            <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:2}}>PLAY FOR KEEPS</div>
-            <div style={{fontSize:10,color:'#8B6914',letterSpacing:2,fontWeight:600,textTransform:'uppercase'}}>Dispersal Draft</div>
-          </a>
-          <span style={{flex:1}}/>
-          <a href="mailto:ej@playforkeepsdynasty.com?subject=Play%20For%20Keeps%20feedback" title="Email Play For Keeps with feedback or bug reports"
-             style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 11px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:20,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:13,letterSpacing:0.3}}>
-            📧 EMAIL PLAY FOR KEEPS
-          </a>
-        </div>
-      </div>
+      <MasterToolbar currentTab="dispersal"/>
       {draftId ? <DispersalDraft draftId={draftId}/> : <DispersalSetup/>}
     </div>
   );
@@ -6290,7 +6334,7 @@ function LookupSearch(){
   return (
     <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',color:'#eee',textAlign:'center'}}>
       <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:10}}>🔍 SLEEPER SNAPSHOT</div>
-      <div style={{fontSize:14,color:'#bbb',marginBottom:30,letterSpacing:0.3,lineHeight:1.6,maxWidth:540,margin:'0 auto 30px'}}>Type any Sleeper username to instantly see their account age, dynasty leagues, trade activity, orphan history, and roster strength. Vet new leaguemates in 5 seconds.</div>
+      <div style={{fontSize:14,color:'#bbb',marginBottom:30,letterSpacing:0.3,lineHeight:1.6,maxWidth:540,margin:'0 auto 30px'}}>Type any Sleeper username to instantly see their account age, total dynasty leagues, trade activity, orphan history, and roster average dynasty value. Vet new leaguemates in seconds.</div>
       <form onSubmit={submit} style={{display:'flex',gap:8,marginBottom:14}}>
         <input
           autoFocus value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
@@ -6804,20 +6848,15 @@ function LookupHeaderSearch(){
 function LookupApp({ identifier }){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
-        {/* PFK brand pinned top-left (clickable home link), search + dispersal on the right.
-            Brand is centered ONLY on the captured snapshot image (off-screen card below). */}
-        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-          <a href="/" style={{textDecoration:'none',display:'flex',alignItems:'center',gap:12}}>
-            <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/>
-            <span style={{color:'#FFD700',fontWeight:900,letterSpacing:2.5,fontSize:14,whiteSpace:'nowrap'}}>PLAY FOR KEEPS</span>
-          </a>
-          <div style={{flex:1}}/>
-          {/* Quick-search input only on profile pages — search page already has the big input */}
-          {identifier && <LookupHeaderSearch/>}
-          <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1,whiteSpace:'nowrap'}}>🎲 DISPERSAL</a>
+      <MasterToolbar currentTab="lookup"/>
+      {/* Quick lookup bar lives BELOW the yellow line on profile pages so it sits in
+          the page-specific area, not in the master toolbar. Search page omits it
+          since it already has the big input. */}
+      {identifier && (
+        <div style={{maxWidth:1240,margin:'0 auto',padding:'12px 16px 0'}}>
+          <LookupHeaderSearch/>
         </div>
-      </div>
+      )}
       {identifier ? <LookupProfile identifier={identifier}/> : <LookupSearch/>}
     </div>
   );
