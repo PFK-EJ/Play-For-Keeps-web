@@ -2708,6 +2708,21 @@ function DevAuthGate({mode, doAuth, authEmail, setAuthEmail, authPassword, setAu
 
 function App(){
   const [tab,setTab]=useState("pfk");
+  // Dev-only: count of completed dispersal drafts (live query on mount).
+  // Hidden on production (gated by hostname check). Cheap query — moves slowly.
+  const isDevHost = typeof window !== 'undefined' && /^(dev\.|localhost|127\.)/.test(window.location.hostname);
+  const [completedDispersalCount,setCompletedDispersalCount] = useState(null);
+  useEffect(()=>{
+    if(!isDevHost || !sb) return;
+    let cancelled = false;
+    (async () => {
+      try{
+        const { count } = await sb.from('dispersal_drafts').select('*', { count: 'exact', head: true }).eq('status', 'complete');
+        if(!cancelled && typeof count === 'number') setCompletedDispersalCount(count);
+      }catch(e){}
+    })();
+    return ()=>{ cancelled = true; };
+  },[isDevHost]);
   const [savedLists,setSavedLists]=useState(()=>{
     const saved=loadStorage('pfk_saved_lists',null);
     if(saved&&saved.length) return saved;
@@ -3255,7 +3270,13 @@ function App(){
               <div style={{fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
               <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>The only fully-featured dispersal draft tool on the market. Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
             </div>
-            <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+              <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
+              {/* Dev-only: completed-drafts counter — live query, hidden on prod */}
+              {isDevHost && completedDispersalCount !== null && (
+                <div style={{fontSize:11,color:"#FFD700",fontWeight:800,letterSpacing:0.5,whiteSpace:"nowrap"}}>{completedDispersalCount.toLocaleString()} completed drafts</div>
+              )}
+            </div>
           </div>
         </a>
 
