@@ -5923,18 +5923,52 @@ const lookupTradeActivity = async (userId, allLeagues) => {
   };
 };
 
+// FantasyCalc value cache, keyed by format string. Each format = different value set
+// (TEP, PPR, SF, league size all change player rankings). We cache per-page-load
+// to avoid re-fetching the same format twice.
+const _fcByFormat = {};
+// Translate a Sleeper league into the FantasyCalc API parameters.
+// Sleeper bonus_rec_te → FC tepLevel: 0 = none, 1 = 0.5, 2 = 1.0
+// Sleeper roster_positions includes "SUPER_FLEX" → numQbs=2, else 1
+const fcFormatForLeague = (lg) => {
+  const ss = lg.scoring_settings || {};
+  const rp = lg.roster_positions || [];
+  const numQbs = rp.includes('SUPER_FLEX') ? 2 : 1;
+  const recVal = parseFloat(ss.rec ?? 0);
+  const ppr = recVal === 1 ? 1 : recVal === 0.5 ? 0.5 : 0;
+  const tepRaw = parseFloat(ss.bonus_rec_te ?? 0);
+  // FantasyCalc tepLevel only supports 0 / 0.5 / 1.0 — round 0.75 to 1, 0.25 to 0.5
+  const tepLevel = tepRaw >= 0.75 ? 2 : tepRaw >= 0.25 ? 1 : 0;
+  const numTeams = lg.total_rosters || 12;
+  return { numQbs, ppr, tepLevel, numTeams, key: `${numQbs}q-${ppr}p-${tepLevel}t-${numTeams}n` };
+};
+const fetchFcForFormat = async (fmt) => {
+  if(_fcByFormat[fmt.key]) return _fcByFormat[fmt.key];
+  const url = `https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${fmt.numQbs}&numTeams=${fmt.numTeams}&ppr=${fmt.ppr}&tepLevel=${fmt.tepLevel}`;
+  try{
+    const arr = await fetch(url).then(r=>r.json());
+    const map = {};
+    (arr||[]).forEach(row => {
+      const sid = row?.player?.sleeperId;
+      if(sid != null) map[String(sid)] = row?.value ?? 0;
+    });
+    _fcByFormat[fmt.key] = map;
+    return map;
+  }catch(e){
+    _fcByFormat[fmt.key] = {};
+    return {};
+  }
+};
+
 // Team strength snapshot: for each CURRENT-season dynasty league the user is in,
-// fetch rosters, sum each team's FantasyCalc dynasty value, rank teams within the
-// league, and find where the user lands. Then average those ranks across leagues.
+// fetch rosters, sum each team's FantasyCalc dynasty value (using the FC value set
+// matched to THAT LEAGUE'S format — SF/1QB, PPR, TEP, league size), rank teams
+// within the league, and find where the user lands. Then average those ranks
+// across leagues.
 //
 // Per Evan: framed as a "matching signal" not a judgment — commissioners can use
 // this both to find competitive players AND to find casual managers, depending on
 // what they want for their league. Same data, two markets.
-//
-// Caveat: we use the SF/1.0PPR FantasyCalc dataset for all leagues even if some
-// are 1QB or 0.5PPR. Within a single league the relative rank is preserved (same
-// yardstick applied to everyone), so AVG RANK is sound. Absolute roster value
-// across formats would need per-format FC fetches — Phase 1+ work.
 const lookupTeamStrength = async (userId, allLeagues) => {
   const targetSeason = String(LOOKUP_CURRENT_YEAR);
   let dynastyTarget = (allLeagues||[]).filter(lg =>
@@ -5949,11 +5983,15 @@ const lookupTeamStrength = async (userId, allLeagues) => {
   if(dynastyTarget.length === 0){
     return { leaguesCount: 0, avgRank: null, avgTeams: 0, ranks: [] };
   }
-  const fc = await fetchFcValues();
-  const valueOf = (pid) => fc.bySleeperId[String(pid)] || 0;
   const ranks = [];
   await Promise.all(dynastyTarget.map(async (lg) => {
     try{
+      // Per-league FC values matched to that league's format.
+      // This is the fix for the McBride/TE-undervaluation bug — TEP=1 leagues
+      // need TEP-adjusted values or TE-heavy rosters get under-ranked.
+      const fmt = fcFormatForLeague(lg);
+      const fcMap = await fetchFcForFormat(fmt);
+      const valueOf = (pid) => fcMap[String(pid)] || 0;
       const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
       const rosterValues = (rosters||[]).map(r => ({
         roster_id: r.roster_id,
