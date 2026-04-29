@@ -3201,6 +3201,7 @@ function App(){
               <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
             <a href="/dispersal" style={{padding:"8px 14px",borderRadius:8,border:"2px solid #2a2a2a",background:"transparent",color:"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🎲 Dispersal Draft</a>
+            <a href="/lookup" style={{padding:"8px 14px",borderRadius:8,border:"2px solid #2a2a2a",background:"transparent",color:"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🔍 Lookup</a>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
@@ -5774,9 +5775,280 @@ function DispersalApp({draftId}){
   );
 }
 
+// ============================================================================
+// 🔍 LOOKUP — Phase 0 of the PFK Trust Layer
+// "Type a Sleeper username, see public-data facts that would've taken you an
+// hour to gather manually." Origin doc + spec live in ~/pfk_research/.
+// Facts only — never judgments. Carfax model, not "snitch site."
+// ============================================================================
+
+const SEASONS_TO_SCAN = ['2025','2024','2023','2022','2021'];
+
+// Resolve a Sleeper user (accepts username OR numeric user_id)
+const lookupResolveUser = async (input) => {
+  const q = (input||'').trim();
+  if(!q) throw new Error('Enter a Sleeper username or user ID');
+  const r = await fetch(`https://api.sleeper.app/v1/user/${encodeURIComponent(q)}`);
+  if(!r.ok) throw new Error('No Sleeper user found with that name');
+  const u = await r.json();
+  if(!u || !u.user_id) throw new Error('No Sleeper user found with that name');
+  return u;
+};
+
+// Pull all leagues for a user across the seasons we scan. Used for activity +
+// orphan history. Each league row carries .season so we can walk back.
+const lookupAllLeagues = async (userId) => {
+  const all = [];
+  await Promise.all(SEASONS_TO_SCAN.map(async (s) => {
+    try{
+      const lgs = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${s}`).then(r=>r.json());
+      (lgs||[]).forEach(lg => all.push({...lg, _season:s}));
+    }catch(e){}
+  }));
+  return all;
+};
+
+// Orphan check: walk each season's leagues and see if the user was in a league
+// during a prior season but is NOT in it (or its descendant) the next season.
+// Phase 0: simple raw count. Phase 1 will distinguish "found own replacement."
+// Returns { last12mo, last24mo, all, details: [{league_name, season, season_left}] }
+const lookupOrphanHistory = async (userId, allLeagues) => {
+  // Build set of league_ids currently held by user, indexed by season
+  const heldBySeason = {};
+  allLeagues.forEach(lg => {
+    if(!heldBySeason[lg._season]) heldBySeason[lg._season] = new Set();
+    heldBySeason[lg._season].add(String(lg.league_id));
+  });
+  // For each league user held in season N-1 but NOT in season N (and N exists),
+  // check the chain — was there a successor (previous_league_id chain) the user
+  // didn't follow? If yes, mark orphan event.
+  // Simpler heuristic for v0: a league the user held in season X but not in
+  // season X+1 (and X+1 leagues exist for them) = orphan event.
+  const details = [];
+  const sortedSeasons = SEASONS_TO_SCAN.slice().sort();
+  for(let i=0;i<sortedSeasons.length-1;i++){
+    const sCur = sortedSeasons[i], sNext = sortedSeasons[i+1];
+    const cur = heldBySeason[sCur] || new Set();
+    if(!heldBySeason[sNext]) continue;
+    const next = heldBySeason[sNext];
+    cur.forEach(lid => {
+      const lg = allLeagues.find(x => String(x.league_id) === lid && x._season === sCur);
+      if(!lg) return;
+      // Find leagues in next season that descend from this one
+      const descendants = allLeagues.filter(x => x._season === sNext && String(x.previous_league_id||'') === lid);
+      // If next-season has leagues for the user, but none of them descend from this league,
+      // and this league itself isn't in next set, count as a likely orphan.
+      if(descendants.length === 0 && !next.has(lid)){
+        details.push({ league_name: lg.name || `League #${lid}`, league_id: lid, season_left: sCur });
+      }
+    });
+  }
+  // Time-window slicing
+  const nowYear = new Date().getFullYear();
+  const last12 = details.filter(d => +d.season_left >= nowYear - 1).length;
+  const last24 = details.filter(d => +d.season_left >= nowYear - 2).length;
+  return { last12mo: last12, last24mo: last24, all: details.length, details };
+};
+
+// Format a date as "X time ago" (e.g. "2 hours ago", "3 days ago", "5 yrs ago")
+const lookupTimeAgo = (date) => {
+  if(!date) return null;
+  const d = (date instanceof Date) ? date : new Date(date);
+  if(isNaN(d.getTime())) return null;
+  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if(sec < 60) return `${sec} sec ago`;
+  if(sec < 3600) return `${Math.floor(sec/60)} min ago`;
+  if(sec < 86400) return `${Math.floor(sec/3600)} hours ago`;
+  if(sec < 86400*30) return `${Math.floor(sec/86400)} days ago`;
+  if(sec < 86400*365) return `${Math.floor(sec/(86400*30))} months ago`;
+  const yrs = Math.floor(sec/(86400*365));
+  return `${yrs} ${yrs===1?'yr':'yrs'} ago`;
+};
+
+// ---------- Lookup search page ----------
+function LookupSearch(){
+  const [query,setQuery] = useState('');
+  const [err,setErr] = useState('');
+  const submit = (e) => {
+    if(e) e.preventDefault();
+    const q = query.trim();
+    if(!q){ setErr('Enter a Sleeper username or user ID'); return; }
+    window.location.href = '/lookup/' + encodeURIComponent(q);
+  };
+  return (
+    <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',color:'#eee',textAlign:'center'}}>
+      <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:8}}>🔍 PFK LOOKUP</div>
+      <div style={{fontSize:16,color:'#aaa',marginBottom:34,letterSpacing:0.5}}>Spend 5 seconds. Sleep better.</div>
+      <form onSubmit={submit} style={{display:'flex',gap:8,marginBottom:14}}>
+        <input
+          autoFocus value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
+          placeholder="Sleeper username (e.g. ej97)"
+          style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
+        <button type="submit" style={{padding:'14px 24px',background:'#FFD700',border:'none',borderRadius:8,color:'#000',fontWeight:900,fontSize:14,letterSpacing:1.5,cursor:'pointer',whiteSpace:'nowrap'}}>LOOKUP →</button>
+      </form>
+      {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{err}</div>}
+      <div style={{fontSize:13,color:'#666',marginTop:30,lineHeight:1.7,textAlign:'left',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'18px 22px'}}>
+        <div style={{color:'#FFD700',fontWeight:800,letterSpacing:1.5,fontSize:11,marginBottom:8}}>WHAT THIS IS</div>
+        Public-data facts about any Sleeper user — account age, last seen, active leagues, orphan history. The kind of basic background check that takes you an hour to do manually, in 5 seconds.<br/><br/>
+        <div style={{color:'#FFD700',fontWeight:800,letterSpacing:1.5,fontSize:11,marginBottom:8}}>WHAT THIS ISN'T</div>
+        A judgment, score, or accusation. We show data. You decide what it means.
+      </div>
+    </div>
+  );
+}
+
+// ---------- Lookup profile page ----------
+function LookupProfile({ identifier }){
+  const [user,setUser] = useState(null);
+  const [leagues,setLeagues] = useState(null);
+  const [orphan,setOrphan] = useState(null);
+  const [loading,setLoading] = useState(true);
+  const [err,setErr] = useState('');
+  const [linkCopied,setLinkCopied] = useState(false);
+
+  useEffect(()=>{
+    let cancelled = false;
+    (async () => {
+      setLoading(true); setErr('');
+      try{
+        const u = await lookupResolveUser(identifier);
+        if(cancelled) return;
+        setUser(u);
+        const lgs = await lookupAllLeagues(u.user_id);
+        if(cancelled) return;
+        setLeagues(lgs);
+        const o = await lookupOrphanHistory(u.user_id, lgs);
+        if(cancelled) return;
+        setOrphan(o);
+      }catch(e){ if(!cancelled) setErr(e.message || 'Lookup failed'); }
+      finally{ if(!cancelled) setLoading(false); }
+    })();
+    return ()=>{ cancelled = true; };
+  },[identifier]);
+
+  const copyLink = () => {
+    try{ navigator.clipboard.writeText(window.location.href); }catch(e){}
+    setLinkCopied(true);
+    setTimeout(()=>setLinkCopied(false), 2000);
+  };
+
+  if(loading){
+    return <div style={{maxWidth:680,margin:'80px auto',textAlign:'center',color:'#aaa',fontSize:14}}>Looking up <span style={{color:'#FFD700',fontFamily:'monospace'}}>{identifier}</span>…</div>;
+  }
+  if(err){
+    return (
+      <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',textAlign:'center',color:'#eee'}}>
+        <div style={{padding:'20px 24px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:8,color:'#ef4444',fontSize:14,marginBottom:18}}>{err}</div>
+        <a href="/lookup" style={{color:'#FFD700',textDecoration:'none',fontWeight:800}}>← Try another lookup</a>
+      </div>
+    );
+  }
+
+  // Stats
+  const lgs = leagues || [];
+  const activeLeagues = lgs.filter(l => l._season === '2025');
+  const dynastyActive = activeLeagues.filter(l => (l.settings||{}).type === 2);
+  const allTimeUnique = new Set(lgs.map(l => String(l.league_id))).size;
+  // Sleeper user object: created may be a unix ms timestamp
+  const createdMs = user.metadata?.created || user.created;
+  const createdDate = createdMs ? new Date(Number(createdMs)) : null;
+
+  const sectionHdr = {fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:1.5,marginBottom:10};
+  const card = {background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'18px 22px',marginBottom:14};
+
+  return (
+    <div style={{maxWidth:680,margin:'40px auto',padding:'0 20px',color:'#eee'}}>
+      {/* Profile header */}
+      <div style={{...card,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+        {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} onError={e=>e.target.style.display='none'}/>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
+          <div style={{fontSize:12,color:'#666',marginTop:2}}>{user.username && user.username !== user.display_name ? `@${user.username} · ` : ''}user_id <code style={{color:'#888'}}>{user.user_id}</code></div>
+          {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
+        </div>
+      </div>
+
+      {/* Activity snapshot */}
+      <div style={card}>
+        <div style={sectionHdr}>📊 ACTIVITY SNAPSHOT</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
+          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{activeLeagues.length}</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>2025 LEAGUES</div>
+          </div>
+          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY (ACTIVE)</div>
+          </div>
+          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{allTimeUnique}</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>UNIQUE LEAGUES (5 YR)</div>
+          </div>
+        </div>
+        <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic'}}>Sleeper doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase via Sleeper partnership or alternate signals.</div>
+      </div>
+
+      {/* Orphan history */}
+      <div style={card}>
+        <div style={sectionHdr}>🪦 ORPHAN HISTORY</div>
+        <div style={{fontSize:13,color:'#aaa',lineHeight:1.7}}>Past leagues this user appears to have left between seasons:</div>
+        <div style={{display:'flex',gap:14,marginTop:10,flexWrap:'wrap'}}>
+          <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 12 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last12mo ?? 0}</strong></div>
+          <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 24 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last24mo ?? 0}</strong></div>
+        </div>
+        {orphan?.details && orphan.details.length > 0 && (
+          <details style={{marginTop:12}}>
+            <summary style={{cursor:'pointer',color:'#aaa',fontSize:12}}>Show details</summary>
+            <div style={{marginTop:8,fontSize:12,color:'#bbb',lineHeight:1.7}}>
+              {orphan.details.map((d,i)=>(<div key={i}>• {d.league_name} ({d.season_left})</div>))}
+            </div>
+          </details>
+        )}
+        <div style={{fontSize:11,color:'#555',marginTop:14,fontStyle:'italic'}}>Phase 1 will distinguish "left as orphan" from "found own replacement" — currently shown as a raw count. Some entries here may have been responsibly handed off.</div>
+      </div>
+
+      {/* Share + opt-out */}
+      <div style={card}>
+        <div style={sectionHdr}>🔗 PROFILE LINK</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <code style={{flex:1,minWidth:200,padding:'8px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,color:'#FFD700',fontSize:12,wordBreak:'break-all'}}>{window.location.href}</code>
+          <button onClick={copyLink} style={{padding:'8px 14px',background:linkCopied?'#10b981':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:12,letterSpacing:1,cursor:'pointer',whiteSpace:'nowrap'}}>{linkCopied?'✓ COPIED':'📋 COPY'}</button>
+        </div>
+      </div>
+
+      <div style={{textAlign:'center',marginTop:24,marginBottom:40,fontSize:12,color:'#666'}}>
+        <div style={{marginBottom:8}}>Is this you and you'd rather not be searchable?</div>
+        <a href={`mailto:ej@playforkeepsdynasty.com?subject=PFK%20Lookup%20opt-out%20request&body=Please%20remove%20my%20PFK%20Lookup%20profile.%0A%0ASleeper%20username%3A%20${encodeURIComponent(user.username||'')}%0ASleeper%20user_id%3A%20${encodeURIComponent(user.user_id||'')}`}
+           style={{color:'#FFD700',textDecoration:'underline'}}>Email us to opt out →</a>
+        <div style={{marginTop:18}}>
+          <a href="/lookup" style={{color:'#888',textDecoration:'none',fontWeight:700}}>← Search another user</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Top-level Lookup page (route: /lookup[/identifier]) ----------
+function LookupApp({ identifier }){
+  return (
+    <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
+        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14}}>
+          <a href="/" style={{textDecoration:'none'}}><img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/></a>
+          <a href="/" style={{textDecoration:'none',color:'#FFD700',fontWeight:900,letterSpacing:2.5,fontSize:14}}>PLAY FOR KEEPS</a>
+          <div style={{flex:1}}/>
+          <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1}}>🎲 DISPERSAL</a>
+        </div>
+      </div>
+      {identifier ? <LookupProfile identifier={identifier}/> : <LookupSearch/>}
+    </div>
+  );
+}
+
 const path = window.location.pathname.replace(/\/$/,'');
 const isAdminRoute = path.endsWith('/admin');
 const dispersalMatch = path.match(/^\/dispersal(?:\/([0-9a-f-]+))?$/i);
+const lookupMatch = path.match(/^\/lookup(?:\/([^/]+))?$/i);
 const isDeadRoute = path === '/zolty' || path === '/compare';
 function NotFoundPage(){
   return (
@@ -5792,6 +6064,7 @@ function NotFoundPage(){
 ReactDOM.render(
   isAdminRoute ? <AdminApp/>
   : dispersalMatch ? <DispersalApp draftId={dispersalMatch[1] || null}/>
+  : lookupMatch ? <LookupApp identifier={lookupMatch[1] ? decodeURIComponent(lookupMatch[1]) : null}/>
   : isDeadRoute ? <NotFoundPage/>
   : <App/>,
   document.getElementById("root")
