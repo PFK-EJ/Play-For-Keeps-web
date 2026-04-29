@@ -50,8 +50,26 @@ input, select { font-family:inherit; }
   .pfk-logo-img { width:56px !important; height:56px !important; }
   .pfk-header-subtitle { display:none !important; }
   .pfk-header-title { font-size:22px !important; letter-spacing:2px !important; }
-  .pfk-top-tabs { width:100% !important; margin-left:0 !important; margin-top:4px; }
-  .pfk-top-tabs button { flex:1 !important; padding:7px 2px !important; font-size:11px !important; letter-spacing:0 !important; }
+  /* Tabs sit in a single horizontally-scrollable row on mobile so the master
+     toolbar stays short — otherwise 5 tabs wrap into 3 rows and eat half the
+     viewport, hiding page content under the sticky bar. */
+  .pfk-top-tabs {
+    width:100% !important;
+    margin-left:0 !important;
+    margin-top:4px;
+    flex-wrap:nowrap !important;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .pfk-top-tabs::-webkit-scrollbar { display:none; }
+  .pfk-top-tabs > button, .pfk-top-tabs > a {
+    flex:0 0 auto !important;
+    white-space:nowrap;
+    padding:7px 10px !important;
+    font-size:11px !important;
+    letter-spacing:0 !important;
+  }
   .pfk-content { padding:10px 4px 16px !important; }
   /* Tight card + row padding so content starts near the left edge */
   .pfk-wide-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -4px; padding:0 4px 2px; }

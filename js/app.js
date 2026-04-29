@@ -3322,26 +3322,28 @@ function App(){
       <MasterToolbar currentTab={tab} onSetTab={setTab} onSignInClick={()=>{setAuthMode('signin');setAuthOpen(true);}} userSleeperName={userRow?.sleeper_username}/>
       {saved && <div style={{position:'fixed',top:14,right:14,zIndex:200,padding:"6px 14px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700,boxShadow:"0 4px 12px rgba(0,0,0,0.5)"}}>✓ Saved</div>}
       <div className="pfk-content" style={{maxWidth:1140,margin:"0 auto",padding:"20px 14px"}}>
-        {/* Dispersal hero CTA — front-and-center on the main page since dispersal
-            is currently PFK's most differentiated tool. Sits above the tab content. */}
-        <a href="/dispersal" style={{display:"block",textDecoration:"none",marginBottom:18,background:"linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)",border:"2px solid #FFD700",borderRadius:14,padding:"18px 22px",boxShadow:"0 0 24px #FFD70022",transition:"all .15s"}}
-           onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,#251c00 0%,#1a1a1a 100%)";e.currentTarget.style.boxShadow="0 0 32px #FFD70044";}}
-           onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)";e.currentTarget.style.boxShadow="0 0 24px #FFD70022";}}>
-          <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"}}>
-            <div style={{fontSize:38,flexShrink:0}}>🎲</div>
-            <div style={{flex:1,minWidth:240}}>
-              <div style={{fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
-              <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>The only fully-featured dispersal draft tool on the market. Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
+        {/* Dispersal hero CTA — only on Rookie Ranks (the landing tab).
+            Other tabs reach Dispersal via the master toolbar nav above the yellow line. */}
+        {(tab==="pfk"||tab==="custom") && (
+          <a href="/dispersal" style={{display:"block",textDecoration:"none",marginBottom:18,background:"linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)",border:"2px solid #FFD700",borderRadius:14,padding:"18px 22px",boxShadow:"0 0 24px #FFD70022",transition:"all .15s"}}
+             onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,#251c00 0%,#1a1a1a 100%)";e.currentTarget.style.boxShadow="0 0 32px #FFD70044";}}
+             onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)";e.currentTarget.style.boxShadow="0 0 24px #FFD70022";}}>
+            <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"}}>
+              <div style={{fontSize:38,flexShrink:0}}>🎲</div>
+              <div style={{flex:1,minWidth:240}}>
+                <div style={{fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
+                <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>The only fully-featured dispersal draft tool on the market. Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
+                {/* Dev-only: completed-drafts counter — live query, hidden on prod */}
+                {isDevHost() && completedDispersalCount !== null && (
+                  <div style={{fontSize:11,color:"#FFD700",fontWeight:800,letterSpacing:0.5,whiteSpace:"nowrap"}}>{completedDispersalCount.toLocaleString()} completed drafts</div>
+                )}
+              </div>
             </div>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-              <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
-              {/* Dev-only: completed-drafts counter — live query, hidden on prod */}
-              {isDevHost() && completedDispersalCount !== null && (
-                <div style={{fontSize:11,color:"#FFD700",fontWeight:800,letterSpacing:0.5,whiteSpace:"nowrap"}}>{completedDispersalCount.toLocaleString()} completed drafts</div>
-              )}
-            </div>
-          </div>
-        </a>
+          </a>
+        )}
 
         {(tab==="pfk"||tab==="custom") && (
           <div style={{display:"inline-flex",gap:4,padding:4,background:"#0a0a0a",border:"1px solid #1e1e1e",borderRadius:8,marginBottom:14}}>
