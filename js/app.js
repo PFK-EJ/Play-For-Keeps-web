@@ -5940,22 +5940,43 @@ const fcFormatForLeague = (lg) => {
   const numTeams = lg.total_rosters || 12;
   return { numQbs, ppr, tepLevel, numTeams, key: `${numQbs}q-${ppr}p-${tepLevel}t-${numTeams}n` };
 };
+// Picks ARE in the main FC /values/current response — listed by name (e.g.
+// "2026 1st", "2027 2nd", "2026 Pick 1.05"). Players are looked up by sleeperId,
+// picks are looked up by name. Both maps are built from one fetch per format.
+const _fcPicksByFormat = {};
 const fetchFcForFormat = async (fmt) => {
   if(_fcByFormat[fmt.key]) return _fcByFormat[fmt.key];
   const url = `https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${fmt.numQbs}&numTeams=${fmt.numTeams}&ppr=${fmt.ppr}&tepLevel=${fmt.tepLevel}`;
   try{
     const arr = await fetch(url).then(r=>r.json());
-    const map = {};
+    const playerMap = {};
+    const pickMap = {};
     (arr||[]).forEach(row => {
       const sid = row?.player?.sleeperId;
-      if(sid != null) map[String(sid)] = row?.value ?? 0;
+      const nm = row?.player?.name || '';
+      const v = row?.value ?? 0;
+      if(sid != null){
+        playerMap[String(sid)] = v;
+      }
+      // Generic picks ("2026 1st") and specific picks ("2026 Pick 1.05") both keyed by name
+      if(/^\d{4}\s+(1st|2nd|3rd|4th|5th)$/.test(nm) || /^\d{4}\s+Pick\s/.test(nm)){
+        pickMap[nm] = v;
+      }
     });
-    _fcByFormat[fmt.key] = map;
-    return map;
+    _fcByFormat[fmt.key] = playerMap;
+    _fcPicksByFormat[fmt.key] = pickMap;
+    return playerMap;
   }catch(e){
     _fcByFormat[fmt.key] = {};
+    _fcPicksByFormat[fmt.key] = {};
     return {};
   }
+};
+// Look up a generic future pick value (e.g. valueOfPick(2026, 1) → "2026 1st" → $3214)
+const fcPickValue = (formatKey, year, round) => {
+  const map = _fcPicksByFormat[formatKey] || {};
+  const suffix = round === 1 ? '1st' : round === 2 ? '2nd' : round === 3 ? '3rd' : `${round}th`;
+  return map[`${year} ${suffix}`] || 0;
 };
 
 // Team strength snapshot: for each CURRENT-season dynasty league the user is in,
@@ -5982,21 +6003,59 @@ const lookupTeamStrength = async (userId, allLeagues) => {
     return { leaguesCount: 0, avgRank: null, avgTeams: 0, ranks: [] };
   }
   const ranks = [];
+  // Pick years/rounds we value (matches FantasyCalc's published generic-pick range)
+  const PICK_YEARS = [LOOKUP_CURRENT_YEAR, LOOKUP_CURRENT_YEAR+1, LOOKUP_CURRENT_YEAR+2];
+  const PICK_ROUNDS = [1, 2, 3, 4];
   await Promise.all(dynastyTarget.map(async (lg) => {
     try{
-      // Per-league FC values matched to that league's format.
-      // This is the fix for the McBride/TE-undervaluation bug — TEP=1 leagues
-      // need TEP-adjusted values or TE-heavy rosters get under-ranked.
       const fmt = fcFormatForLeague(lg);
       const fcMap = await fetchFcForFormat(fmt);
-      const valueOf = (pid) => fcMap[String(pid)] || 0;
-      const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
-      const rosterValues = (rosters||[]).map(r => ({
-        roster_id: r.roster_id,
-        owner_id: r.owner_id,
-        co_owners: r.co_owners || [],
-        totalValue: (r.players||[]).reduce((sum, pid) => sum + valueOf(pid), 0),
-      }));
+      const valueOfPlayer = (pid) => fcMap[String(pid)] || 0;
+      // Fetch rosters AND traded picks in parallel — picks add significant value
+      // to dynasty rosters (a 2026 1st can be worth $3K+, a 2027 1st $3K+).
+      // Without picks, contender teams that hold lots of picks get undervalued.
+      const [rosters, tradedPicks] = await Promise.all([
+        fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json()),
+        fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/traded_picks`, {cache:'no-store'}).then(r=>r.json()).catch(()=>[]),
+      ]);
+      // Build pick ownership map: each roster starts owning their own picks for
+      // PICK_YEARS × PICK_ROUNDS. Then apply traded_picks to redirect ownership.
+      // Sleeper traded_picks entries: roster_id = original owner, owner_id = current owner.
+      const rosterCount = (rosters||[]).length;
+      const pickOwner = {}; // "year-round-origRid" → currentOwnerRid
+      for(let r = 1; r <= rosterCount; r++){
+        for(const y of PICK_YEARS){
+          for(const round of PICK_ROUNDS){
+            pickOwner[`${y}-${round}-${r}`] = r;
+          }
+        }
+      }
+      (tradedPicks||[]).forEach(tp => {
+        const y = parseInt(tp.season);
+        const round = tp.round;
+        const orig = tp.roster_id;
+        const cur = tp.owner_id;
+        if(PICK_YEARS.includes(y) && PICK_ROUNDS.includes(round) && orig != null && cur != null){
+          pickOwner[`${y}-${round}-${orig}`] = cur;
+        }
+      });
+      // Aggregate pick value per current-owner roster
+      const pickValByRoster = {};
+      Object.keys(pickOwner).forEach(key => {
+        const [y, round] = key.split('-');
+        const owner = pickOwner[key];
+        pickValByRoster[owner] = (pickValByRoster[owner] || 0) + fcPickValue(fmt.key, parseInt(y), parseInt(round));
+      });
+      const rosterValues = (rosters||[]).map(r => {
+        const playerVal = (r.players||[]).reduce((sum, pid) => sum + valueOfPlayer(pid), 0);
+        const pickVal = pickValByRoster[r.roster_id] || 0;
+        return {
+          roster_id: r.roster_id,
+          owner_id: r.owner_id,
+          co_owners: r.co_owners || [],
+          totalValue: playerVal + pickVal,
+        };
+      });
       rosterValues.sort((a,b) => b.totalValue - a.totalValue);
       const userIndex = rosterValues.findIndex(r =>
         r.owner_id === userId || r.co_owners.includes(userId)
