@@ -6339,7 +6339,7 @@ function LookupSearch(){
       <div style={{fontSize:14,color:'#bbb',marginBottom:30,letterSpacing:0.3,lineHeight:1.6,maxWidth:540,margin:'0 auto 30px'}}>Type any Sleeper username to instantly see their account age, total dynasty leagues, trade activity, orphan history, and roster average dynasty value. Vet new leaguemates in seconds.</div>
       <form onSubmit={submit} style={{display:'flex',gap:8,marginBottom:14}}>
         <input
-          autoFocus value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
+          value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
           placeholder="Sleeper username (e.g. ej97)"
           style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
         <button type="submit" style={{padding:'14px 24px',background:'#FFD700',border:'none',borderRadius:8,color:'#000',fontWeight:900,fontSize:14,letterSpacing:1.5,cursor:'pointer',whiteSpace:'nowrap'}}>LOOKUP →</button>
