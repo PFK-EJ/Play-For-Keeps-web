@@ -6567,7 +6567,13 @@ function LookupProfile({ identifier }){
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🔍 PFK SLEEPER PROFILE</div>
               <div style={{display:'flex',alignItems:'center',gap:14}}>
-                {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} crossOrigin="anonymous"/>}
+                {/* Stylized initial-letter avatar instead of the real Sleeper avatar:
+                    sleepercdn.com doesn't send CORS headers, so html2canvas can't capture
+                    the real image into the share .png (it just gets skipped). Initial-
+                    letter placeholder is brand-consistent and always renders cleanly. */}
+                <div style={{width:48,height:48,borderRadius:'50%',background:'#FFD700',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:22,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+                  {((user.display_name || user.username || '?')[0] || '?').toUpperCase()}
+                </div>
                 <div>
                   <div style={{fontSize:24,fontWeight:900,color:'#fff',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
                   {createdDate && <div style={{fontSize:12,color:'#888',marginTop:2}}>Account {lookupTimeAgo(createdDate)}</div>}
@@ -6661,14 +6667,35 @@ function LookupProfile({ identifier }){
 }
 
 // ---------- Top-level Lookup page (route: /lookup[/identifier]) ----------
+// Quick search input for the header — only renders on profile pages so users
+// can run a new lookup without navigating back to /lookup.
+function LookupHeaderSearch(){
+  const [q,setQ] = useState('');
+  const submit = (e) => {
+    if(e) e.preventDefault();
+    const v = (q||'').trim();
+    if(!v) return;
+    window.location.href = '/lookup/' + encodeURIComponent(v);
+  };
+  return (
+    <form onSubmit={submit} style={{display:'flex',gap:6,alignItems:'center'}}>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 New lookup…"
+        style={{padding:'6px 10px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',width:160}}/>
+      <button type="submit" style={{padding:'6px 11px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:11,letterSpacing:1,cursor:'pointer'}}>GO</button>
+    </form>
+  );
+}
+
 function LookupApp({ identifier }){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
-        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14}}>
+        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <a href="/" style={{textDecoration:'none'}}><img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/></a>
           <a href="/" style={{textDecoration:'none',color:'#FFD700',fontWeight:900,letterSpacing:2.5,fontSize:14}}>PLAY FOR KEEPS</a>
           <div style={{flex:1}}/>
+          {/* Quick-search input only on profile pages — search page already has the big input */}
+          {identifier && <LookupHeaderSearch/>}
           <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1}}>🎲 DISPERSAL</a>
         </div>
       </div>
