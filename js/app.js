@@ -6299,7 +6299,7 @@ function LookupProfile({ identifier }){
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
       <div style={card}>
         <div style={sectionHdr}>💪 AVG DYNASTY VALUE STANDINGS</div>
-        <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5}}>Where this user's roster typically finishes in their leagues by total dynasty value (lower = stronger). <span style={{color:'#666'}}>Values via fantasycalc.com.</span></div>
+        <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5}}>Where you rank in dynasty value on avg across all your leagues. <span style={{color:'#666'}}>Values via fantasycalc.com.</span></div>
         {strengthLoading && !teamStrength && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Calculating roster ranks across leagues…</div>
         )}
