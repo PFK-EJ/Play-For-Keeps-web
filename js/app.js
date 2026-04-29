@@ -2730,7 +2730,8 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
     if(onSignInClick){ e.preventDefault(); onSignInClick(); }
     // else let the link navigate to /?signin=1
   };
-  // Tab definitions — Power Rankings is dev-only and parked at the end.
+  // Tab definitions — Power Rankings has been moved out of the public nav
+  // and into the admin panel; we'll work on it there until it's ready to ship.
   // Each tab: [id, label, descriptionForTooltip, href, isInPageOnMainPage]
   // Order locked by Evan: Rookie Ranks → Dispersal → Sleeper Snapshot → Trade Polls
   const tabs = [
@@ -2738,8 +2739,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
     ["dispersal","🎲 Dispersal Draft","The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
     ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
     ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
-    ["team","📊 Power Rankings","Power Rankings (in development)","/?tab=team",true],
-  ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(window.location.hostname));
+  ];
   const handleTabClick = (e, id, isInPage) => {
     if(isInPage && onSetTab){
       e.preventDefault();
@@ -4259,7 +4259,7 @@ function AdminApp(){
       </div>
       {publishMsg&&<div style={{padding:'8px 16px',background:publishMsg.startsWith('Error')?'#3a1010':'#103a10',color:publishMsg.startsWith('Error')?'#ef4444':'#10b981',fontSize:14,fontWeight:700}}>{publishMsg}</div>}
       <div style={{display:'flex',gap:0,background:'#080808',borderBottom:'1px solid #222',padding:'0 16px'}}>
-        {[['rankings','RANKINGS'],['model','ROOKIE MODEL'],['compare','PFK vs ZOLTY']].map(([k,label])=>(
+        {[['rankings','RANKINGS'],['model','ROOKIE MODEL'],['compare','PFK vs ZOLTY'],['power','POWER RANKINGS']].map(([k,label])=>(
           <button key={k} onClick={()=>setAdminTab(k)} style={{
             padding:'10px 18px', background:'transparent', border:'none',
             borderBottom: adminTab===k ? '2px solid #FFD700' : '2px solid transparent',
@@ -4267,7 +4267,7 @@ function AdminApp(){
           }}>{label}</button>
         ))}
       </div>
-      {adminTab==='model' ? <RookieModelTab/> : adminTab==='compare' ? <PFKvsZoltyTab officialList={list}/> : (<>
+      {adminTab==='model' ? <RookieModelTab/> : adminTab==='compare' ? <PFKvsZoltyTab officialList={list}/> : adminTab==='power' ? <div style={{padding:'16px'}}><TeamTab/></div> : (<>
       <div style={{padding:'12px 16px',background:'#0a0a0a',borderBottom:'1px solid #222'}}>
         <div style={{fontSize:12,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
         <SettingsToggleBar value={adminSettings} onChange={setAdminSettings}/>
