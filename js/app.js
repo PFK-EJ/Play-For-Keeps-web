@@ -3209,54 +3209,58 @@ function App(){
         </div>
       )}
       <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1140,margin:"0 auto",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-          <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
-          <div>
-            <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
-            <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
+        <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:10}}>
+          {/* Top row: brand on left, email-support + sign-out (or sign-in) on the right */}
+          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <div>
+              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
+              <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
+            </div>
+            {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
+            <div style={{flex:1}}/>
+            {/* Right cluster: X follow + smaller Email Support + Sign in/out */}
+            <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
+               aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayForKeepsFF on X"
+               style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
+               onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
+               onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+              <span>@PlayforkeepsFF</span>
+            </a>
+            <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
+               aria-label="Email PFK support with feedback or bug reports"
+               data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
+               style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
+              📧 Email Support
+            </a>
+            {session?(
+              <>
+                {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
+                <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
+              </>
+            ):(
+              <button onClick={()=>{setAuthMode('signin');setAuthOpen(true);}} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1}}>SIGN IN</button>
+            )}
           </div>
-          {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
-          <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:4,flexWrap:"wrap"}}>
+          {/* Bottom row: nav tabs sit just above the yellow border line */}
+          <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
             {/* "Customize" was its own tab. It's now a sub-toggle inside "Rookie Ranks"
                 (View Official | Edit Mine), so we keep both 'pfk' and 'custom' as valid
                 tab states but only show ONE nav button — active when EITHER state is set. */}
-            {/* Tooltips on every nav button — hover shows what each tool does */}
             {[
               ["pfk","👑 Rookie Ranks",["pfk","custom"],"PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own"],
               ["team","📊 Power Rankings",["team"],"Power Rankings (in development)"],
               ["polls","🗳️ Trade Polls",["polls"],"Create a dynasty trade poll, share the link, and get votes from the community"],
             ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l,states,desc])=>(
-              <button key={t} onClick={()=>setTab(t)} title={desc} data-tooltip={desc} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
+              <button key={t} onClick={()=>setTab(t)} aria-label={desc} data-tooltip={desc} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
             ))}
-            <a href="/dispersal" title="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
+            <a href="/dispersal" aria-label="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
                data-tooltip="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
                style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
-            <a href="/lookup" title="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
+            <a href="/lookup" aria-label="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
                data-tooltip="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
                style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
-               title="Follow @PlayForKeepsFF on X"
-               style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 11px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:20,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:13,letterSpacing:0.3,transition:"all .15s"}}
-               onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
-               onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
-              <span>@PlayForKeepsFF</span>
-            </a>
-            <a href="mailto:ej@playforkeepsdynasty.com?subject=Play%20For%20Keeps%20feedback"
-               title="Email Play For Keeps with feedback or bug reports"
-               style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 11px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:20,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:13,letterSpacing:0.3}}>
-              📧 EMAIL PLAY FOR KEEPS
-            </a>
-            {session?(
-              <>
-                {userRow?.sleeper_username&&<div style={{fontSize:11,color:"#888"}}>Sleeper: {userRow.sleeper_username}</div>}
-                <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:13}}>Sign out</button>
-              </>
-            ):(
-              <button onClick={()=>{setAuthMode('signin');setAuthOpen(true);}} style={{padding:"8px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:13,letterSpacing:1}}>SIGN IN</button>
-            )}
           </div>
         </div>
       </div>
@@ -6285,8 +6289,8 @@ function LookupSearch(){
   };
   return (
     <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',color:'#eee',textAlign:'center'}}>
-      <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:8}}>🔍 SLEEPER USER ORPHAN HISTORY</div>
-      <div style={{fontSize:16,color:'#aaa',marginBottom:34,letterSpacing:0.5}}>Look up a manager to find better leaguemates.</div>
+      <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:10}}>🔍 SLEEPER SNAPSHOT</div>
+      <div style={{fontSize:14,color:'#bbb',marginBottom:30,letterSpacing:0.3,lineHeight:1.6,maxWidth:540,margin:'0 auto 30px'}}>Type any Sleeper username to instantly see their account age, dynasty leagues, trade activity, orphan history, and roster strength. Vet new leaguemates in 5 seconds.</div>
       <form onSubmit={submit} style={{display:'flex',gap:8,marginBottom:14}}>
         <input
           autoFocus value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
