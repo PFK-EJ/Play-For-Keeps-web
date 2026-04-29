@@ -7257,6 +7257,7 @@ function TradeFinderApp(){
                 <input type="range" min="3" max="25" step="1" value={tolerance} onChange={e=>setTolerance(Number(e.target.value))}
                        style={{width:'100%',accentColor:'#FFD700'}}/>
                 <div style={{fontSize:11,color:'#666'}}>Range: {Math.round(liveAnchor.value*(1-tolerance/100)).toLocaleString()} – {Math.round(liveAnchor.value*(1+tolerance/100)).toLocaleString()}</div>
+                <div style={{fontSize:10,color:'#555',fontStyle:'italic'}}>💾 Your tolerance preference saves automatically for future visits.</div>
               </div>
               {!liveAnchor.isPick && (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
