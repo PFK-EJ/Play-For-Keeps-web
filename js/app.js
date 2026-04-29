@@ -3250,7 +3250,7 @@ function App(){
         {(tab==="pfk"||tab==="custom") && (
           <div style={{display:"inline-flex",gap:4,padding:4,background:"#0a0a0a",border:"1px solid #1e1e1e",borderRadius:8,marginBottom:14}}>
             <button onClick={()=>setTab("pfk")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="pfk"?"#FFD700":"transparent",color:tab==="pfk"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>👑 View Official</button>
-            <button onClick={()=>setTab("custom")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="custom"?"#FFD700":"transparent",color:tab==="custom"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>✏️ Edit Mine</button>
+            <button onClick={()=>setTab("custom")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="custom"?"#FFD700":"transparent",color:tab==="custom"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>✏️ Customize My Own</button>
           </div>
         )}
         {tab==="pfk"&&(
