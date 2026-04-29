@@ -6133,6 +6133,11 @@ function LookupProfile({ identifier }){
   // Team strength (avg power-rank across current dynasty leagues) — also background.
   const [teamStrength,setTeamStrength] = useState(null);
   const [strengthLoading,setStrengthLoading] = useState(false);
+  // Snapshot share state — same pattern as the dispersal share-pool feature.
+  const profileCardRef = useRef(null);
+  const [profileShareBusy,setProfileShareBusy] = useState(false);
+  const [desktopShare,setDesktopShare] = useState(null);
+  const [shareToast,setShareToast] = useState('');
 
   useEffect(()=>{
     let cancelled = false;
@@ -6190,6 +6195,46 @@ function LookupProfile({ identifier }){
     setTimeout(()=>setLinkCopied(false), 2000);
   };
 
+  // 📸 SHARE PROFILE — captures the off-screen profile card and:
+  //   mobile: native share sheet (Photos / iMessage / X / Discord)
+  //   desktop: pops a modal with Download / Copy / Share to X
+  // Same pattern as the dispersal share-pool feature.
+  const shareProfileImage = async () => {
+    if(!window.html2canvas){ alert('Screenshot library not loaded yet — refresh and try again.'); return; }
+    if(!profileCardRef.current){ alert('Profile card not ready — try again in a sec.'); return; }
+    setProfileShareBusy(true);
+    try{
+      const canvas = await window.html2canvas(profileCardRef.current, { backgroundColor:'#080808', scale:2, useCORS:true });
+      const filename = `pfk_${(user?.username||user?.user_id||'profile').replace(/[^a-z0-9]/gi,'_')}.png`;
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+      if(isMobile && blob && navigator.canShare){
+        const file = new File([blob], filename, { type:'image/png' });
+        if(navigator.canShare({ files:[file] })){
+          try{
+            await navigator.share({ files:[file], title:`PFK profile — ${user?.display_name || user?.username || ''}` });
+            return;
+          }catch(e){ if(e && e.name==='AbortError') return; }
+        }
+      }
+      if(isMobile){
+        // Mobile fallback when Web Share isn't supported
+        const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = filename; link.href = url;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        if(blob) setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        return;
+      }
+      // Desktop: pop the share modal so user picks an action
+      if(blob){
+        setShareToast('');
+        setDesktopShare({ blob, filename });
+      }
+    }catch(e){ alert('Share failed: ' + (e.message||e)); }
+    finally{ setProfileShareBusy(false); }
+  };
+
   if(loading){
     return <div style={{maxWidth:680,margin:'80px auto',textAlign:'center',color:'#aaa',fontSize:14}}>Looking up <span style={{color:'#FFD700',fontFamily:'monospace'}}>{identifier}</span>…</div>;
   }
@@ -6237,6 +6282,7 @@ function LookupProfile({ identifier }){
           <div style={{fontSize:12,color:'#666',marginTop:2}}>{user.username && user.username !== user.display_name ? `@${user.username} · ` : ''}user_id <code style={{color:'#888'}}>{user.user_id}</code></div>
           {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
         </div>
+        <button onClick={shareProfileImage} disabled={profileShareBusy} title="Share a PFK-branded snapshot of this profile" style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#FFD700'),borderRadius:7,color:profileShareBusy?'#888':'#FFD700',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{profileShareBusy?'BUILDING…':'📸 SHARE'}</button>
       </div>
 
       {/* Activity snapshot — dynasty-focused */}
@@ -6360,6 +6406,164 @@ function LookupProfile({ identifier }){
            style={{color:'#FFD700',textDecoration:'underline'}}>Email us to opt out →</a>
         <div style={{marginTop:18}}>
           <a href="/lookup" style={{color:'#888',textDecoration:'none',fontWeight:700}}>← Search another user</a>
+        </div>
+      </div>
+
+      {/* Desktop share modal — same 3-action pattern as the dispersal share-pool flow */}
+      {desktopShare && (() => {
+        const closeModal = () => { setDesktopShare(null); setShareToast(''); };
+        const doDownload = () => {
+          const url = URL.createObjectURL(desktopShare.blob);
+          const link = document.createElement('a');
+          link.download = desktopShare.filename; link.href = url;
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+          setTimeout(()=>URL.revokeObjectURL(url), 1000);
+          setShareToast('Downloaded ✓'); setTimeout(closeModal, 900);
+        };
+        const doCopy = async () => {
+          try{
+            if(!window.ClipboardItem || !navigator.clipboard?.write){
+              setShareToast('Copy not supported in this browser — use Download instead'); return;
+            }
+            await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': desktopShare.blob })]);
+            setShareToast('Copied to clipboard ✓ — paste anywhere');
+            setTimeout(closeModal, 1400);
+          }catch(e){ setShareToast('Copy failed: ' + (e.message||e)); }
+        };
+        const doShareToX = async () => {
+          let copied = false;
+          try{
+            if(window.ClipboardItem && navigator.clipboard?.write){
+              await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': desktopShare.blob })]);
+              copied = true;
+            }
+          }catch(e){}
+          const tweetText = `Sleeper background check on @${user?.username || user?.display_name || 'this manager'} — built with @PlayforkeepsFF\n${window.location.href}`;
+          window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank');
+          setShareToast(copied ? 'Image copied — paste it into the tweet (Cmd/Ctrl+V)' : 'Tweet opened — image not auto-copied (use Copy first)');
+          setTimeout(closeModal, 2400);
+        };
+        return (
+          <div onClick={closeModal} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:99999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:440,background:'#0f0f0f',border:'2px solid #FFD700',borderRadius:12,padding:'22px 24px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                <div style={{fontWeight:900,fontSize:15,letterSpacing:1.5,color:'#FFD700'}}>📸 SHARE PROFILE</div>
+                <button onClick={closeModal} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
+              </div>
+              <div style={{fontSize:13,color:'#aaa',marginBottom:14,lineHeight:1.5}}>Image is ready. Pick what to do with it:</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                <button onClick={doDownload} style={{padding:'12px 16px',background:'#0a1f10',border:'1.5px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📥 &nbsp;DOWNLOAD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· save .png to your computer</span></button>
+                <button onClick={doCopy} style={{padding:'12px 16px',background:'transparent',border:'1.5px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📋 &nbsp;COPY TO CLIPBOARD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· paste into iMessage, Slack, etc.</span></button>
+                <button onClick={doShareToX} style={{padding:'12px 16px',background:'#000',border:'1.5px solid #fff',borderRadius:7,color:'#fff',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left',display:'flex',alignItems:'center',gap:8}}>
+                  <svg viewBox="0 0 24 24" style={{width:16,height:16}}>
+                    <path fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  &nbsp;SHARE TO X &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· copies image + opens tweet</span>
+                </button>
+              </div>
+              {shareToast && <div style={{marginTop:14,padding:'10px 12px',background:'#0a2a1a',border:'1px solid #10b981',borderRadius:7,color:'#10b981',fontSize:12,fontWeight:700,textAlign:'center'}}>{shareToast}</div>}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Off-screen share card — captured via html2canvas. Painted at -99999px so
+          the layout is correct without ever being visible to the user. */}
+      <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
+        <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'30px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
+          {/* Card header */}
+          <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
+            <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:54,width:'auto',objectFit:'contain',flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🔍 PFK SLEEPER PROFILE</div>
+              <div style={{display:'flex',alignItems:'center',gap:14}}>
+                {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} crossOrigin="anonymous"/>}
+                <div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#fff',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
+                  {createdDate && <div style={{fontSize:12,color:'#888',marginTop:2}}>Account {lookupTimeAgo(createdDate)}</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Avg dynasty value standings */}
+          {teamStrength && teamStrength.leaguesCount > 0 && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>💪 AVG DYNASTY VALUE STANDINGS</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teamStrength.avgRank.toFixed(1)}</div>
+                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG RANK</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teamStrength.avgTeams.toFixed(0)}</div>
+                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teamStrength.leaguesCount}</div>
+                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Trade activity */}
+          {tradeActivity && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>🤝 TRADE ACTIVITY</div>
+              {[
+                { label: `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`, data: tradeActivity.current },
+                { label: `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`, data: tradeActivity.prior },
+              ].map((s, idx) => s.data && s.data.leaguesCount > 0 && (
+                <div key={idx} style={{marginBottom:8}}>
+                  <div style={{fontSize:10,color:'#a78bfa',fontWeight:800,letterSpacing:1.5,marginBottom:5}}>{s.label}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                    <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                      <div style={{fontSize:20,fontWeight:900,color:'#FFD700'}}>{s.data.totalTrades}</div>
+                      <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>TOTAL TRADES</div>
+                    </div>
+                    <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                      <div style={{fontSize:20,fontWeight:900,color:'#FFD700'}}>{s.data.avgPerLeague.toFixed(1)}</div>
+                      <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>AVG / LEAGUE</div>
+                    </div>
+                    <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                      <div style={{fontSize:14,fontWeight:900,color:'#FFD700',lineHeight:1.3}}>{s.data.lastTradeDate ? lookupTimeAgo(s.data.lastTradeDate) : 'none'}</div>
+                      <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Orphan history */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>🪦 DYNASTY ORPHAN HISTORY</div>
+            <div style={{display:'flex',gap:10}}>
+              <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan?.last12mo ?? 0}</div>
+                <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST 12 MONTHS</div>
+              </div>
+              <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan?.last24mo ?? 0}</div>
+                <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST 24 MONTHS</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>LOOK UP ANY SLEEPER USER AT</div>
+              <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>playforkeepsdynasty.com/lookup</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <svg viewBox="0 0 24 24" style={{width:18,height:18,flexShrink:0}}>
+                <path fill="#FFD700" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>@PlayforkeepsFF</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
