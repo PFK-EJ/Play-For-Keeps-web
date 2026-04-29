@@ -2738,6 +2738,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
     ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
     ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
     ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
+    ["trade","💱 Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
     ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
   ];
   const handleTabClick = (e, id, isInPage) => {
@@ -6865,10 +6866,259 @@ function LookupApp({ identifier }){
   );
 }
 
+// ============================================================================
+// 💱 TRADE FINDER
+// "Type 1.03 → see every veteran (and pick) within ±X% of its value, grouped
+// by position." Fills a gap that KTC, FantasyCalc, and DynastyProcess all
+// share: every existing calculator forces a two-sided trade entry, so users
+// have to already know what to type. Trade Finder reverses the flow.
+// Default format: Superflex 1.0 PPR (PFK's standard everywhere else).
+// ============================================================================
+
+let _tfRichCache = null;
+const fetchTradeFinderAssets = async () => {
+  if(_tfRichCache) return _tfRichCache;
+  try{
+    const arr = await fetch('https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&numTeams=12&ppr=1').then(r=>r.json());
+    const assets = (arr||[]).map(row => {
+      const p = row?.player || {};
+      const name = p.name || '';
+      const pos = (p.position || '').toUpperCase();
+      const value = row?.value ?? 0;
+      const isPick = /^\d{4}\s+(1st|2nd|3rd|4th|5th)$/.test(name) || /^\d{4}\s+Pick\s/.test(name);
+      const isSlotPick = /^\d{4}\s+Pick\s/.test(name);
+      // Generic round picks ("2026 1st") clutter results next to slot picks ("2026 Pick 1.03")
+      // and confuse users — slot picks are more accurate so we hide the generic ones.
+      if(isPick && !isSlotPick) return null;
+      return {
+        name,
+        normName: (name||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(),
+        pos: isPick ? 'PICK' : (pos || 'OTHER'),
+        age: p.maturedYear ? null : (p.age ?? null),
+        value,
+        isPick,
+        sleeperId: p.sleeperId || null,
+      };
+    }).filter(Boolean).filter(a => a.value > 0);
+    _tfRichCache = assets;
+  }catch(e){
+    _tfRichCache = [];
+  }
+  return _tfRichCache;
+};
+
+// Normalize free-text pick input. Accepts "1.03", "2026 1.03", "1.3", "26 1.03"
+// and returns a canonical "2026 Pick 1.03" string for matching against FC names.
+const normalizePickQuery = (q) => {
+  const trimmed = (q||'').trim();
+  // Already canonical?
+  if(/^\d{4}\s+Pick\s+\d+\.\d+$/i.test(trimmed)) return trimmed;
+  // Pure "R.PP" form (e.g. "1.03")
+  const bare = trimmed.match(/^(\d+)\.(\d+)$/);
+  if(bare){
+    const yr = new Date().getFullYear();
+    const round = bare[1];
+    const slot = bare[2].padStart(2,'0');
+    return `${yr} Pick ${round}.${slot}`;
+  }
+  // "YYYY R.PP" or "YY R.PP"
+  const withYr = trimmed.match(/^(\d{2}|\d{4})\s+(\d+)\.(\d+)$/);
+  if(withYr){
+    let yr = withYr[1];
+    if(yr.length === 2) yr = '20' + yr;
+    return `${yr} Pick ${withYr[2]}.${withYr[3].padStart(2,'0')}`;
+  }
+  return null;
+};
+
+function TradeFinderApp(){
+  const [assets, setAssets] = useState(null); // null=loading, []=failed, [...]=loaded
+  const [query, setQuery] = useState('');
+  const [anchor, setAnchor] = useState(null);
+  const [tolerance, setTolerance] = useState(10); // percent
+  const [filter, setFilter] = useState('all'); // 'all' | 'players' | 'picks'
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    fetchTradeFinderAssets().then(setAssets);
+  },[]);
+
+  // Suggestions: fuzzy on player names + canonical pick names. Boost exact pick matches.
+  const suggestions = useMemo(() => {
+    if(!assets || !query.trim()) return [];
+    const q = query.trim().toLowerCase();
+    const pickCanonical = normalizePickQuery(query);
+    const out = [];
+    assets.forEach(a => {
+      let score = 0;
+      if(pickCanonical && a.name === pickCanonical) score = 1000;
+      else if(a.normName === q) score = 900;
+      else if(a.normName.startsWith(q)) score = 500;
+      else if(a.normName.includes(q)) score = 200;
+      else if(a.isPick && a.name.toLowerCase().includes(q)) score = 100;
+      if(score > 0) out.push({ ...a, _score: score });
+    });
+    return out.sort((x,y) => y._score - x._score || y.value - x.value).slice(0, 10);
+  },[assets, query]);
+
+  const equivalents = useMemo(() => {
+    if(!anchor || !assets) return null;
+    const lo = anchor.value * (1 - tolerance/100);
+    const hi = anchor.value * (1 + tolerance/100);
+    const matches = assets.filter(a => a.name !== anchor.name && a.value >= lo && a.value <= hi);
+    const filtered = matches.filter(a => {
+      if(filter === 'players') return !a.isPick;
+      if(filter === 'picks') return a.isPick;
+      return true;
+    });
+    const groups = { QB:[], RB:[], WR:[], TE:[], PICK:[], OTHER:[] };
+    filtered.forEach(a => {
+      const k = groups[a.pos] ? a.pos : 'OTHER';
+      groups[k].push(a);
+    });
+    Object.keys(groups).forEach(k => groups[k].sort((x,y) => y.value - x.value));
+    return { groups, total: filtered.length };
+  },[anchor, assets, tolerance, filter]);
+
+  const selectAsset = (a) => {
+    setAnchor(a);
+    setQuery(a.name);
+    setShowSuggestions(false);
+    if(inputRef.current) inputRef.current.blur();
+  };
+
+  const reset = () => {
+    setAnchor(null);
+    setQuery('');
+    setShowSuggestions(false);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const posColor = (pos) => ({
+    QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#FFD700', OTHER:'#9ca3af'
+  }[pos] || '#9ca3af');
+
+  return (
+    <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      <MasterToolbar currentTab="trade"/>
+      <div style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 60px'}}>
+        <div style={{textAlign:'center',marginBottom:24}}>
+          <div style={{fontSize:28,fontWeight:900,color:'#FFD700',letterSpacing:2.5,marginBottom:6}}>💱 TRADE FINDER</div>
+          <div style={{fontSize:13,color:'#bbb',maxWidth:560,margin:'0 auto',lineHeight:1.5}}>
+            Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. Powered by FantasyCalc · Superflex · 1.0 PPR.
+          </div>
+        </div>
+
+        <div style={{position:'relative',marginBottom:18}}>
+          <div style={{display:'flex',gap:8}}>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e=>{ setQuery(e.target.value); setShowSuggestions(true); if(anchor) setAnchor(null); }}
+              onFocus={()=>setShowSuggestions(true)}
+              onBlur={()=>setTimeout(()=>setShowSuggestions(false), 150)}
+              placeholder={assets===null ? 'Loading values…' : 'Try "1.03" or "Ja\'Marr Chase"'}
+              disabled={assets===null}
+              style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
+            {anchor && <button onClick={reset} style={{padding:'14px 18px',background:'transparent',border:'1px solid #555',borderRadius:8,color:'#888',fontWeight:700,fontSize:13,cursor:'pointer',letterSpacing:0.5}}>CLEAR</button>}
+          </div>
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={{position:'absolute',top:'100%',left:0,right:anchor?72:0,marginTop:4,background:'#0f0f0f',border:'1px solid #FFD70044',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,0.6)',zIndex:50,maxHeight:320,overflowY:'auto'}}>
+              {suggestions.map(s => (
+                <div key={s.name} onMouseDown={()=>selectAsset(s)}
+                     style={{padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid #1a1a1a',display:'flex',alignItems:'center',gap:10,fontSize:14}}
+                     onMouseEnter={e=>e.currentTarget.style.background='#1a1400'}
+                     onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <span style={{padding:'2px 7px',background:posColor(s.pos)+'22',color:posColor(s.pos),borderRadius:4,fontSize:10,fontWeight:900,letterSpacing:0.5,minWidth:38,textAlign:'center'}}>{s.pos}</span>
+                  <span style={{flex:1,color:'#fff'}}>{s.name}</span>
+                  <span style={{color:'#FFD700',fontWeight:800,fontSize:13}}>{s.value.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {anchor && (
+          <>
+            <div style={{background:'linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)',border:'2px solid #FFD700',borderRadius:12,padding:'16px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+              <span style={{padding:'4px 10px',background:posColor(anchor.pos),color:'#000',borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:0.5}}>{anchor.pos}</span>
+              <div style={{flex:1,minWidth:160}}>
+                <div style={{fontSize:18,fontWeight:900,color:'#fff'}}>{anchor.name}</div>
+                <div style={{fontSize:12,color:'#888',marginTop:2}}>Anchor value</div>
+              </div>
+              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{anchor.value.toLocaleString()}</div>
+            </div>
+
+            <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:18,display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 280px',display:'flex',flexDirection:'column',gap:6}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#888',fontWeight:700,letterSpacing:0.5}}>
+                  <span>VALUE TOLERANCE</span>
+                  <span style={{color:'#FFD700'}}>±{tolerance}%</span>
+                </div>
+                <input type="range" min="3" max="25" step="1" value={tolerance} onChange={e=>setTolerance(Number(e.target.value))}
+                       style={{width:'100%',accentColor:'#FFD700'}}/>
+                <div style={{fontSize:11,color:'#666'}}>Range: {Math.round(anchor.value*(1-tolerance/100)).toLocaleString()} – {Math.round(anchor.value*(1+tolerance/100)).toLocaleString()}</div>
+              </div>
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                {[['all','All'],['players','Players'],['picks','Picks']].map(([k,label])=>(
+                  <button key={k} onClick={()=>setFilter(k)} style={{padding:'7px 14px',borderRadius:6,border:filter===k?'1.5px solid #FFD700':'1.5px solid #1e1e1e',background:filter===k?'#FFD700':'transparent',color:filter===k?'#000':'#aaa',fontWeight:800,fontSize:12,cursor:'pointer',letterSpacing:0.5}}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {equivalents && equivalents.total === 0 && (
+              <div style={{textAlign:'center',padding:40,color:'#666',fontSize:14}}>
+                No equivalent assets in this range. Widen the tolerance with the slider above.
+              </div>
+            )}
+
+            {equivalents && equivalents.total > 0 && (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
+                {['QB','RB','WR','TE','PICK','OTHER'].filter(k => equivalents.groups[k].length > 0).map(k => (
+                  <div key={k} style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden'}}>
+                    <div style={{padding:'10px 14px',background:posColor(k)+'18',borderBottom:'1px solid '+posColor(k)+'44',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span style={{color:posColor(k),fontWeight:900,fontSize:13,letterSpacing:1}}>{k === 'PICK' ? 'PICKS' : k}</span>
+                      <span style={{color:'#666',fontSize:11,fontWeight:700}}>{equivalents.groups[k].length}</span>
+                    </div>
+                    <div>
+                      {equivalents.groups[k].map(a => {
+                        const delta = ((a.value - anchor.value) / anchor.value) * 100;
+                        const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(1) + '%';
+                        const deltaColor = Math.abs(delta) < 3 ? '#10b981' : delta > 0 ? '#FFD700' : '#888';
+                        return (
+                          <div key={a.name} style={{padding:'9px 14px',borderBottom:'1px solid #131313',display:'flex',alignItems:'center',gap:8,fontSize:13}}>
+                            <span style={{flex:1,color:'#eee',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.name}</span>
+                            <span style={{color:'#FFD700',fontWeight:800,minWidth:48,textAlign:'right'}}>{a.value.toLocaleString()}</span>
+                            <span style={{color:deltaColor,fontSize:11,fontWeight:700,minWidth:48,textAlign:'right'}}>{deltaStr}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {!anchor && assets && assets.length > 0 && (
+          <div style={{textAlign:'center',padding:'40px 20px',color:'#666',fontSize:14,lineHeight:1.7}}>
+            <div style={{fontSize:34,marginBottom:8}}>💡</div>
+            Pick anything to anchor on — we'll show every player and pick within ±10% of its value (adjustable).<br/>
+            <span style={{fontSize:12,color:'#555'}}>Default range matches KTC's "fair trade" threshold.</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const path = window.location.pathname.replace(/\/$/,'');
 const isAdminRoute = path.endsWith('/admin');
 const dispersalMatch = path.match(/^\/dispersal(?:\/([0-9a-f-]+))?$/i);
 const lookupMatch = path.match(/^\/lookup(?:\/([^/]+))?$/i);
+const isTradeFinderRoute = path === '/trade-finder';
 const isDeadRoute = path === '/zolty' || path === '/compare';
 function NotFoundPage(){
   return (
@@ -6885,6 +7135,7 @@ ReactDOM.render(
   isAdminRoute ? <AdminApp/>
   : dispersalMatch ? <DispersalApp draftId={dispersalMatch[1] || null}/>
   : lookupMatch ? <LookupApp identifier={lookupMatch[1] ? decodeURIComponent(lookupMatch[1]) : null}/>
+  : isTradeFinderRoute ? <TradeFinderApp/>
   : isDeadRoute ? <NotFoundPage/>
   : <App/>,
   document.getElementById("root")
