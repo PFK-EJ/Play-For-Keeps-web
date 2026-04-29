@@ -6567,11 +6567,14 @@ function LookupProfile({ identifier }){
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🔍 PFK SLEEPER PROFILE</div>
               <div style={{display:'flex',alignItems:'center',gap:14}}>
-                {/* Stylized initial-letter avatar instead of the real Sleeper avatar:
-                    sleepercdn.com doesn't send CORS headers, so html2canvas can't capture
-                    the real image into the share .png (it just gets skipped). Initial-
-                    letter placeholder is brand-consistent and always renders cleanly. */}
-                <div style={{width:48,height:48,borderRadius:'50%',background:'#FFD700',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:22,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+                {/* Real Sleeper avatar — proxied through /api/avatar/{id} so it's
+                    same-origin (sleepercdn.com doesn't send CORS headers; html2canvas
+                    couldn't read the pixels otherwise). Falls back to an initial-
+                    letter placeholder if the proxy fetch fails for any reason. */}
+                {user.avatar
+                  ? <img src={`/api/avatar/${user.avatar}`} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e',flexShrink:0}} onError={e=>{e.target.style.display='none'; const fb = e.target.nextElementSibling; if(fb) fb.style.display='flex';}}/>
+                  : null}
+                <div style={{width:48,height:48,borderRadius:'50%',background:'#FFD700',display: user.avatar ? 'none' : 'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:22,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
                   {((user.display_name || user.username || '?')[0] || '?').toUpperCase()}
                 </div>
                 <div>
