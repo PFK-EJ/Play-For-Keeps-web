@@ -5856,33 +5856,19 @@ const lookupOrphanHistory = async (userId, allLeagues) => {
   return { last12mo: last12, last24mo: last24, all: details.length, details };
 };
 
-// Trade activity snapshot: walks the user's CURRENT-season dynasty leagues,
-// finds their roster_id in each, fetches weekly transactions, and counts
-// completed trades they were part of. Returns:
-//   { season, leaguesCount, totalTrades, avgPerLeague, lastTradeDate }
+// Compute trade stats for a single season's dynasty leagues. Helper used by
+// lookupTradeActivity to compute current + prior seasons in parallel.
 //
-// IMPORTANT lesson learned: dynasty trades happen YEAR-ROUND, but Sleeper
-// stores them under whichever league_id is active for that season. In April
-// 2026 (now), most active trading lives in 2026 league_ids. Earlier version
-// scanned the prior season → "last trade today" showed as "3 months ago"
-// because the prior-season league's last trade was end-of-playoffs in Jan.
-// Fall back to prior year only if user has no current-year dynasty leagues.
-//
-// This is heavy (~200 API calls for a 12-league user) — call AFTER the rest
-// of the profile renders so the page never feels slow.
-const lookupTradeActivity = async (userId, allLeagues) => {
-  let targetSeason = String(LOOKUP_CURRENT_YEAR);
-  let dynastyTarget = (allLeagues||[]).filter(lg =>
-    (lg.settings||{}).type === 2 && lg._season === targetSeason
+// IMPORTANT: dynasty trades happen YEAR-ROUND, but Sleeper stores them under
+// whichever league_id is active for that season. In April 2026 (now), most
+// active trading lives in 2026 league_ids. The 2025 league_id holds end-of-
+// playoffs trades from Jan/Feb 2026 + the in-season weeks of 2025 itself.
+const lookupTradesForSeason = async (userId, allLeagues, season) => {
+  const dynastyTarget = (allLeagues||[]).filter(lg =>
+    (lg.settings||{}).type === 2 && lg._season === season
   );
   if(dynastyTarget.length === 0){
-    targetSeason = String(LOOKUP_CURRENT_YEAR - 1);
-    dynastyTarget = (allLeagues||[]).filter(lg =>
-      (lg.settings||{}).type === 2 && lg._season === targetSeason
-    );
-  }
-  if(dynastyTarget.length === 0){
-    return { season: targetSeason, leaguesCount: 0, totalTrades: 0, avgPerLeague: 0, lastTradeDate: null };
+    return { season, leaguesCount: 0, totalTrades: 0, avgPerLeague: 0, lastTradeDate: null };
   }
   let totalTrades = 0;
   let lastTradeDate = null;
@@ -5894,8 +5880,6 @@ const lookupTradeActivity = async (userId, allLeagues) => {
       if(!userRoster) return;
       leaguesWithUser++;
       const userRosterId = userRoster.roster_id;
-      // Sleeper exposes weekly transactions for every regular + playoff week.
-      // Walk weeks 1-17 to cover the full season's trade window.
       const weeks = Array.from({length: 17}, (_, i) => i + 1);
       const txArrays = await Promise.all(weeks.map(w =>
         fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${w}`, {cache:'no-store'})
@@ -5915,12 +5899,26 @@ const lookupTradeActivity = async (userId, allLeagues) => {
     }catch(e){}
   }));
   return {
-    season: targetSeason,
+    season,
     leaguesCount: leaguesWithUser,
     totalTrades,
     avgPerLeague: leaguesWithUser > 0 ? (totalTrades / leaguesWithUser) : 0,
     lastTradeDate,
   };
+};
+
+// Trade activity snapshot — fetches CURRENT season + PRIOR season in parallel.
+// Showing both gives commish more data points early in a season when the current
+// year has limited activity. Heavy (~400 API calls for a 12-league user) — runs
+// in background so page doesn't feel slow.
+const lookupTradeActivity = async (userId, allLeagues) => {
+  const currentSeason = String(LOOKUP_CURRENT_YEAR);
+  const priorSeason = String(LOOKUP_CURRENT_YEAR - 1);
+  const [current, prior] = await Promise.all([
+    lookupTradesForSeason(userId, allLeagues, currentSeason),
+    lookupTradesForSeason(userId, allLeagues, priorSeason),
+  ]);
+  return { current, prior };
 };
 
 // FantasyCalc value cache, keyed by format string. Each format = different value set
@@ -6191,34 +6189,53 @@ function LookupProfile({ identifier }){
         </div>
       </div>
 
-      {/* Trade activity — last completed season. Loads in background. */}
+      {/* Trade activity — current + prior season. Both load in background.
+          Showing both gives commish more data points early in a new season. */}
       <div style={card}>
-        <div style={sectionHdr}>🤝 TRADE ACTIVITY ({tradeActivity?.season || LOOKUP_CURRENT_YEAR} DYNASTY LEAGUES)</div>
+        <div style={sectionHdr}>🤝 TRADE ACTIVITY</div>
         {tradeLoading && !tradeActivity && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Counting trades across leagues…</div>
         )}
-        {tradeActivity && tradeActivity.leaguesCount === 0 && (
-          <div style={{padding:'14px',color:'#888',fontSize:13,textAlign:'center'}}>No dynasty leagues found for the {tradeActivity.season} season.</div>
-        )}
-        {tradeActivity && tradeActivity.leaguesCount > 0 && (
-          <>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
-              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{tradeActivity.totalTrades}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TOTAL TRADES</div>
+        {tradeActivity && (() => {
+          // Inline sub-section renderer — same layout for current and prior.
+          const renderSeason = (data, label) => {
+            if(!data || data.leaguesCount === 0){
+              return (
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,color:'#a78bfa',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>{label}</div>
+                  <div style={{padding:'10px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,fontSize:12,color:'#888',textAlign:'center'}}>No dynasty leagues found for this season.</div>
+                </div>
+              );
+            }
+            return (
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:11,color:'#a78bfa',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>{label}</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8}}>
+                  <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                    <div style={{fontSize:22,fontWeight:900,color:'#FFD700'}}>{data.totalTrades}</div>
+                    <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>TOTAL TRADES</div>
+                  </div>
+                  <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                    <div style={{fontSize:22,fontWeight:900,color:'#FFD700'}}>{data.avgPerLeague.toFixed(1)}</div>
+                    <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>AVG PER LEAGUE</div>
+                  </div>
+                  <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                    <div style={{fontSize:16,fontWeight:900,color:'#FFD700',lineHeight:1.2}}>{data.lastTradeDate ? lookupTimeAgo(data.lastTradeDate) : 'none'}</div>
+                    <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:'#555',marginTop:6,fontStyle:'italic'}}>Across {data.leaguesCount} dynasty {data.leaguesCount===1?'league':'leagues'}.</div>
               </div>
-              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{tradeActivity.avgPerLeague.toFixed(1)}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG PER LEAGUE</div>
-              </div>
-              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:18,fontWeight:900,color:'#FFD700',lineHeight:1.2}}>{tradeActivity.lastTradeDate ? lookupTimeAgo(tradeActivity.lastTradeDate) : 'never'}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST TRADE</div>
-              </div>
-            </div>
-            <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic'}}>Across {tradeActivity.leaguesCount} of this user's current dynasty {tradeActivity.leaguesCount===1?'league':'leagues'}. Includes offseason trades — dynasty trading happens year-round.</div>
-          </>
-        )}
+            );
+          };
+          return (
+            <>
+              {renderSeason(tradeActivity.current, `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`)}
+              {renderSeason(tradeActivity.prior, `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`)}
+              <div style={{fontSize:11,color:'#555',marginTop:8,fontStyle:'italic'}}>Includes offseason trades — dynasty trading happens year-round.</div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
