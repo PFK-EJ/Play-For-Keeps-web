@@ -3226,11 +3226,13 @@ function App(){
               ["team","📊 Power Rankings",["team"],"Power Rankings (in development)"],
               ["polls","🗳️ Trade Polls",["polls"],"Create a dynasty trade poll, share the link, and get votes from the community"],
             ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l,states,desc])=>(
-              <button key={t} onClick={()=>setTab(t)} title={desc} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
+              <button key={t} onClick={()=>setTab(t)} title={desc} data-tooltip={desc} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
             ))}
             <a href="/dispersal" title="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
+               data-tooltip="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
                style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
             <a href="/lookup" title="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
+               data-tooltip="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
                style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>

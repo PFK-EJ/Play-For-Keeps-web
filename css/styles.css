@@ -9,6 +9,38 @@ input, select { font-family:inherit; }
 ::-webkit-scrollbar-track { background:#111; }
 ::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
 @keyframes pfk-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,.5);} 50%{box-shadow:0 0 0 8px rgba(255,215,0,0);} }
+
+/* Custom tooltips — replace native browser title delay (~1s) with instant on-brand bubble.
+   Usage: add data-tooltip="..." to any element. Keep title="" too for screen readers. */
+[data-tooltip] { position:relative; }
+[data-tooltip]:hover::after, [data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position:absolute;
+  top:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%);
+  background:#0f0f0f;
+  color:#fff;
+  border:1px solid #FFD700;
+  padding:8px 12px;
+  border-radius:6px;
+  font-size:12px;
+  font-weight:600;
+  font-family:'Inter','Segoe UI',sans-serif;
+  text-transform:none;
+  letter-spacing:0.2px;
+  line-height:1.45;
+  white-space:normal;
+  width:max-content;
+  max-width:280px;
+  text-align:center;
+  z-index:9999;
+  pointer-events:none;
+  box-shadow:0 6px 18px rgba(0,0,0,0.6);
+  animation:pfk-tip-in 80ms ease-out;
+}
+@keyframes pfk-tip-in { from{opacity:0;transform:translate(-50%,-4px);} to{opacity:1;transform:translate(-50%,0);} }
+@media (max-width:600px){ [data-tooltip]:hover::after, [data-tooltip]:focus-visible::after { display:none; } }
 @media (min-width:601px){
   .pfk-filter-bar { position:sticky; top:82px; z-index:50; background:#080808; padding:8px 0; margin-bottom:8px !important; }
   .pfk-pr-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:20px; align-items:start; }
