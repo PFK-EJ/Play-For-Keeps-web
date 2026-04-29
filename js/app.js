@@ -6291,7 +6291,6 @@ function LookupProfile({ identifier }){
             <>
               {renderSeason(tradeActivity.current, `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`)}
               {renderSeason(tradeActivity.prior, `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`)}
-              <div style={{fontSize:11,color:'#555',marginTop:8,fontStyle:'italic'}}>Includes offseason trades — dynasty trading happens year-round.</div>
             </>
           );
         })()}
