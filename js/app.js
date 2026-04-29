@@ -2707,6 +2707,107 @@ function DevAuthGate({mode, doAuth, authEmail, setAuthEmail, authPassword, setAu
 }
 
 // ============================================================================
+// useSleeperUser — shared hook for the linked Sleeper account.
+// Backed by localStorage (key: pfk_sleeper_user). Any component can call
+// useSleeperUser() and it stays in sync with every other instance: when one
+// component links/unlinks, all the others re-render via the 'pfk:sleeper-changed'
+// custom event (same-tab updates) and the native 'storage' event (cross-tab).
+// This is what makes the Sleeper link in MasterToolbar instantly reflect in
+// Trade Finder (and future Lookup/Dispersal integrations) on the same page.
+// ============================================================================
+const SLEEPER_STORAGE_KEY = 'pfk_sleeper_user';
+const SLEEPER_CHANGE_EVENT = 'pfk:sleeper-changed';
+function useSleeperUser(){
+  const read = () => {
+    try{ return JSON.parse(localStorage.getItem(SLEEPER_STORAGE_KEY) || 'null'); }catch(e){ return null; }
+  };
+  const [user, setUserState] = useState(read);
+  useEffect(() => {
+    const refresh = () => setUserState(read());
+    window.addEventListener(SLEEPER_CHANGE_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(SLEEPER_CHANGE_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  },[]);
+  const setUser = (next) => {
+    if(next) localStorage.setItem(SLEEPER_STORAGE_KEY, JSON.stringify(next));
+    else { localStorage.removeItem(SLEEPER_STORAGE_KEY); localStorage.removeItem('pfk_sleeper_league'); }
+    setUserState(next);
+    window.dispatchEvent(new Event(SLEEPER_CHANGE_EVENT));
+  };
+  return [user, setUser];
+}
+
+// ============================================================================
+// SleeperLink — the "Link Sleeper" button + linked chip used inside MasterToolbar.
+// Pulled out so the toolbar's own state stays focused on session/tabs.
+// ============================================================================
+function SleeperLink(){
+  const [user, setUser] = useSleeperUser();
+  const [linking, setLinking] = useState(false);
+  const [val, setVal] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setErr('');
+    const q = (val||'').trim();
+    if(!q){ setErr('Enter your Sleeper username'); return; }
+    setBusy(true);
+    try{
+      const u = await lookupResolveUser(q);
+      setUser({ user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null });
+      setLinking(false);
+      setVal('');
+    }catch(e){
+      setErr(e.message || 'Could not find that Sleeper user');
+    }finally{
+      setBusy(false);
+    }
+  };
+  if(user){
+    const avatar = user.avatar ? `https://sleepercdn.com/avatars/thumbs/${user.avatar}` : null;
+    return (
+      <div data-tooltip="Your linked Sleeper account — click × to unlink"
+           style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 6px 3px 3px",background:"#0a0a0a",border:"1px solid #FFD70066",borderRadius:18}}>
+        {avatar
+          ? <img src={avatar} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
+          : <div style={{width:22,height:22,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900,fontSize:11}}>{(user.username||'?')[0].toUpperCase()}</div>
+        }
+        <span style={{color:'#FFD700',fontWeight:800,fontSize:11,letterSpacing:0.3,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>@{user.username}</span>
+        <button onClick={()=>{ if(confirm('Unlink your Sleeper account?')) setUser(null); }}
+                title="Unlink Sleeper"
+                style={{background:'transparent',border:'none',color:'#666',fontSize:12,fontWeight:900,cursor:'pointer',padding:'0 4px',lineHeight:1}}>×</button>
+      </div>
+    );
+  }
+  if(linking){
+    return (
+      <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+        <input autoFocus value={val} onChange={e=>{setVal(e.target.value); setErr('');}}
+               onKeyDown={e=>e.key==='Enter'&&submit()}
+               placeholder="Sleeper username"
+               disabled={busy}
+               style={{padding:'4px 8px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:11,fontFamily:'inherit',width:130}}/>
+        <button onClick={submit} disabled={busy}
+                style={{padding:'4px 8px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:10,cursor:busy?'wait':'pointer',letterSpacing:0.5}}>{busy?'…':'GO'}</button>
+        <button onClick={()=>{setLinking(false); setVal(''); setErr('');}}
+                style={{background:'transparent',border:'none',color:'#888',fontSize:14,cursor:'pointer',padding:'0 4px'}}>×</button>
+        {err && <span style={{color:'#ef4444',fontSize:10,marginLeft:4}}>{err}</span>}
+      </span>
+    );
+  }
+  return (
+    <button onClick={()=>{setLinking(true); setErr('');}}
+            data-tooltip="Link your Sleeper account once — Trade Finder, Lookup, and other tools will use it automatically"
+            style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",fontWeight:700,fontSize:11,letterSpacing:0.3,cursor:'pointer'}}>
+      🔗 Link Sleeper
+    </button>
+  );
+}
+
+// ============================================================================
 // MasterToolbar — shared header across every PFK page (App, DispersalApp, LookupApp).
 // Above the yellow line: brand + all 5 nav tabs (left) + X + Email Support + Sign in/out (right).
 // Used so users can jump between tools from any page without going home first.
@@ -2779,11 +2880,9 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
              style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
             📧 Email Support
           </a>
+          <SleeperLink/>
           {session ? (
-            <>
-              {userSleeperName && <div style={{fontSize:11,color:"#888"}}>Sleeper: {userSleeperName}</div>}
-              <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
-            </>
+            <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
           ) : (
             <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
           )}
@@ -6976,16 +7075,11 @@ function TradeFinderApp(){
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef(null);
 
-  // ---- Sleeper account linking + league-aware values (Phase 1) ----
-  // Persisted in localStorage so users only link once. Stored shape:
-  // { user_id, username, display_name, avatar }
-  const [sleeperUser, setSleeperUser] = useState(() => {
-    try{ return JSON.parse(localStorage.getItem('pfk_sleeper_user') || 'null'); }catch(e){ return null; }
-  });
-  const [linking, setLinking] = useState(false); // true while showing the username input
-  const [linkInput, setLinkInput] = useState('');
-  const [linkErr, setLinkErr] = useState('');
-  const [linkBusy, setLinkBusy] = useState(false);
+  // ---- Sleeper account + league-aware values (Phase 1) ----
+  // sleeperUser is now globally shared via useSleeperUser — linking happens in
+  // the master toolbar (or anywhere else that uses the hook), and Trade Finder
+  // re-renders automatically when the linked account changes.
+  const [sleeperUser] = useSleeperUser();
   const [leagues, setLeagues] = useState(null);   // null=not-yet-fetched, []=fetched-empty, [...]=fetched
   const [leagueId, setLeagueId] = useState(() => localStorage.getItem('pfk_sleeper_league') || '');
   const selectedLeague = useMemo(() => (leagues||[]).find(l => l.league_id === leagueId) || null, [leagues, leagueId]);
@@ -6999,9 +7093,13 @@ function TradeFinderApp(){
     fetchTradeFinderAssets(activeFormat).then(setAssets);
   },[activeFormat.key]);
 
-  // After mount, if a user is already linked, fetch their dynasty leagues.
+  // Refetch leagues whenever the linked user changes (toolbar link/unlink).
   useEffect(() => {
-    if(!sleeperUser?.user_id) return;
+    if(!sleeperUser?.user_id){
+      setLeagues(null);
+      setLeagueId('');
+      return;
+    }
     (async () => {
       try{
         const yr = String(new Date().getFullYear());
@@ -7014,33 +7112,6 @@ function TradeFinderApp(){
       }catch(e){ setLeagues([]); }
     })();
   },[sleeperUser?.user_id]);
-
-  const doLinkSleeper = async () => {
-    setLinkErr('');
-    const q = (linkInput||'').trim();
-    if(!q){ setLinkErr('Enter your Sleeper username'); return; }
-    setLinkBusy(true);
-    try{
-      const u = await lookupResolveUser(q);
-      const profile = { user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null };
-      localStorage.setItem('pfk_sleeper_user', JSON.stringify(profile));
-      setSleeperUser(profile);
-      setLinking(false);
-      setLinkInput('');
-    }catch(e){
-      setLinkErr(e.message || 'Could not find that Sleeper user');
-    }finally{
-      setLinkBusy(false);
-    }
-  };
-
-  const unlinkSleeper = () => {
-    localStorage.removeItem('pfk_sleeper_user');
-    localStorage.removeItem('pfk_sleeper_league');
-    setSleeperUser(null);
-    setLeagues(null);
-    setLeagueId('');
-  };
 
   const pickLeague = (id) => {
     setLeagueId(id);
@@ -7128,58 +7199,23 @@ function TradeFinderApp(){
     QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#FFD700', OTHER:'#9ca3af'
   }[pos] || '#9ca3af');
 
-  // Sleeper avatar resolution — direct CDN URL (we're not capturing this with
-  // html2canvas so no CORS proxy needed). Falls back to a placeholder circle.
-  const avatarUrl = sleeperUser?.avatar ? `https://sleepercdn.com/avatars/thumbs/${sleeperUser.avatar}` : null;
-
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <MasterToolbar currentTab="trade"/>
       <div style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 60px'}}>
 
-        {/* Top-left Sleeper link block — separate from the master toolbar's SIGN IN
-            (that's the Supabase admin login). This links a Sleeper account so
-            values can adjust to the user's specific league scoring settings. */}
+        {/* League dropdown — Sleeper link itself lives in the master toolbar now,
+            so all we need here is the per-tool league picker (one league at a time
+            in Trade Finder, even if the user's in many). */}
         <div style={{marginBottom:20,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
-          {!sleeperUser && !linking && (
-            <button onClick={()=>{setLinking(true); setLinkErr('');}}
-                    style={{padding:'8px 14px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#FFD700',fontWeight:800,fontSize:13,cursor:'pointer',letterSpacing:0.5}}>
-              🔗 Link Sleeper
-            </button>
-          )}
-          {!sleeperUser && linking && (
-            <div style={{display:'flex',flexDirection:'column',gap:6,maxWidth:320}}>
-              <div style={{display:'flex',gap:6}}>
-                <input autoFocus value={linkInput} onChange={e=>{setLinkInput(e.target.value); setLinkErr('');}}
-                       onKeyDown={e=>e.key==='Enter'&&doLinkSleeper()}
-                       placeholder="Sleeper username"
-                       disabled={linkBusy}
-                       style={{padding:'8px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',width:200}}/>
-                <button onClick={doLinkSleeper} disabled={linkBusy}
-                        style={{padding:'8px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:12,cursor:linkBusy?'wait':'pointer',letterSpacing:0.5}}>
-                  {linkBusy ? '…' : 'LINK'}
-                </button>
-                <button onClick={()=>{setLinking(false); setLinkInput(''); setLinkErr('');}}
-                        style={{padding:'8px 10px',background:'transparent',border:'1px solid #444',borderRadius:6,color:'#888',fontSize:12,cursor:'pointer'}}>
-                  ✕
-                </button>
-              </div>
-              {linkErr && <div style={{color:'#ef4444',fontSize:12}}>{linkErr}</div>}
-              <div style={{fontSize:11,color:'#666'}}>Public lookup — no password, no permission needed. Just your Sleeper username.</div>
+          {!sleeperUser && (
+            <div style={{padding:'10px 14px',background:'#0a0a0a',border:'1px dashed #FFD70044',borderRadius:8,color:'#aaa',fontSize:12,maxWidth:480}}>
+              💡 Link your Sleeper account in the toolbar above — Trade Finder will then auto-adjust values to your specific league's scoring settings.
             </div>
           )}
           {sleeperUser && (
             <>
-              <div style={{display:'inline-flex',alignItems:'center',gap:10,padding:'6px 12px 6px 6px',background:'#0a0a0a',border:'1px solid #FFD70044',borderRadius:24}}>
-                {avatarUrl
-                  ? <img src={avatarUrl} alt="" style={{width:30,height:30,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
-                  : <div style={{width:30,height:30,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900,fontSize:13}}>{(sleeperUser.username||'?')[0].toUpperCase()}</div>
-                }
-                <span style={{color:'#fff',fontWeight:700,fontSize:13}}>@{sleeperUser.username}</span>
-                <button onClick={unlinkSleeper} title="Unlink Sleeper account"
-                        style={{padding:'2px 8px',background:'transparent',border:'1px solid #333',borderRadius:12,color:'#666',fontSize:10,fontWeight:700,cursor:'pointer',letterSpacing:0.5,marginLeft:2}}>UNLINK</button>
-              </div>
-              {leagues === null && <div style={{fontSize:12,color:'#888'}}>Loading dynasty leagues…</div>}
+              {leagues === null && <div style={{fontSize:12,color:'#888'}}>Loading your dynasty leagues…</div>}
               {leagues && leagues.length === 0 && <div style={{fontSize:12,color:'#888'}}>No dynasty leagues found for {new Date().getFullYear()}.</div>}
               {leagues && leagues.length > 0 && (
                 <select value={leagueId} onChange={e=>pickLeague(e.target.value)}
@@ -7195,7 +7231,7 @@ function TradeFinderApp(){
         <div style={{textAlign:'center',marginBottom:18}}>
           <div style={{fontSize:28,fontWeight:900,color:'#FFD700',letterSpacing:2.5,marginBottom:6}}>⚖️ TRADE FINDER</div>
           <div style={{fontSize:13,color:'#bbb',maxWidth:600,margin:'0 auto',lineHeight:1.5}}>
-            Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. <strong style={{color:'#eee'}}>Link your Sleeper account</strong> and pick a league above — values auto-adjust to that league's exact scoring settings.
+            Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. <strong style={{color:'#eee'}}>Link your Sleeper account in the toolbar</strong> and pick a league — values auto-adjust to that league's exact scoring settings.
           </div>
           {/* Format chip — tells the user exactly which value table is in use right now. */}
           <div style={{marginTop:10,display:'inline-flex',alignItems:'center',gap:8,padding:'5px 12px',background:'#0a0a0a',border:'1px solid '+(selectedLeague?'#10b98166':'#1e1e1e'),borderRadius:16,fontSize:11,fontWeight:700,letterSpacing:0.5,color:selectedLeague?'#10b981':'#888'}}>
