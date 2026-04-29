@@ -2406,7 +2406,12 @@ function TradePollsTab({session,onRequestSignIn}){
     if(!sb){ setLoading(false); return; }
     setLoading(true);
     const { data:polls } = await sb.from('polls').select('id,title,options,settings,created_at,poll_votes(option_index,user_id)').order('created_at',{ascending:false}).limit(100);
-    const list=(polls||[]).map(p=>{
+    // 48-hour expiration: polls older than 48hrs are filtered from the public feed.
+    // Computed client-side from created_at — no schema migration needed.
+    const POLL_TTL_MS = 48 * 60 * 60 * 1000;
+    const cutoff = Date.now() - POLL_TTL_MS;
+    const fresh = (polls||[]).filter(p => new Date(p.created_at).getTime() > cutoff);
+    const list=fresh.map(p=>{
       const counts=Array(p.options.length).fill(0);
       (p.poll_votes||[]).forEach(v=>{ if(counts[v.option_index]!==undefined) counts[v.option_index]++; });
       return {...p, counts, total:(p.poll_votes||[]).length};
@@ -3200,11 +3205,18 @@ function App(){
             {/* "Customize" was its own tab. It's now a sub-toggle inside "Rookie Ranks"
                 (View Official | Edit Mine), so we keep both 'pfk' and 'custom' as valid
                 tab states but only show ONE nav button — active when EITHER state is set. */}
-            {[["pfk","👑 Rookie Ranks",["pfk","custom"]],["team","📊 Power Rankings",["team"]],["polls","🗳️ Trade Polls",["polls"]]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l,states])=>(
-              <button key={t} onClick={()=>setTab(t)} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
+            {/* Tooltips on every nav button — hover shows what each tool does */}
+            {[
+              ["pfk","👑 Rookie Ranks",["pfk","custom"],"PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own"],
+              ["team","📊 Power Rankings",["team"],"Power Rankings (in development)"],
+              ["polls","🗳️ Trade Polls",["polls"],"Create a dynasty trade poll, share the link, and get votes from the community"],
+            ].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l,states,desc])=>(
+              <button key={t} onClick={()=>setTab(t)} title={desc} style={{padding:"5px 10px",borderRadius:6,border:states.includes(tab)?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:states.includes(tab)?"#FFD700":"transparent",color:states.includes(tab)?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
             ))}
-            <a href="/dispersal" style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
-            <a href="/lookup" style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
+            <a href="/dispersal" title="The only fully-featured dispersal draft tool — pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks"
+               style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
+            <a href="/lookup" title="Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in"
+               style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
