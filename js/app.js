@@ -6912,13 +6912,19 @@ const fetchTradeFinderAssets = async (fmt = TF_DEFAULT_FORMAT) => {
   return _tfRichByFormat[fmt.key];
 };
 
-// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 12-team").
-const formatLabel = (fmt) => {
+// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 6PT PT · 12-team").
+// Optional `league` arg lets us surface scoring fields FC doesn't take as params
+// (currently just pass TD points) for transparency. FC doesn't differentiate values
+// by pass TD scoring, so this is informational only — but users want to confirm
+// their league's exact settings are being recognized.
+const formatLabel = (fmt, league = null) => {
   const qb = fmt.numQbs === 2 ? 'SF' : '1QB';
   const ppr = fmt.ppr === 1 ? '1.0 PPR' : fmt.ppr === 0.5 ? '0.5 PPR' : '0 PPR';
   // tepLevel uses FC's int convention: 0=none, 1=0.5 TEP, 2=1.0 TEP
   const tep = fmt.tepLevel === 2 ? ' · 1.0 TEP' : fmt.tepLevel === 1 ? ' · 0.5 TEP' : '';
-  return `${qb} · ${ppr}${tep} · ${fmt.numTeams}-team`;
+  const ptd = league?.scoring_settings?.pass_td;
+  const ptdStr = (ptd != null && ptd !== 4) ? ` · ${ptd}pt PT` : (ptd === 4 ? ' · 4pt PT' : '');
+  return `${qb} · ${ppr}${tep}${ptdStr} · ${fmt.numTeams}-team`;
 };
 
 // Normalize free-text pick input. Accepts "1.03", "2026 1.03", "1.3", "26 1.03"
@@ -7160,7 +7166,7 @@ function TradeFinderApp(){
           <div style={{marginTop:10,display:'inline-flex',alignItems:'center',gap:8,padding:'5px 12px',background:'#0a0a0a',border:'1px solid '+(selectedLeague?'#10b98166':'#1e1e1e'),borderRadius:16,fontSize:11,fontWeight:700,letterSpacing:0.5,color:selectedLeague?'#10b981':'#888'}}>
             <span style={{fontSize:9}}>●</span>
             {selectedLeague
-              ? <>Values for: <span style={{color:'#fff'}}>{selectedLeague.name}</span> · {formatLabel(activeFormat)}</>
+              ? <>Values for: <span style={{color:'#fff'}}>{selectedLeague.name}</span> · {formatLabel(activeFormat, selectedLeague)}</>
               : <>Values: Default {formatLabel(TF_DEFAULT_FORMAT)} (link Sleeper for league-specific values)</>
             }
           </div>
