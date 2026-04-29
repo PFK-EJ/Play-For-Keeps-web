@@ -3193,15 +3193,15 @@ function App(){
           <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
           <div>
             <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
-            <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Rookie Draft Ranks</div>
+            <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
           </div>
           {saved&&<div style={{marginLeft:8,padding:"4px 12px",background:"#0a2a1a",border:"1px solid #10b981",borderRadius:20,fontSize:13,color:"#10b981",fontWeight:700}}>✓ Saved</div>}
-          <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
-            {[["pfk","👑 PFK 2026 Rookies"],["custom","✏️ Customize My Rankings"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
-              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
+          <div className="pfk-top-tabs" style={{marginLeft:"auto",display:"flex",gap:4,flexWrap:"wrap"}}>
+            {[["pfk","👑 Rookie Ranks"],["custom","✏️ Customize"],["team","📊 Power Rankings"],["polls","🗳️ Trade Polls"]].filter(([t])=>t!=="team"||/^(dev\.|localhost|127\.)/.test(location.hostname)).map(([t,l])=>(
+              <button key={t} onClick={()=>setTab(t)} style={{padding:"5px 10px",borderRadius:6,border:tab===t?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,transition:"all .15s",lineHeight:1.4}}>{l}</button>
             ))}
-            <a href="/dispersal" style={{padding:"8px 14px",borderRadius:8,border:"2px solid #2a2a2a",background:"transparent",color:"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🎲 Dispersal Draft</a>
-            <a href="/lookup" style={{padding:"8px 14px",borderRadius:8,border:"2px solid #2a2a2a",background:"transparent",color:"#999",fontWeight:700,fontSize:14,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🔍 Sleeper Profile Snapshot</a>
+            <a href="/dispersal" style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🎲 Dispersal Draft</a>
+            <a href="/lookup" style={{padding:"5px 10px",borderRadius:6,border:"1.5px solid #1e1e1e",background:"transparent",color:"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4}}>🔍 Sleeper Snapshot</a>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
@@ -6693,6 +6693,7 @@ function LookupProfile({ identifier }){
                 <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan.orphanRatePct.toFixed(1)}%</div>
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>ORPHAN RATE</div>
+                  <div style={{fontSize:9,color:'#666',fontWeight:700,marginTop:2}}>{orphan.all} of {orphan.uniqueLeagues}</div>
                 </div>
               )}
             </div>
@@ -6741,19 +6742,17 @@ function LookupApp({ identifier }){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <div style={{background:'#0a0a0a',borderBottom:'2px solid #FFD700',padding:'10px 16px'}}>
-        {/* 3-column grid keeps the PFK brand truly centered while search + dispersal
-            stay anchored right. Empty left column balances the right column's width. */}
-        <div style={{maxWidth:1240,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr auto 1fr',alignItems:'center',gap:14}}>
-          <div></div>
+        {/* PFK brand pinned top-left (clickable home link), search + dispersal on the right.
+            Brand is centered ONLY on the captured snapshot image (off-screen card below). */}
+        <div style={{maxWidth:1240,margin:'0 auto',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <a href="/" style={{textDecoration:'none',display:'flex',alignItems:'center',gap:12}}>
             <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:48,height:48,objectFit:'contain'}} onError={e=>e.target.style.display='none'}/>
             <span style={{color:'#FFD700',fontWeight:900,letterSpacing:2.5,fontSize:14,whiteSpace:'nowrap'}}>PLAY FOR KEEPS</span>
           </a>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:10,flexWrap:'wrap'}}>
-            {/* Quick-search input only on profile pages — search page already has the big input */}
-            {identifier && <LookupHeaderSearch/>}
-            <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1,whiteSpace:'nowrap'}}>🎲 DISPERSAL</a>
-          </div>
+          <div style={{flex:1}}/>
+          {/* Quick-search input only on profile pages — search page already has the big input */}
+          {identifier && <LookupHeaderSearch/>}
+          <a href="/dispersal" style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD70055',borderRadius:6,color:'#FFD700',textDecoration:'none',fontWeight:800,fontSize:12,letterSpacing:1,whiteSpace:'nowrap'}}>🎲 DISPERSAL</a>
         </div>
       </div>
       {identifier ? <LookupProfile identifier={identifier}/> : <LookupSearch/>}
