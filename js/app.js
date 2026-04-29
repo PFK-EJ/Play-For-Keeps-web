@@ -5808,22 +5808,20 @@ const lookupAllLeagues = async (userId) => {
   return all;
 };
 
-// Orphan check: walk each season's leagues and see if the user was in a league
+// Orphan check: walk DYNASTY leagues only and see if the user was in a league
 // during a prior season but is NOT in it (or its descendant) the next season.
+// Redraft leagues (settings.type !== 2) are never counted as orphans — they
+// inherently end after one season, so missing in season N+1 is normal, not a
+// red flag. Same logic for keeper leagues.
 // Phase 0: simple raw count. Phase 1 will distinguish "found own replacement."
-// Returns { last12mo, last24mo, all, details: [{league_name, season, season_left}] }
 const lookupOrphanHistory = async (userId, allLeagues) => {
-  // Build set of league_ids currently held by user, indexed by season
+  // Restrict to dynasty leagues only (settings.type === 2)
+  const dynastyOnly = (allLeagues||[]).filter(lg => (lg.settings||{}).type === 2);
   const heldBySeason = {};
-  allLeagues.forEach(lg => {
+  dynastyOnly.forEach(lg => {
     if(!heldBySeason[lg._season]) heldBySeason[lg._season] = new Set();
     heldBySeason[lg._season].add(String(lg.league_id));
   });
-  // For each league user held in season N-1 but NOT in season N (and N exists),
-  // check the chain — was there a successor (previous_league_id chain) the user
-  // didn't follow? If yes, mark orphan event.
-  // Simpler heuristic for v0: a league the user held in season X but not in
-  // season X+1 (and X+1 leagues exist for them) = orphan event.
   const details = [];
   const sortedSeasons = SEASONS_TO_SCAN.slice().sort();
   for(let i=0;i<sortedSeasons.length-1;i++){
@@ -5832,18 +5830,14 @@ const lookupOrphanHistory = async (userId, allLeagues) => {
     if(!heldBySeason[sNext]) continue;
     const next = heldBySeason[sNext];
     cur.forEach(lid => {
-      const lg = allLeagues.find(x => String(x.league_id) === lid && x._season === sCur);
+      const lg = dynastyOnly.find(x => String(x.league_id) === lid && x._season === sCur);
       if(!lg) return;
-      // Find leagues in next season that descend from this one
-      const descendants = allLeagues.filter(x => x._season === sNext && String(x.previous_league_id||'') === lid);
-      // If next-season has leagues for the user, but none of them descend from this league,
-      // and this league itself isn't in next set, count as a likely orphan.
+      const descendants = dynastyOnly.filter(x => x._season === sNext && String(x.previous_league_id||'') === lid);
       if(descendants.length === 0 && !next.has(lid)){
         details.push({ league_name: lg.name || `League #${lid}`, league_id: lid, season_left: sCur });
       }
     });
   }
-  // Time-window slicing
   const nowYear = new Date().getFullYear();
   const last12 = details.filter(d => +d.season_left >= nowYear - 1).length;
   const last24 = details.filter(d => +d.season_left >= nowYear - 2).length;
@@ -5944,11 +5938,13 @@ function LookupProfile({ identifier }){
     );
   }
 
-  // Stats
+  // Stats — dynasty-focused since that's PFK's audience.
+  // Sleeper league.settings.type: 0=redraft, 1=keeper, 2=dynasty
   const lgs = leagues || [];
   const activeLeagues = lgs.filter(l => l._season === '2025');
   const dynastyActive = activeLeagues.filter(l => (l.settings||{}).type === 2);
-  const allTimeUnique = new Set(lgs.map(l => String(l.league_id))).size;
+  const otherActive = activeLeagues.filter(l => (l.settings||{}).type !== 2);
+  const dynastyAllTime = new Set(lgs.filter(l => (l.settings||{}).type === 2).map(l => String(l.league_id))).size;
   // Sleeper user object: created may be a unix ms timestamp
   const createdMs = user.metadata?.created || user.created;
   const createdDate = createdMs ? new Date(Number(createdMs)) : null;
@@ -5968,30 +5964,33 @@ function LookupProfile({ identifier }){
         </div>
       </div>
 
-      {/* Activity snapshot */}
+      {/* Activity snapshot — dynasty-focused */}
       <div style={card}>
         <div style={sectionHdr}>📊 ACTIVITY SNAPSHOT</div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
           <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{activeLeagues.length}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>2025 LEAGUES</div>
-          </div>
-          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
             <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY (ACTIVE)</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES (2025)</div>
           </div>
           <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{allTimeUnique}</div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>UNIQUE LEAGUES (5 YR)</div>
+            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{dynastyAllTime}</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY (5-YR UNIQUE)</div>
+          </div>
+          <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{otherActive.length}</div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>OTHER ACTIVE (REDRAFT/KEEPER)</div>
           </div>
         </div>
-        <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic'}}>Sleeper doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase via Sleeper partnership or alternate signals.</div>
+        <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>
+          Sleeper's public API may not always include leagues where this user is a co-manager rather than primary owner — co-managed leagues can be undercounted. Phase 1 will add a roster scan to catch those.
+          <br/>Sleeper also doesn't expose a public "last seen" timestamp, so we can't show that yet. Coming in a future phase.
+        </div>
       </div>
 
-      {/* Orphan history */}
+      {/* Orphan history — dynasty leagues only */}
       <div style={card}>
-        <div style={sectionHdr}>🪦 ORPHAN HISTORY</div>
-        <div style={{fontSize:13,color:'#aaa',lineHeight:1.7}}>Past leagues this user appears to have left between seasons:</div>
+        <div style={sectionHdr}>🪦 DYNASTY ORPHAN HISTORY</div>
+        <div style={{fontSize:13,color:'#aaa',lineHeight:1.7}}>Past <strong style={{color:'#fff'}}>dynasty</strong> leagues this user appears to have left between seasons. Redraft / keeper leagues that ended naturally are not counted.</div>
         <div style={{display:'flex',gap:14,marginTop:10,flexWrap:'wrap'}}>
           <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 12 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last12mo ?? 0}</strong></div>
           <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 24 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last24mo ?? 0}</strong></div>
