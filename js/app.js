@@ -6912,11 +6912,20 @@ const fetchTradeFinderAssets = async (fmt = TF_DEFAULT_FORMAT) => {
   return _tfRichByFormat[fmt.key];
 };
 
-// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 6PT PT · 12-team").
-// Optional `league` arg lets us surface scoring fields FC doesn't take as params
-// (currently just pass TD points) for transparency. FC doesn't differentiate values
-// by pass TD scoring, so this is informational only — but users want to confirm
-// their league's exact settings are being recognized.
+// Per-position pass-TD multiplier. FC's API doesn't differentiate values by
+// pass TD scoring, so we apply our own multiplier on top of FC values — same
+// table the rookie rankings use (PTD_MULT). Baseline is 5pt = 1.00.
+// 4pt PT: QB tax 5%. 6pt PT: QB bump 5%. RB/WR/TE never affected.
+// Picks unaffected (no position).
+const ptdAdjust = (value, pos, passTd) => {
+  if(!passTd || passTd === 5) return value;
+  const m = ({4:0.95, 6:1.05}[passTd]) ?? 1;
+  return pos === 'QB' ? value * m : value;
+};
+
+// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 6pt PT · 12-team").
+// Optional `league` arg surfaces scoring fields FC doesn't take as params (pass TD)
+// — and the PTD multiplier above is what makes that field actually affect values.
 const formatLabel = (fmt, league = null) => {
   const qb = fmt.numQbs === 2 ? 'SF' : '1QB';
   const ppr = fmt.ppr === 1 ? '1.0 PPR' : fmt.ppr === 0.5 ? '0.5 PPR' : '0 PPR';
@@ -7032,16 +7041,35 @@ function TradeFinderApp(){
     else localStorage.removeItem('pfk_sleeper_league');
   };
 
+  // displayAssets = FC values with PTD multiplier applied per position based on
+  // selected league's pass_td. FC's API doesn't differentiate values by pass TD
+  // scoring, so we use our own PTD_MULT table on top. When no league is linked
+  // (or pass_td is 5/null), this is a pass-through.
+  const displayAssets = useMemo(() => {
+    if(!assets) return null;
+    const ptd = selectedLeague?.scoring_settings?.pass_td;
+    if(!ptd || ptd === 5) return assets;
+    return assets.map(a => ({ ...a, value: ptdAdjust(a.value, a.pos, ptd) }));
+  },[assets, selectedLeague]);
+
+  // Anchor is stored as the asset object captured at selection time; if the league
+  // changes after that, look up the current displayAssets entry by name so the
+  // anchor's value stays in sync with whichever PTD multiplier is active now.
+  const liveAnchor = useMemo(() => {
+    if(!anchor || !displayAssets) return anchor;
+    return displayAssets.find(a => a.name === anchor.name) || anchor;
+  },[anchor, displayAssets]);
+
   // Suggestions: fuzzy on player names + canonical pick names. Boost exact pick matches.
   // Query gets the SAME normalization as asset names so apostrophes/punctuation
   // never break matching ("jamar" or "ja'marr" both find "Ja'Marr Chase").
   const suggestions = useMemo(() => {
-    if(!assets || !query.trim()) return [];
+    if(!displayAssets || !query.trim()) return [];
     const q = query.trim().toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
     if(!q) return [];
     const pickCanonical = normalizePickQuery(query);
     const out = [];
-    assets.forEach(a => {
+    displayAssets.forEach(a => {
       let score = 0;
       if(pickCanonical && a.name === pickCanonical) score = 1000;
       else if(a.normName === q) score = 900;
@@ -7051,17 +7079,17 @@ function TradeFinderApp(){
       if(score > 0) out.push({ ...a, _score: score });
     });
     return out.sort((x,y) => y._score - x._score || y.value - x.value).slice(0, 10);
-  },[assets, query]);
+  },[displayAssets, query]);
 
   const equivalents = useMemo(() => {
-    if(!anchor || !assets) return null;
-    const lo = anchor.value * (1 - tolerance/100);
-    const hi = anchor.value * (1 + tolerance/100);
-    const matches = assets.filter(a => a.name !== anchor.name && a.value >= lo && a.value <= hi);
+    if(!liveAnchor || !displayAssets) return null;
+    const lo = liveAnchor.value * (1 - tolerance/100);
+    const hi = liveAnchor.value * (1 + tolerance/100);
+    const matches = displayAssets.filter(a => a.name !== liveAnchor.name && a.value >= lo && a.value <= hi);
     // When anchoring on a pick, suppress other picks — users want vets, not "1.09 → 1.08".
     // The filter row also hides in this case so the UI doesn't offer a useless "Picks Only".
     const filtered = matches.filter(a => {
-      if(anchor.isPick) return !a.isPick;
+      if(liveAnchor.isPick) return !a.isPick;
       if(filter === 'players') return !a.isPick;
       if(filter === 'picks') return a.isPick;
       return true;
@@ -7073,7 +7101,7 @@ function TradeFinderApp(){
     });
     Object.keys(groups).forEach(k => groups[k].sort((x,y) => y.value - x.value));
     return { groups, total: filtered.length };
-  },[anchor, assets, tolerance, filter]);
+  },[liveAnchor, displayAssets, tolerance, filter]);
 
   const selectAsset = (a) => {
     setAnchor(a);
@@ -7202,15 +7230,15 @@ function TradeFinderApp(){
           )}
         </div>
 
-        {anchor && (
+        {liveAnchor && (
           <>
             <div style={{background:'linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)',border:'2px solid #FFD700',borderRadius:12,padding:'16px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-              <span style={{padding:'4px 10px',background:posColor(anchor.pos),color:'#000',borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:0.5}}>{anchor.pos}</span>
+              <span style={{padding:'4px 10px',background:posColor(liveAnchor.pos),color:'#000',borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:0.5}}>{liveAnchor.pos}</span>
               <div style={{flex:1,minWidth:160}}>
-                <div style={{fontSize:18,fontWeight:900,color:'#fff'}}>{anchor.name}</div>
+                <div style={{fontSize:18,fontWeight:900,color:'#fff'}}>{liveAnchor.name}</div>
                 <div style={{fontSize:12,color:'#888',marginTop:2}}>Anchor value</div>
               </div>
-              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{anchor.value.toLocaleString()}</div>
+              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{liveAnchor.value.toLocaleString()}</div>
             </div>
 
             <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:18,display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
@@ -7221,9 +7249,9 @@ function TradeFinderApp(){
                 </div>
                 <input type="range" min="3" max="25" step="1" value={tolerance} onChange={e=>setTolerance(Number(e.target.value))}
                        style={{width:'100%',accentColor:'#FFD700'}}/>
-                <div style={{fontSize:11,color:'#666'}}>Range: {Math.round(anchor.value*(1-tolerance/100)).toLocaleString()} – {Math.round(anchor.value*(1+tolerance/100)).toLocaleString()}</div>
+                <div style={{fontSize:11,color:'#666'}}>Range: {Math.round(liveAnchor.value*(1-tolerance/100)).toLocaleString()} – {Math.round(liveAnchor.value*(1+tolerance/100)).toLocaleString()}</div>
               </div>
-              {!anchor.isPick && (
+              {!liveAnchor.isPick && (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   {[['all','All'],['players','Players'],['picks','Picks']].map(([k,label])=>(
                     <button key={k} onClick={()=>setFilter(k)} style={{padding:'7px 14px',borderRadius:6,border:filter===k?'1.5px solid #FFD700':'1.5px solid #1e1e1e',background:filter===k?'#FFD700':'transparent',color:filter===k?'#000':'#aaa',fontWeight:800,fontSize:12,cursor:'pointer',letterSpacing:0.5}}>{label}</button>
@@ -7248,7 +7276,7 @@ function TradeFinderApp(){
                     </div>
                     <div>
                       {equivalents.groups[k].map(a => {
-                        const delta = ((a.value - anchor.value) / anchor.value) * 100;
+                        const delta = ((a.value - liveAnchor.value) / liveAnchor.value) * 100;
                         const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(1) + '%';
                         const deltaColor = Math.abs(delta) < 3 ? '#10b981' : delta > 0 ? '#FFD700' : '#888';
                         return (
