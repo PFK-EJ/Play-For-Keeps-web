@@ -7108,8 +7108,8 @@ function TradeFinderApp(){
         {!anchor && assets && assets.length > 0 && (
           <div style={{textAlign:'center',padding:'40px 20px',color:'#666',fontSize:14,lineHeight:1.7}}>
             <div style={{fontSize:34,marginBottom:8}}>💡</div>
-            Pick anything to anchor on — we'll show every player and pick within ±10% of its value (adjustable).<br/>
-            <span style={{fontSize:12,color:'#555'}}>Default range matches KTC's "fair trade" threshold.</span>
+            Pick anything to anchor on — we'll show every player and pick within ±7% of its value by default.<br/>
+            <span style={{fontSize:12,color:'#555'}}>Use the slider to widen the range up to ±25% or tighten it to ±3%.</span>
           </div>
         )}
       </div>
