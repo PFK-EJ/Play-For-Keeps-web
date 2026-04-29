@@ -6875,11 +6875,16 @@ function LookupApp({ identifier }){
 // Default format: Superflex 1.0 PPR (PFK's standard everywhere else).
 // ============================================================================
 
-let _tfRichCache = null;
-const fetchTradeFinderAssets = async () => {
-  if(_tfRichCache) return _tfRichCache;
+// Cache rich asset arrays per FC format key so swapping leagues only re-fetches
+// once per unique format combo (most users have 2-4 distinct formats max).
+const _tfRichByFormat = {};
+// Default format when no league is linked: Superflex / 1.0 PPR / no TEP / 12 teams.
+const TF_DEFAULT_FORMAT = { numQbs: 2, ppr: 1, tepLevel: 0, numTeams: 12, key: '2q-1p-0t-12n' };
+const fetchTradeFinderAssets = async (fmt = TF_DEFAULT_FORMAT) => {
+  if(_tfRichByFormat[fmt.key]) return _tfRichByFormat[fmt.key];
   try{
-    const arr = await fetch('https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&numTeams=12&ppr=1').then(r=>r.json());
+    const url = `https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${fmt.numQbs}&numTeams=${fmt.numTeams}&ppr=${fmt.ppr}&tepLevel=${fmt.tepLevel}`;
+    const arr = await fetch(url).then(r=>r.json());
     const assets = (arr||[]).map(row => {
       const p = row?.player || {};
       const name = p.name || '';
@@ -6900,11 +6905,20 @@ const fetchTradeFinderAssets = async () => {
         sleeperId: p.sleeperId || null,
       };
     }).filter(Boolean).filter(a => a.value > 0);
-    _tfRichCache = assets;
+    _tfRichByFormat[fmt.key] = assets;
   }catch(e){
-    _tfRichCache = [];
+    _tfRichByFormat[fmt.key] = [];
   }
-  return _tfRichCache;
+  return _tfRichByFormat[fmt.key];
+};
+
+// Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 12-team").
+const formatLabel = (fmt) => {
+  const qb = fmt.numQbs === 2 ? 'SF' : '1QB';
+  const ppr = fmt.ppr === 1 ? '1.0 PPR' : fmt.ppr === 0.5 ? '0.5 PPR' : '0 PPR';
+  // tepLevel uses FC's int convention: 0=none, 1=0.5 TEP, 2=1.0 TEP
+  const tep = fmt.tepLevel === 2 ? ' · 1.0 TEP' : fmt.tepLevel === 1 ? ' · 0.5 TEP' : '';
+  return `${qb} · ${ppr}${tep} · ${fmt.numTeams}-team`;
 };
 
 // Normalize free-text pick input. Accepts "1.03", "2026 1.03", "1.3", "26 1.03"
@@ -6940,9 +6954,77 @@ function TradeFinderApp(){
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef(null);
 
+  // ---- Sleeper account linking + league-aware values (Phase 1) ----
+  // Persisted in localStorage so users only link once. Stored shape:
+  // { user_id, username, display_name, avatar }
+  const [sleeperUser, setSleeperUser] = useState(() => {
+    try{ return JSON.parse(localStorage.getItem('pfk_sleeper_user') || 'null'); }catch(e){ return null; }
+  });
+  const [linking, setLinking] = useState(false); // true while showing the username input
+  const [linkInput, setLinkInput] = useState('');
+  const [linkErr, setLinkErr] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [leagues, setLeagues] = useState(null);   // null=not-yet-fetched, []=fetched-empty, [...]=fetched
+  const [leagueId, setLeagueId] = useState(() => localStorage.getItem('pfk_sleeper_league') || '');
+  const selectedLeague = useMemo(() => (leagues||[]).find(l => l.league_id === leagueId) || null, [leagues, leagueId]);
+  const activeFormat = useMemo(() => selectedLeague ? fcFormatForLeague(selectedLeague) : TF_DEFAULT_FORMAT, [selectedLeague]);
+
+  // Re-fetch FC values whenever the active format changes (league switch or first load).
+  // Anchor is intentionally preserved — the same player/pick is still a valid anchor,
+  // we just refresh the value table around them.
   useEffect(() => {
-    fetchTradeFinderAssets().then(setAssets);
-  },[]);
+    setAssets(null);
+    fetchTradeFinderAssets(activeFormat).then(setAssets);
+  },[activeFormat.key]);
+
+  // After mount, if a user is already linked, fetch their dynasty leagues.
+  useEffect(() => {
+    if(!sleeperUser?.user_id) return;
+    (async () => {
+      try{
+        const yr = String(new Date().getFullYear());
+        const lgs = await fetch(`https://api.sleeper.app/v1/user/${sleeperUser.user_id}/leagues/nfl/${yr}`, {cache:'no-store'}).then(r=>r.json());
+        // Dynasty only — settings.type === 2 (redraft = different mindset, intentionally excluded)
+        const dynasty = (lgs||[]).filter(l => l?.settings?.type === 2).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+        setLeagues(dynasty);
+        // If the previously-saved leagueId isn't in the current set, clear it.
+        if(leagueId && !dynasty.find(l => l.league_id === leagueId)) setLeagueId('');
+      }catch(e){ setLeagues([]); }
+    })();
+  },[sleeperUser?.user_id]);
+
+  const doLinkSleeper = async () => {
+    setLinkErr('');
+    const q = (linkInput||'').trim();
+    if(!q){ setLinkErr('Enter your Sleeper username'); return; }
+    setLinkBusy(true);
+    try{
+      const u = await lookupResolveUser(q);
+      const profile = { user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null };
+      localStorage.setItem('pfk_sleeper_user', JSON.stringify(profile));
+      setSleeperUser(profile);
+      setLinking(false);
+      setLinkInput('');
+    }catch(e){
+      setLinkErr(e.message || 'Could not find that Sleeper user');
+    }finally{
+      setLinkBusy(false);
+    }
+  };
+
+  const unlinkSleeper = () => {
+    localStorage.removeItem('pfk_sleeper_user');
+    localStorage.removeItem('pfk_sleeper_league');
+    setSleeperUser(null);
+    setLeagues(null);
+    setLeagueId('');
+  };
+
+  const pickLeague = (id) => {
+    setLeagueId(id);
+    if(id) localStorage.setItem('pfk_sleeper_league', id);
+    else localStorage.removeItem('pfk_sleeper_league');
+  };
 
   // Suggestions: fuzzy on player names + canonical pick names. Boost exact pick matches.
   // Query gets the SAME normalization as asset names so apostrophes/punctuation
@@ -7005,14 +7087,82 @@ function TradeFinderApp(){
     QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#FFD700', OTHER:'#9ca3af'
   }[pos] || '#9ca3af');
 
+  // Sleeper avatar resolution — direct CDN URL (we're not capturing this with
+  // html2canvas so no CORS proxy needed). Falls back to a placeholder circle.
+  const avatarUrl = sleeperUser?.avatar ? `https://sleepercdn.com/avatars/thumbs/${sleeperUser.avatar}` : null;
+
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <MasterToolbar currentTab="trade"/>
       <div style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 60px'}}>
-        <div style={{textAlign:'center',marginBottom:24}}>
+
+        {/* Top-left Sleeper link block — separate from the master toolbar's SIGN IN
+            (that's the Supabase admin login). This links a Sleeper account so
+            values can adjust to the user's specific league scoring settings. */}
+        <div style={{marginBottom:20,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
+          {!sleeperUser && !linking && (
+            <button onClick={()=>{setLinking(true); setLinkErr('');}}
+                    style={{padding:'8px 14px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#FFD700',fontWeight:800,fontSize:13,cursor:'pointer',letterSpacing:0.5}}>
+              🔗 Link Sleeper
+            </button>
+          )}
+          {!sleeperUser && linking && (
+            <div style={{display:'flex',flexDirection:'column',gap:6,maxWidth:320}}>
+              <div style={{display:'flex',gap:6}}>
+                <input autoFocus value={linkInput} onChange={e=>{setLinkInput(e.target.value); setLinkErr('');}}
+                       onKeyDown={e=>e.key==='Enter'&&doLinkSleeper()}
+                       placeholder="Sleeper username"
+                       disabled={linkBusy}
+                       style={{padding:'8px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',width:200}}/>
+                <button onClick={doLinkSleeper} disabled={linkBusy}
+                        style={{padding:'8px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:12,cursor:linkBusy?'wait':'pointer',letterSpacing:0.5}}>
+                  {linkBusy ? '…' : 'LINK'}
+                </button>
+                <button onClick={()=>{setLinking(false); setLinkInput(''); setLinkErr('');}}
+                        style={{padding:'8px 10px',background:'transparent',border:'1px solid #444',borderRadius:6,color:'#888',fontSize:12,cursor:'pointer'}}>
+                  ✕
+                </button>
+              </div>
+              {linkErr && <div style={{color:'#ef4444',fontSize:12}}>{linkErr}</div>}
+              <div style={{fontSize:11,color:'#666'}}>Public lookup — no password, no permission needed. Just your Sleeper username.</div>
+            </div>
+          )}
+          {sleeperUser && (
+            <>
+              <div style={{display:'inline-flex',alignItems:'center',gap:10,padding:'6px 12px 6px 6px',background:'#0a0a0a',border:'1px solid #FFD70044',borderRadius:24}}>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="" style={{width:30,height:30,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
+                  : <div style={{width:30,height:30,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900,fontSize:13}}>{(sleeperUser.username||'?')[0].toUpperCase()}</div>
+                }
+                <span style={{color:'#fff',fontWeight:700,fontSize:13}}>@{sleeperUser.username}</span>
+                <button onClick={unlinkSleeper} title="Unlink Sleeper account"
+                        style={{padding:'2px 8px',background:'transparent',border:'1px solid #333',borderRadius:12,color:'#666',fontSize:10,fontWeight:700,cursor:'pointer',letterSpacing:0.5,marginLeft:2}}>UNLINK</button>
+              </div>
+              {leagues === null && <div style={{fontSize:12,color:'#888'}}>Loading dynasty leagues…</div>}
+              {leagues && leagues.length === 0 && <div style={{fontSize:12,color:'#888'}}>No dynasty leagues found for {new Date().getFullYear()}.</div>}
+              {leagues && leagues.length > 0 && (
+                <select value={leagueId} onChange={e=>pickLeague(e.target.value)}
+                        style={{padding:'8px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',minWidth:240,maxWidth:'100%',cursor:'pointer'}}>
+                  <option value="">— Pick a league —</option>
+                  {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
+                </select>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={{textAlign:'center',marginBottom:18}}>
           <div style={{fontSize:28,fontWeight:900,color:'#FFD700',letterSpacing:2.5,marginBottom:6}}>⚖️ TRADE FINDER</div>
-          <div style={{fontSize:13,color:'#bbb',maxWidth:560,margin:'0 auto',lineHeight:1.5}}>
-            Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. Powered by FantasyCalc · Superflex · 1.0 PPR.
+          <div style={{fontSize:13,color:'#bbb',maxWidth:600,margin:'0 auto',lineHeight:1.5}}>
+            Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. <strong style={{color:'#eee'}}>Link your Sleeper account</strong> and pick a league above — values auto-adjust to that league's exact scoring settings.
+          </div>
+          {/* Format chip — tells the user exactly which value table is in use right now. */}
+          <div style={{marginTop:10,display:'inline-flex',alignItems:'center',gap:8,padding:'5px 12px',background:'#0a0a0a',border:'1px solid '+(selectedLeague?'#10b98166':'#1e1e1e'),borderRadius:16,fontSize:11,fontWeight:700,letterSpacing:0.5,color:selectedLeague?'#10b981':'#888'}}>
+            <span style={{fontSize:9}}>●</span>
+            {selectedLeague
+              ? <>Values for: <span style={{color:'#fff'}}>{selectedLeague.name}</span> · {formatLabel(activeFormat)}</>
+              : <>Values: Default {formatLabel(TF_DEFAULT_FORMAT)} (link Sleeper for league-specific values)</>
+            }
           </div>
         </div>
 
