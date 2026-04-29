@@ -2738,7 +2738,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
     ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
     ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
     ["lookup","🔍 Sleeper Snapshot","Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/lookup",false],
-    ["trade","💱 Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
+    ["trade","⚖️ Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
     ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
   ];
   const handleTabClick = (e, id, isInPage) => {
@@ -6867,7 +6867,7 @@ function LookupApp({ identifier }){
 }
 
 // ============================================================================
-// 💱 TRADE FINDER
+// ⚖️ TRADE FINDER
 // "Type 1.03 → see every veteran (and pick) within ±X% of its value, grouped
 // by position." Fills a gap that KTC, FantasyCalc, and DynastyProcess all
 // share: every existing calculator forces a two-sided trade entry, so users
@@ -7007,7 +7007,7 @@ function TradeFinderApp(){
       <MasterToolbar currentTab="trade"/>
       <div style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 60px'}}>
         <div style={{textAlign:'center',marginBottom:24}}>
-          <div style={{fontSize:28,fontWeight:900,color:'#FFD700',letterSpacing:2.5,marginBottom:6}}>💱 TRADE FINDER</div>
+          <div style={{fontSize:28,fontWeight:900,color:'#FFD700',letterSpacing:2.5,marginBottom:6}}>⚖️ TRADE FINDER</div>
           <div style={{fontSize:13,color:'#bbb',maxWidth:560,margin:'0 auto',lineHeight:1.5}}>
             Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. Powered by FantasyCalc · Superflex · 1.0 PPR.
           </div>
