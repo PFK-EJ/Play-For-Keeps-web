@@ -6935,7 +6935,7 @@ function TradeFinderApp(){
   const [assets, setAssets] = useState(null); // null=loading, []=failed, [...]=loaded
   const [query, setQuery] = useState('');
   const [anchor, setAnchor] = useState(null);
-  const [tolerance, setTolerance] = useState(10); // percent
+  const [tolerance, setTolerance] = useState(7); // percent
   const [filter, setFilter] = useState('all'); // 'all' | 'players' | 'picks'
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef(null);
@@ -6945,9 +6945,12 @@ function TradeFinderApp(){
   },[]);
 
   // Suggestions: fuzzy on player names + canonical pick names. Boost exact pick matches.
+  // Query gets the SAME normalization as asset names so apostrophes/punctuation
+  // never break matching ("jamar" or "ja'marr" both find "Ja'Marr Chase").
   const suggestions = useMemo(() => {
     if(!assets || !query.trim()) return [];
-    const q = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+    if(!q) return [];
     const pickCanonical = normalizePickQuery(query);
     const out = [];
     assets.forEach(a => {
