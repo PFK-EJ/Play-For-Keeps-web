@@ -5883,8 +5883,8 @@ function LookupSearch(){
   };
   return (
     <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',color:'#eee',textAlign:'center'}}>
-      <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:8}}>🔍 PFK LOOKUP</div>
-      <div style={{fontSize:16,color:'#aaa',marginBottom:34,letterSpacing:0.5}}>Spend 5 seconds. Sleep better.</div>
+      <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:8}}>🔍 SLEEPER USER ORPHAN HISTORY</div>
+      <div style={{fontSize:16,color:'#aaa',marginBottom:34,letterSpacing:0.5}}>Look up a manager to find better leaguemates.</div>
       <form onSubmit={submit} style={{display:'flex',gap:8,marginBottom:14}}>
         <input
           autoFocus value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
@@ -5893,12 +5893,6 @@ function LookupSearch(){
         <button type="submit" style={{padding:'14px 24px',background:'#FFD700',border:'none',borderRadius:8,color:'#000',fontWeight:900,fontSize:14,letterSpacing:1.5,cursor:'pointer',whiteSpace:'nowrap'}}>LOOKUP →</button>
       </form>
       {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{err}</div>}
-      <div style={{fontSize:13,color:'#666',marginTop:30,lineHeight:1.7,textAlign:'left',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'18px 22px'}}>
-        <div style={{color:'#FFD700',fontWeight:800,letterSpacing:1.5,fontSize:11,marginBottom:8}}>WHAT THIS IS</div>
-        Public-data facts about any Sleeper user — account age, last seen, active leagues, orphan history. The kind of basic background check that takes you an hour to do manually, in 5 seconds.<br/><br/>
-        <div style={{color:'#FFD700',fontWeight:800,letterSpacing:1.5,fontSize:11,marginBottom:8}}>WHAT THIS ISN'T</div>
-        A judgment, score, or accusation. We show data. You decide what it means.
-      </div>
     </div>
   );
 }
