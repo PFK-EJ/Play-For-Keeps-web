@@ -4579,6 +4579,12 @@ function DispersalSetup(){
   // generic pick lines to the picks textarea.
   const [allHavePicks,setAllHavePicks] = useState(false);
   const [bulkPicksYears,setBulkPicksYears] = useState(()=>new Set([2026,2027,2028,2029]));
+  // Sleeper traded_picks cache for the "Pull actual ownership" button. Lazy
+  // loaded on first click since most commishes will use the assumed-clean-slate
+  // bulk-add and we don't want to fetch unnecessary data.
+  const [sleeperTradedPicks,setSleeperTradedPicks] = useState(null);
+  const [pullingSleeperPicks,setPullingSleeperPicks] = useState(false);
+  const [pullPicksMsg,setPullPicksMsg] = useState('');
   // Share-pool state — for the 📸 SHARE POOL button (commish previews + shares
   // a PFK-branded image of the pool BEFORE creating the draft, to advertise it).
   const poolCardRef = useRef(null);
@@ -5005,6 +5011,72 @@ function DispersalSetup(){
     setPicksText(prev => (prev ? prev.replace(/\n+$/,'') + '\n' : '') + lines.join('\n'));
     setAllHavePicks(false); // collapse the controls so commish doesn't double-fire
   };
+
+  // Pull ACTUAL pick ownership from Sleeper for the selected dispersal rosters.
+  // For each selected roster, walks traded_picks to figure out:
+  //   - which of their original picks they still own (not traded away)
+  //   - which picks they've ACQUIRED from other rosters
+  // Each line goes into picksText with a "via {original-owner-username}" tag
+  // so the commish can see whose pick is which once they're in the pool.
+  // Picks are round-only (e.g. "2027 1st") since Sleeper doesn't assign slots
+  // to future drafts — that's how Sleeper itself displays pre-draft picks.
+  const applyPullSleeperPicks = async () => {
+    if(setupMode !== 'sleeper' || !sleeperData || sleeperSelected.size === 0 || bulkPicksYears.size === 0) return;
+    setPullingSleeperPicks(true);
+    setPullPicksMsg('');
+    try{
+      let tp = sleeperTradedPicks;
+      if(!tp){
+        tp = await fetch(`https://api.sleeper.app/v1/league/${sleeperId.trim()}/traded_picks`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]);
+        setSleeperTradedPicks(tp || []);
+      }
+      const usersById = {};
+      (sleeperData.users||[]).forEach(u => { usersById[u.user_id] = u; });
+      const usernameForRoster = (rid) => {
+        if(sleeperUsernames[rid]) return sleeperUsernames[rid];
+        const r = (sleeperData.rosters||[]).find(x => x.roster_id === rid);
+        const u = r?.owner_id ? usersById[r.owner_id] : null;
+        return u?.display_name || u?.username || `Team ${rid}`;
+      };
+      const roundLabel = (n) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`;
+      const years = Array.from(bulkPicksYears).sort();
+      const rounds = [1, 2, 3, 4];
+      const lines = [];
+      sleeperSelected.forEach(rid => {
+        years.forEach(y => {
+          rounds.forEach(round => {
+            // Original pick: include unless this roster traded it away
+            const tradedAway = (tp||[]).find(t =>
+              String(t.season) === String(y) && t.round === round &&
+              t.roster_id === rid && t.owner_id !== rid
+            );
+            if(!tradedAway){
+              lines.push(`${y} ${roundLabel(round)} via ${usernameForRoster(rid)}`);
+            }
+            // Acquired picks: ones this roster currently owns that originally
+            // belonged to a different roster
+            const acquired = (tp||[]).filter(t =>
+              String(t.season) === String(y) && t.round === round &&
+              t.owner_id === rid && t.roster_id !== rid
+            );
+            acquired.forEach(t => {
+              lines.push(`${y} ${roundLabel(round)} via ${usernameForRoster(t.roster_id)}`);
+            });
+          });
+        });
+      });
+      if(lines.length === 0){
+        setPullPicksMsg('No picks found for the selected managers in those years.');
+      } else {
+        setPicksText(prev => (prev ? prev.replace(/\n+$/,'') + '\n' : '') + lines.join('\n'));
+        setPullPicksMsg(`Added ${lines.length} pick${lines.length===1?'':'s'} reflecting actual Sleeper ownership.`);
+      }
+    }catch(e){
+      setPullPicksMsg('Could not pull picks — try again.');
+    }finally{
+      setPullingSleeperPicks(false);
+    }
+  };
   // Bulk-picks controls UI — defined as a JSX value (not a Component) so React
   // reconciles in place. (Same lesson as the leagueInfoInputs focus-loss fix.)
   const bulkPicksControls = (
@@ -5032,7 +5104,29 @@ function DispersalSetup(){
                 ? 'PICK AT LEAST ONE YEAR'
                 : `🪄 ADD ${bulkPicksTotal} PICKS  ·  ${managerCountForBulk} mgrs × 4 rounds × ${bulkPicksYears.size} ${bulkPicksYears.size===1?'year':'years'}`}
           </button>
-          <div style={{fontSize:11,color:'#666',marginTop:6,textAlign:'center'}}>Picks are appended to the textarea below — your existing entries stay.</div>
+          <div style={{fontSize:11,color:'#666',marginTop:6,marginBottom:10,textAlign:'center'}}>🪄 Assumes a clean slate — every selected manager owns their own picks. Use this if your league hasn't traded picks yet.</div>
+          {/* Sleeper-only second button: pulls ACTUAL pick ownership from
+              traded_picks. Only enabled in Sleeper mode with a league loaded. */}
+          {setupMode==='sleeper' && (
+            <>
+              <div style={{height:1,background:'#1e1e1e',margin:'4px 0 10px'}}/>
+              <button type="button" onClick={applyPullSleeperPicks}
+                disabled={!sleeperData || sleeperSelected.size===0 || bulkPicksYears.size===0 || pullingSleeperPicks}
+                style={{width:'100%',padding:'10px 14px',background:(!sleeperData||sleeperSelected.size===0||bulkPicksYears.size===0||pullingSleeperPicks)?'#222':'#a78bfa',border:'none',borderRadius:6,color:(!sleeperData||sleeperSelected.size===0||bulkPicksYears.size===0||pullingSleeperPicks)?'#666':'#000',fontWeight:900,cursor:(!sleeperData||sleeperSelected.size===0||bulkPicksYears.size===0||pullingSleeperPicks)?'default':'pointer',fontSize:13,letterSpacing:1}}>
+                {pullingSleeperPicks
+                  ? 'PULLING FROM SLEEPER…'
+                  : !sleeperData
+                  ? 'FETCH A SLEEPER LEAGUE FIRST'
+                  : sleeperSelected.size===0
+                  ? 'SELECT MANAGERS FIRST'
+                  : bulkPicksYears.size===0
+                  ? 'PICK AT LEAST ONE YEAR'
+                  : `✨ PULL ACTUAL OWNERSHIP FROM SLEEPER`}
+              </button>
+              <div style={{fontSize:11,color:'#666',marginTop:6,textAlign:'center'}}>✨ Reads <code style={{color:'#a78bfa'}}>traded_picks</code> and adds each selected manager's actual current pick inventory — including picks they've acquired and excluding ones they've traded away. Picks tagged "via {'{original-owner}'}".</div>
+              {pullPicksMsg && <div style={{fontSize:11,color:pullPicksMsg.startsWith('Added')?'#10b981':'#f59e0b',marginTop:6,textAlign:'center',fontWeight:700}}>{pullPicksMsg}</div>}
+            </>
+          )}
         </div>
       )}
     </div>
