@@ -7307,6 +7307,11 @@ function TradeFinderApp(){
     return () => { cancelled = true; };
   },[selectedLeague?.league_id]);
 
+  // Filter mode for the trade history modal: 'all' shows every trade we found;
+  // 'relevant' filters to trades involving any player or pick currently in
+  // the Trade Finder context (anchor + equivalents). Default 'all' so the
+  // modal is never empty; users can opt into 'relevant' when matches exist.
+  const [tradeFilterMode, setTradeFilterMode] = useState('all');
   // Trade history modal state — opens when user clicks an owner badge.
   // { rosterInfo: ownership.byRosterId entry, status: 'loading'|'ready'|'error', trades: [...] }
   //
@@ -7317,6 +7322,7 @@ function TradeFinderApp(){
   // name so the user has context.
   const [tradeModal, setTradeModal] = useState(null);
   const openTradeHistory = async (rosterInfo) => {
+    setTradeFilterMode('all');
     setTradeModal({ rosterInfo, status: 'loading', trades: [] });
     try{
       const userId = rosterInfo.user_id;
@@ -7421,6 +7427,55 @@ function TradeFinderApp(){
     });
     return out.sort((x,y) => y._score - x._score || y.value - x.value).slice(0, 10);
   },[displayAssets, query]);
+
+  // Set of sleeperIds + pick keys ("YYYY-R") for the anchor + every equivalent
+  // currently visible. Used by the trade history modal to flag which trades
+  // involve players/picks the user is actively considering — that's the most
+  // useful context for "what does this leaguemate value these assets at?"
+  const relevantContext = useMemo(() => {
+    const playerIds = new Set();
+    const pickKeys = new Set();
+    const addAsset = (a) => {
+      if(!a) return;
+      if(a.isPick){
+        // Match by season+round; FC's slot-specific pick name "2026 Pick 1.03"
+        // and Sleeper's traded-pick "2026 1st" both reduce to "2026-1".
+        const m = a.name.match(/^(\d{4})\s+(?:Pick\s+)?(\d+)/);
+        if(m) pickKeys.add(`${m[1]}-${m[2]}`);
+      } else if(a.sleeperId){
+        playerIds.add(String(a.sleeperId));
+      }
+    };
+    addAsset(liveAnchor);
+    if(displayAssets && liveAnchor){
+      const lo = liveAnchor.value * (1 - tolerance/100);
+      const hi = liveAnchor.value * (1 + tolerance/100);
+      displayAssets.forEach(a => {
+        if(a.name === liveAnchor.name) return;
+        if(a.value >= lo && a.value <= hi) addAsset(a);
+      });
+    }
+    return { playerIds, pickKeys };
+  },[liveAnchor, displayAssets, tolerance]);
+
+  const tradeIsRelevant = (tx) => {
+    if(!relevantContext) return false;
+    // Players in the trade (adds + drops keys are sleeperIds)
+    const allPlayerIds = new Set([
+      ...Object.keys(tx.adds || {}),
+      ...Object.keys(tx.drops || {}),
+    ]);
+    for(const pid of allPlayerIds){
+      if(relevantContext.playerIds.has(String(pid))) return true;
+    }
+    // Picks in the trade (each has season + round)
+    for(const p of (tx.draft_picks || [])){
+      if(relevantContext.pickKeys.has(`${p.season}-${p.round}`)) return true;
+    }
+    return false;
+  };
+  const isRelevantPlayer = (pid) => relevantContext?.playerIds?.has(String(pid));
+  const isRelevantPick = (p) => relevantContext?.pickKeys?.has(`${p.season}-${p.round}`);
 
   const equivalents = useMemo(() => {
     if(!liveAnchor || !displayAssets) return null;
@@ -7649,40 +7704,86 @@ function TradeFinderApp(){
             {tradeModal.status === 'ready' && tradeModal.trades.length === 0 && (
               <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No completed trades found across this leaguemate's dynasty leagues.</div>
             )}
-            {tradeModal.status === 'ready' && tradeModal.trades.length > 0 && tradeModal.trades.map((tx,i) => {
-              // Each trade carries the user's roster_id IN THAT LEAGUE (different
-              // leagues = different roster_ids for the same user).
-              const myRosterId = tx._myRosterId;
-              // Players THIS leaguemate received in the trade (adds keyed by their roster_id)
-              const received = Object.entries(tx.adds || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
-              const sent     = Object.entries(tx.drops || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
-              // Picks: tx.draft_picks lists each pick's owner_id (post-trade) and previous_owner_id
-              const picksReceived = (tx.draft_picks || []).filter(p => p.owner_id === myRosterId && p.previous_owner_id !== myRosterId);
-              const picksSent     = (tx.draft_picks || []).filter(p => p.previous_owner_id === myRosterId && p.owner_id !== myRosterId);
-              const date = tx.status_updated || tx.created;
-              const dateStr = date ? new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
-              return (
-                <div key={tx.transaction_id || i} style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,marginBottom:10,fontSize:13}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
-                    <div style={{fontSize:11,color:'#FFD700',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
-                    <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{dateStr}</div>
-                  </div>
-                  <div style={{marginBottom:6}}>
-                    <span style={{color:'#10b981',fontWeight:800,fontSize:11,letterSpacing:0.5}}>RECEIVED:</span>
-                    <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>
-                      {[...received.map(resolvePlayerName), ...picksReceived.map(formatPickInTrade)].join(' · ') || <span style={{color:'#666'}}>nothing</span>}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{color:'#ef4444',fontWeight:800,fontSize:11,letterSpacing:0.5}}>SENT:</span>
-                    <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>
-                      {[...sent.map(resolvePlayerName), ...picksSent.map(formatPickInTrade)].join(' · ') || <span style={{color:'#666'}}>nothing</span>}
-                    </div>
-                  </div>
-                </div>
+            {tradeModal.status === 'ready' && tradeModal.trades.length > 0 && (() => {
+              // Tab toggle between "all trades" and "relevant only" (matches the
+              // current Trade Finder context — anchor + equivalents). Tap-friendly
+              // padding + flex:1 split for mobile, count badges so users see the
+              // signal at a glance.
+              const relevantTrades = tradeModal.trades.filter(tradeIsRelevant);
+              const visibleTrades = tradeFilterMode === 'relevant' ? relevantTrades : tradeModal.trades;
+              const hasRelevant = relevantTrades.length > 0;
+              const tabBtn = (key, label, count, disabled) => (
+                <button onClick={()=>!disabled && setTradeFilterMode(key)} disabled={disabled}
+                        style={{flex:1,padding:'8px 10px',borderRadius:6,
+                                border: tradeFilterMode===key ? '1.5px solid #FFD700' : '1.5px solid #1e1e1e',
+                                background: tradeFilterMode===key ? '#FFD700' : 'transparent',
+                                color: tradeFilterMode===key ? '#000' : (disabled?'#444':'#aaa'),
+                                fontWeight:800,fontSize:12,letterSpacing:0.4,cursor:disabled?'not-allowed':'pointer'}}>
+                  {label} <span style={{opacity:0.7,fontWeight:700}}>({count})</span>
+                </button>
               );
-            })}
-            <div style={{fontSize:10,color:'#555',marginTop:8,textAlign:'center'}}>Player names resolved via FantasyCalc index — uncommon names may appear as Player #ID.</div>
+              return (
+                <>
+                  <div style={{display:'flex',gap:6,marginBottom:14}}>
+                    {tabBtn('all', 'All trades', tradeModal.trades.length, false)}
+                    {tabBtn('relevant', '★ Relevant', relevantTrades.length, !hasRelevant)}
+                  </div>
+                  {tradeFilterMode === 'relevant' && relevantTrades.length === 0 && (
+                    <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No trades involve any player or pick from your current Trade Finder results.</div>
+                  )}
+                  {visibleTrades.map((tx,i) => {
+                    // Each trade carries the user's roster_id IN THAT LEAGUE (different
+                    // leagues = different roster_ids for the same user).
+                    const myRosterId = tx._myRosterId;
+                    const received = Object.entries(tx.adds || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
+                    const sent     = Object.entries(tx.drops || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
+                    const picksReceived = (tx.draft_picks || []).filter(p => p.owner_id === myRosterId && p.previous_owner_id !== myRosterId);
+                    const picksSent     = (tx.draft_picks || []).filter(p => p.previous_owner_id === myRosterId && p.owner_id !== myRosterId);
+                    const date = tx.status_updated || tx.created;
+                    const dateStr = date ? new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
+                    const txRelevant = tradeIsRelevant(tx);
+                    // Render a list of items (players + picks) with relevant ones
+                    // highlighted in gold + ★. Empty list renders "nothing".
+                    const renderItems = (playerIds, picks, kind) => {
+                      const items = [
+                        ...playerIds.map(pid => ({key:`${kind}-p-${pid}`, label:resolvePlayerName(pid), relevant:isRelevantPlayer(pid)})),
+                        ...picks.map(p => ({key:`${kind}-d-${p.season}-${p.round}`, label:formatPickInTrade(p), relevant:isRelevantPick(p)})),
+                      ];
+                      if(items.length === 0) return <span style={{color:'#666'}}>nothing</span>;
+                      return items.map((it, idx) => (
+                        <React.Fragment key={it.key}>
+                          {idx > 0 && <span style={{color:'#444'}}> · </span>}
+                          <span style={it.relevant ? {color:'#FFD700',fontWeight:800} : null}>
+                            {it.relevant && '★ '}{it.label}
+                          </span>
+                        </React.Fragment>
+                      ));
+                    };
+                    return (
+                      <div key={tx.transaction_id || i}
+                           style={{padding:'12px 14px',
+                                   background: txRelevant ? '#1a1400' : '#0f0f0f',
+                                   border: txRelevant ? '1px solid #FFD70066' : '1px solid #1e1e1e',
+                                   borderRadius:8,marginBottom:10,fontSize:13}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
+                          <div style={{fontSize:11,color:'#FFD700',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
+                          <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{dateStr}</div>
+                        </div>
+                        <div style={{marginBottom:6}}>
+                          <span style={{color:'#10b981',fontWeight:800,fontSize:11,letterSpacing:0.5}}>RECEIVED:</span>
+                          <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>{renderItems(received, picksReceived, 'rec')}</div>
+                        </div>
+                        <div>
+                          <span style={{color:'#ef4444',fontWeight:800,fontSize:11,letterSpacing:0.5}}>SENT:</span>
+                          <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>{renderItems(sent, picksSent, 'snt')}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+            <div style={{fontSize:10,color:'#555',marginTop:8,textAlign:'center'}}>★ = involves a player/pick from your current Trade Finder results · names via FantasyCalc index</div>
           </div>
         </div>
       )}
