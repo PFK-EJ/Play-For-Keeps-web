@@ -6490,6 +6490,21 @@ function LookupProfile({ identifier }){
   // (it's heavy — ~200 API calls for an active user). null = not yet loaded.
   const [tradeActivity,setTradeActivity] = useState(null);
   const [tradeLoading,setTradeLoading] = useState(false);
+  // Recent trades modal (shared with Trade Finder). Open when the commish wants
+  // to scout a user's actual trade history for collusion patterns. Stays simple
+  // — passes the looked-up user, lets the modal scan + render.
+  const [tradesModalOpen,setTradesModalOpen] = useState(false);
+  const [fcAssetIndex,setFcAssetIndex] = useState(null); // for player name resolution
+  useEffect(() => {
+    // Lazy-load FC's rich asset list (with names) so the trades modal can render
+    // "Bijan Robinson" instead of "Player #4866". One-time module-cached fetch.
+    fetchTradeFinderAssets().then(setFcAssetIndex);
+  },[]);
+  const lookupResolvePlayerName = (pid) => {
+    if(!fcAssetIndex || !pid) return `Player #${pid}`;
+    const hit = fcAssetIndex.find(a => a.sleeperId && String(a.sleeperId) === String(pid));
+    return hit ? hit.name : `Player #${pid}`;
+  };
   // Team strength (avg power-rank across current dynasty leagues) — also background.
   const [teamStrength,setTeamStrength] = useState(null);
   const [strengthLoading,setStrengthLoading] = useState(false);
@@ -6706,6 +6721,16 @@ function LookupProfile({ identifier }){
             </>
           );
         })()}
+        {/* Recent trades CTA — opens the same modal Trade Finder uses, scoped
+            to this user across all their dynasty leagues. Useful for commish
+            collusion scouting (facts only — they draw their own conclusions). */}
+        {user && (
+          <button onClick={() => setTradesModalOpen(true)}
+                  style={{marginTop:8,width:'100%',padding:'12px 14px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#FFD700',fontWeight:800,fontSize:13,letterSpacing:0.5,cursor:'pointer'}}>
+            🔍 View Recent Trades →
+          </button>
+        )}
+        <div style={{fontSize:11,color:'#666',marginTop:6,lineHeight:1.5}}>See up to 25 of this user's most recent dynasty trades across every league they're in. Useful for spotting unusual patterns (commish collusion checks).</div>
       </div>
 
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
@@ -6952,6 +6977,21 @@ function LookupProfile({ identifier }){
           </div>
         </div>
       </div>
+      {/* Recent trades modal — opens from the Trade Activity card's CTA. No
+          relevantContext (we're not in a Trade Finder flow), so the ★ Relevant
+          tab doesn't render — modal just shows All trades. */}
+      {tradesModalOpen && user && (
+        <RecentTradesModal
+          userInfo={{
+            user_id: user.user_id,
+            username: user.username,
+            display_name: user.display_name || user.username,
+            avatar: user.avatar,
+          }}
+          onClose={() => setTradesModalOpen(false)}
+          resolvePlayerName={lookupResolvePlayerName}
+        />
+      )}
     </div>
   );
 }
@@ -7201,6 +7241,212 @@ const normalizePickQuery = (q) => {
   return null;
 };
 
+// ============================================================================
+// RecentTradesModal — shared "last N trades for this Sleeper user" modal.
+// Used by Trade Finder (with Trade Finder context for ★ Relevant highlighting)
+// and Sleeper Snapshot (no context — just the raw trade history).
+//
+// Props:
+//   userInfo          { user_id, username, display_name, avatar }
+//   onClose           () => void
+//   resolvePlayerName (sleeperId) => string  — falls back to "Player #id" if omitted
+//   relevantContext   optional { playerIds: Set, pickKeys: Set } for highlighting
+//   tradeCap          optional number (default 25)
+// ============================================================================
+function RecentTradesModal({ userInfo, onClose, resolvePlayerName, relevantContext, tradeCap }){
+  const cap = tradeCap || 25;
+  const nameOf = resolvePlayerName || (pid => `Player #${pid}`);
+  const [status, setStatus] = useState('loading');
+  const [trades, setTrades] = useState([]);
+  const [leagueCount, setLeagueCount] = useState(0);
+  const [filterMode, setFilterMode] = useState('all');
+
+  const tradeIsRelevant = (tx) => {
+    if(!relevantContext) return false;
+    const allPlayerIds = new Set([
+      ...Object.keys(tx.adds || {}),
+      ...Object.keys(tx.drops || {}),
+    ]);
+    for(const pid of allPlayerIds){
+      if(relevantContext.playerIds.has(String(pid))) return true;
+    }
+    for(const p of (tx.draft_picks || [])){
+      if(relevantContext.pickKeys.has(`${p.season}-${p.round}`)) return true;
+    }
+    return false;
+  };
+  const isRelevantPlayer = (pid) => relevantContext?.playerIds?.has(String(pid));
+  const isRelevantPick = (p) => relevantContext?.pickKeys?.has(`${p.season}-${p.round}`);
+
+  // Resolve picks to their slot when we have league-specific draft order
+  // ("2026 Pick 1.03" instead of generic "2026 1st"). Only for current draft year.
+  const formatPick = (p, slotByRosterId, draftSeason) => {
+    const round = p.round === 1 ? '1st' : p.round === 2 ? '2nd' : p.round === 3 ? '3rd' : `${p.round}th`;
+    const generic = `${p.season} ${round}`;
+    if(!slotByRosterId || String(p.season) !== draftSeason) return generic;
+    const slot = slotByRosterId[p.roster_id];
+    if(!slot) return generic;
+    return `${p.season} Pick ${p.round}.${String(slot).padStart(2,'0')}`;
+  };
+
+  useEffect(() => {
+    if(!userInfo?.user_id) return;
+    let cancelled = false;
+    setStatus('loading');
+    setTrades([]);
+    (async () => {
+      try{
+        const yrCur = String(new Date().getFullYear());
+        const yrPrev = String(new Date().getFullYear() - 1);
+        const [lgsCur, lgsPrev] = await Promise.all([
+          fetch(`https://api.sleeper.app/v1/user/${userInfo.user_id}/leagues/nfl/${yrCur}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+          fetch(`https://api.sleeper.app/v1/user/${userInfo.user_id}/leagues/nfl/${yrPrev}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        ]);
+        const dynasty = [...lgsCur, ...lgsPrev].filter(l => l?.settings?.type === 2);
+        const tradesNested = await Promise.all(dynasty.map(async (lg) => {
+          try{
+            const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
+            const myRoster = (rosters||[]).find(r => r.owner_id === userInfo.user_id || (r.co_owners||[]).includes(userInfo.user_id));
+            if(!myRoster) return [];
+            const myRosterId = myRoster.roster_id;
+            const weeks = Array.from({length: 18}, (_, i) => i + 1);
+            const [draftSlots, ...txArrays] = await Promise.all([
+              lookupDraftSlots(lg.league_id, rosters),
+              ...weeks.map(w =>
+                fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${w}`, {cache:'no-store'})
+                  .then(r => r.ok ? r.json() : []).catch(() => [])
+              ),
+            ]);
+            const slotByRosterId = {};
+            if(draftSlots?.slotByRoster){
+              Object.entries(draftSlots.slotByRoster).forEach(([rid, slot]) => {
+                slotByRosterId[parseInt(rid)] = parseInt(slot);
+              });
+            }
+            return txArrays.flat()
+              .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(myRosterId))
+              .map(tx => ({ ...tx, _leagueName: lg.name, _myRosterId: myRosterId, _slotByRosterId: slotByRosterId, _draftSeason: String(lg.season) }));
+          }catch(e){ return []; }
+        }));
+        if(cancelled) return;
+        const all = tradesNested.flat()
+          .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
+          .slice(0, cap);
+        setTrades(all);
+        setLeagueCount(dynasty.length);
+        // Default to ★ Relevant tab if any matches (only when context provided)
+        if(relevantContext && all.some(tradeIsRelevant)) setFilterMode('relevant');
+        else setFilterMode('all');
+        setStatus('ready');
+      }catch(e){
+        if(!cancelled) setStatus('error');
+      }
+    })();
+    return () => { cancelled = true; };
+  },[userInfo?.user_id]);
+
+  const avatarUrl = userInfo?.avatar ? `https://sleepercdn.com/avatars/thumbs/${userInfo.avatar}` : null;
+
+  return (
+    <div onClick={onClose}
+         style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div onClick={e=>e.stopPropagation()}
+           style={{background:'#0a0a0a',border:'2px solid #FFD700',borderRadius:14,padding:20,maxWidth:560,width:'100%',maxHeight:'80vh',overflowY:'auto'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,paddingBottom:12,borderBottom:'1px solid #1e1e1e'}}>
+          {avatarUrl
+            ? <img src={avatarUrl} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
+            : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(userInfo?.display_name||'?')[0].toUpperCase()}</div>}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{userInfo?.username || userInfo?.display_name}</div>
+            <div style={{fontSize:11,color:'#888'}}>{status === 'ready' ? `${trades.length} most recent trade${trades.length===1?'':'s'}` : 'Recent trades'}{leagueCount ? ` · scanned ${leagueCount} dynasty league${leagueCount===1?'':'s'}` : ''}</div>
+          </div>
+          <button onClick={onClose}
+                  style={{background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',padding:'4px 10px',cursor:'pointer',fontSize:14,fontWeight:700}}>×</button>
+        </div>
+        {status === 'loading' && <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>Scanning league transactions…</div>}
+        {status === 'error' && <div style={{padding:20,textAlign:'center',color:'#ef4444',fontSize:13}}>Couldn't load trades — try again.</div>}
+        {status === 'ready' && trades.length === 0 && (
+          <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No completed trades found across this user's dynasty leagues.</div>
+        )}
+        {status === 'ready' && trades.length > 0 && (() => {
+          const relevantTrades = relevantContext ? trades.filter(tradeIsRelevant) : [];
+          const visibleTrades = filterMode === 'relevant' ? relevantTrades : trades;
+          const hasRelevant = relevantTrades.length > 0;
+          const tabBtn = (key, label, count, disabled) => (
+            <button onClick={()=>!disabled && setFilterMode(key)} disabled={disabled}
+                    style={{flex:1,padding:'8px 10px',borderRadius:6,
+                            border: filterMode===key ? '1.5px solid #FFD700' : '1.5px solid #1e1e1e',
+                            background: filterMode===key ? '#FFD700' : 'transparent',
+                            color: filterMode===key ? '#000' : (disabled?'#444':'#aaa'),
+                            fontWeight:800,fontSize:12,letterSpacing:0.4,cursor:disabled?'not-allowed':'pointer'}}>
+              {label} <span style={{opacity:0.7,fontWeight:700}}>({count})</span>
+            </button>
+          );
+          return (
+            <>
+              {relevantContext && (
+                <div style={{display:'flex',gap:6,marginBottom:14}}>
+                  {tabBtn('relevant', '★ Relevant', relevantTrades.length, !hasRelevant)}
+                  {tabBtn('all', 'All trades', trades.length, false)}
+                </div>
+              )}
+              {filterMode === 'relevant' && relevantTrades.length === 0 && (
+                <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No trades involve any player or pick from your current Trade Finder results.</div>
+              )}
+              {visibleTrades.map((tx,i) => {
+                const myRosterId = tx._myRosterId;
+                const received = Object.entries(tx.adds || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
+                const sent     = Object.entries(tx.drops || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
+                const picksReceived = (tx.draft_picks || []).filter(p => p.owner_id === myRosterId && p.previous_owner_id !== myRosterId);
+                const picksSent     = (tx.draft_picks || []).filter(p => p.previous_owner_id === myRosterId && p.owner_id !== myRosterId);
+                const date = tx.status_updated || tx.created;
+                const dateStr = date ? new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
+                const txRelevant = relevantContext && tradeIsRelevant(tx);
+                const renderItems = (playerIds, picks, kind) => {
+                  const items = [
+                    ...playerIds.map(pid => ({key:`${kind}-p-${pid}`, label:nameOf(pid), relevant:isRelevantPlayer(pid)})),
+                    ...picks.map(p => ({key:`${kind}-d-${p.season}-${p.round}-${p.roster_id}`, label:formatPick(p, tx._slotByRosterId, tx._draftSeason), relevant:isRelevantPick(p)})),
+                  ];
+                  if(items.length === 0) return <span style={{color:'#666'}}>nothing</span>;
+                  return items.map((it, idx) => (
+                    <React.Fragment key={it.key}>
+                      {idx > 0 && <span style={{color:'#444'}}> · </span>}
+                      <span style={it.relevant ? {color:'#FFD700',fontWeight:800} : null}>
+                        {it.relevant && '★ '}{it.label}
+                      </span>
+                    </React.Fragment>
+                  ));
+                };
+                return (
+                  <div key={tx.transaction_id || i}
+                       style={{padding:'12px 14px',
+                               background: txRelevant ? '#1a1400' : '#0f0f0f',
+                               border: txRelevant ? '1px solid #FFD70066' : '1px solid #1e1e1e',
+                               borderRadius:8,marginBottom:10,fontSize:13}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
+                      <div style={{fontSize:11,color:'#FFD700',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
+                      <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{dateStr}</div>
+                    </div>
+                    <div style={{marginBottom:6}}>
+                      <span style={{color:'#10b981',fontWeight:800,fontSize:11,letterSpacing:0.5}}>RECEIVED:</span>
+                      <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>{renderItems(received, picksReceived, 'rec')}</div>
+                    </div>
+                    <div>
+                      <span style={{color:'#ef4444',fontWeight:800,fontSize:11,letterSpacing:0.5}}>SENT:</span>
+                      <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>{renderItems(sent, picksSent, 'snt')}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          );
+        })()}
+        <div style={{fontSize:10,color:'#555',marginTop:8,textAlign:'center'}}>{relevantContext ? '★ = involves a player/pick from your Trade Finder results · ' : ''}player names via FantasyCalc index</div>
+      </div>
+    </div>
+  );
+}
+
 function TradeFinderApp(){
   const [assets, setAssets] = useState(null); // null=loading, []=failed, [...]=loaded
   const [query, setQuery] = useState('');
@@ -7347,104 +7593,16 @@ function TradeFinderApp(){
     return () => { cancelled = true; };
   },[selectedLeague?.league_id]);
 
-  // Filter mode for the trade history modal: 'all' shows every trade we found;
-  // 'relevant' filters to trades involving any player or pick currently in
-  // the Trade Finder context (anchor + equivalents). Default 'all' so the
-  // modal is never empty; users can opt into 'relevant' when matches exist.
-  const [tradeFilterMode, setTradeFilterMode] = useState('all');
-  // Trade history modal state — opens when user clicks an owner badge.
-  // { rosterInfo: ownership.byRosterId entry, status: 'loading'|'ready'|'error', trades: [...] }
-  //
-  // Strategy: instead of digging deep into one league's history (where old trades
-  // tell you nothing about the leaguemate today — dynasty values change fast),
-  // we scan ALL of their current-year dynasty leagues and surface the 5 MOST
-  // RECENT trades regardless of which league. Each trade card shows the league
-  // name so the user has context.
-  const [tradeModal, setTradeModal] = useState(null);
-  const openTradeHistory = async (rosterInfo) => {
-    setTradeFilterMode('all');
-    setTradeModal({ rosterInfo, status: 'loading', trades: [] });
-    try{
-      const userId = rosterInfo.user_id;
-      if(!userId) throw new Error('No user_id on this roster');
-      // Pull all dynasty leagues for this leaguemate (current year + prior year)
-      // — prior year covers winter trade window when current year league_ids
-      // may have few/no trades yet.
-      const yrCur = String(new Date().getFullYear());
-      const yrPrev = String(new Date().getFullYear() - 1);
-      const [lgsCur, lgsPrev] = await Promise.all([
-        fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${yrCur}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-        fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${yrPrev}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-      ]);
-      const dynasty = [...lgsCur, ...lgsPrev].filter(l => l?.settings?.type === 2);
-      // For each league: fetch rosters to find this user's roster_id in that
-      // league (it's not necessarily the same as in selectedLeague), then scan
-      // every week of transactions.
-      const tradesNested = await Promise.all(dynasty.map(async (lg) => {
-        try{
-          const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
-          const myRoster = (rosters||[]).find(r => r.owner_id === userId || (r.co_owners||[]).includes(userId));
-          if(!myRoster) return [];
-          const myRosterId = myRoster.roster_id;
-          // Also fetch this league's draft slots in parallel with transactions —
-          // lets us resolve current-year pick trades to their slot ("2026 Pick 1.03"
-          // instead of generic "2026 1st"). Each league has its own draft order.
-          const weeks = Array.from({length: 18}, (_, i) => i + 1);
-          const [draftSlots, ...txArrays] = await Promise.all([
-            lookupDraftSlots(lg.league_id, rosters),
-            ...weeks.map(w =>
-              fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${w}`, {cache:'no-store'})
-                .then(r => r.ok ? r.json() : []).catch(() => [])
-            ),
-          ]);
-          // Build roster_id → draft slot for this league's current rookie draft.
-          // (For trades involving picks from this draft year only — 2027+ has no
-          // assigned slot so those still display as generic round.)
-          const slotByRosterId = {};
-          if(draftSlots?.slotByRoster){
-            Object.entries(draftSlots.slotByRoster).forEach(([rid, slot]) => {
-              slotByRosterId[parseInt(rid)] = parseInt(slot);
-            });
-          }
-          return txArrays.flat()
-            .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(myRosterId))
-            .map(tx => ({ ...tx, _leagueName: lg.name, _myRosterId: myRosterId, _slotByRosterId: slotByRosterId, _draftSeason: String(lg.season) }));
-        }catch(e){ return []; }
-      }));
-      // Cap at 25 — generous enough to surface real patterns without making
-      // the modal an endless scroll. Beyond ~25 the older trades stop being
-      // useful context anyway since dynasty values drift fast.
-      const trades = tradesNested.flat()
-        .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
-        .slice(0, 25);
-      // Default to ★ Relevant tab if any results actually relate to the current
-      // Trade Finder context — that's the more useful view. Fall back to All
-      // when there's nothing relevant so the modal isn't empty by default.
-      const hasRelevant = trades.some(tradeIsRelevant);
-      if(hasRelevant) setTradeFilterMode('relevant');
-      setTradeModal(m => m && m.rosterInfo.user_id === rosterInfo.user_id ? { ...m, status: 'ready', trades, leagueCount: dynasty.length } : m);
-    }catch(e){
-      setTradeModal(m => m ? { ...m, status: 'error' } : m);
-    }
-  };
-  // Resolve a Sleeper player_id to a readable name using FC's name index (covers
-  // the ~500 players users actually trade). Falls back to "Player #id" for the rest.
+  // Trade history modal — entirely self-contained in <RecentTradesModal>.
+  // We just track which user we're viewing; the modal handles scanning + render.
+  const [tradeModalUser, setTradeModalUser] = useState(null);
+  const openTradeHistory = (rosterInfo) => setTradeModalUser(rosterInfo);
+  // Resolve a Sleeper player_id → readable name using the loaded FC asset list.
+  // Used by RecentTradesModal so trade rows show "Bijan Robinson" not "Player #4866".
   const resolvePlayerName = (pid) => {
     if(!assets || !pid) return `Player #${pid}`;
     const hit = assets.find(a => a.sleeperId && String(a.sleeperId) === String(pid));
     return hit ? hit.name : `Player #${pid}`;
-  };
-  // If the trade carries per-league slot info AND this pick is for THAT league's
-  // current draft year, show "2026 Pick 1.03" (slot-specific). Otherwise fall
-  // back to generic "2026 1st" — used for future-year picks where slot order
-  // isn't determined yet.
-  const formatPickInTrade = (p, slotByRosterId, draftSeason) => {
-    const round = p.round === 1 ? '1st' : p.round === 2 ? '2nd' : p.round === 3 ? '3rd' : `${p.round}th`;
-    const generic = `${p.season} ${round}`;
-    if(!slotByRosterId || String(p.season) !== draftSeason) return generic;
-    const slot = slotByRosterId[p.roster_id];
-    if(!slot) return generic;
-    return `${p.season} Pick ${p.round}.${String(slot).padStart(2, '0')}`;
   };
 
   // displayAssets = FC values with PFK's per-position multipliers applied for
@@ -7789,112 +7947,18 @@ function TradeFinderApp(){
         )}
       </div>
 
-      {/* Trade history modal — opens when user clicks an owner badge.
-          Shows the leaguemate's last 5 completed trades in this league with
-          player names resolved via FC's index (covers most relevant pieces). */}
-      {tradeModal && (
-        <div onClick={()=>setTradeModal(null)}
-             style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-          <div onClick={e=>e.stopPropagation()}
-               style={{background:'#0a0a0a',border:'2px solid #FFD700',borderRadius:14,padding:20,maxWidth:560,width:'100%',maxHeight:'80vh',overflowY:'auto'}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,paddingBottom:12,borderBottom:'1px solid #1e1e1e'}}>
-              {tradeModal.rosterInfo.avatar
-                ? <img src={`https://sleepercdn.com/avatars/thumbs/${tradeModal.rosterInfo.avatar}`} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
-                : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(tradeModal.rosterInfo.display_name||'?')[0].toUpperCase()}</div>}
-              <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{tradeModal.rosterInfo.username || tradeModal.rosterInfo.display_name}</div>
-                <div style={{fontSize:11,color:'#888'}}>{tradeModal.status === 'ready' ? `${tradeModal.trades.length} most recent trade${tradeModal.trades.length===1?'':'s'}` : 'Recent trades'}{tradeModal.leagueCount ? ` · scanned ${tradeModal.leagueCount} dynasty league${tradeModal.leagueCount===1?'':'s'}` : ''}</div>
-              </div>
-              <button onClick={()=>setTradeModal(null)}
-                      style={{background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',padding:'4px 10px',cursor:'pointer',fontSize:14,fontWeight:700}}>×</button>
-            </div>
-            {tradeModal.status === 'loading' && <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>Scanning league transactions…</div>}
-            {tradeModal.status === 'error' && <div style={{padding:20,textAlign:'center',color:'#ef4444',fontSize:13}}>Couldn't load trades — try again.</div>}
-            {tradeModal.status === 'ready' && tradeModal.trades.length === 0 && (
-              <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No completed trades found across this leaguemate's dynasty leagues.</div>
-            )}
-            {tradeModal.status === 'ready' && tradeModal.trades.length > 0 && (() => {
-              // Tab toggle between "all trades" and "relevant only" (matches the
-              // current Trade Finder context — anchor + equivalents). Tap-friendly
-              // padding + flex:1 split for mobile, count badges so users see the
-              // signal at a glance.
-              const relevantTrades = tradeModal.trades.filter(tradeIsRelevant);
-              const visibleTrades = tradeFilterMode === 'relevant' ? relevantTrades : tradeModal.trades;
-              const hasRelevant = relevantTrades.length > 0;
-              const tabBtn = (key, label, count, disabled) => (
-                <button onClick={()=>!disabled && setTradeFilterMode(key)} disabled={disabled}
-                        style={{flex:1,padding:'8px 10px',borderRadius:6,
-                                border: tradeFilterMode===key ? '1.5px solid #FFD700' : '1.5px solid #1e1e1e',
-                                background: tradeFilterMode===key ? '#FFD700' : 'transparent',
-                                color: tradeFilterMode===key ? '#000' : (disabled?'#444':'#aaa'),
-                                fontWeight:800,fontSize:12,letterSpacing:0.4,cursor:disabled?'not-allowed':'pointer'}}>
-                  {label} <span style={{opacity:0.7,fontWeight:700}}>({count})</span>
-                </button>
-              );
-              return (
-                <>
-                  <div style={{display:'flex',gap:6,marginBottom:14}}>
-                    {tabBtn('relevant', '★ Relevant', relevantTrades.length, !hasRelevant)}
-                    {tabBtn('all', 'All trades', tradeModal.trades.length, false)}
-                  </div>
-                  {tradeFilterMode === 'relevant' && relevantTrades.length === 0 && (
-                    <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No trades involve any player or pick from your current Trade Finder results.</div>
-                  )}
-                  {visibleTrades.map((tx,i) => {
-                    // Each trade carries the user's roster_id IN THAT LEAGUE (different
-                    // leagues = different roster_ids for the same user).
-                    const myRosterId = tx._myRosterId;
-                    const received = Object.entries(tx.adds || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
-                    const sent     = Object.entries(tx.drops || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
-                    const picksReceived = (tx.draft_picks || []).filter(p => p.owner_id === myRosterId && p.previous_owner_id !== myRosterId);
-                    const picksSent     = (tx.draft_picks || []).filter(p => p.previous_owner_id === myRosterId && p.owner_id !== myRosterId);
-                    const date = tx.status_updated || tx.created;
-                    const dateStr = date ? new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
-                    const txRelevant = tradeIsRelevant(tx);
-                    // Render a list of items (players + picks) with relevant ones
-                    // highlighted in gold + ★. Empty list renders "nothing".
-                    const renderItems = (playerIds, picks, kind) => {
-                      const items = [
-                        ...playerIds.map(pid => ({key:`${kind}-p-${pid}`, label:resolvePlayerName(pid), relevant:isRelevantPlayer(pid)})),
-                        ...picks.map(p => ({key:`${kind}-d-${p.season}-${p.round}-${p.roster_id}`, label:formatPickInTrade(p, tx._slotByRosterId, tx._draftSeason), relevant:isRelevantPick(p)})),
-                      ];
-                      if(items.length === 0) return <span style={{color:'#666'}}>nothing</span>;
-                      return items.map((it, idx) => (
-                        <React.Fragment key={it.key}>
-                          {idx > 0 && <span style={{color:'#444'}}> · </span>}
-                          <span style={it.relevant ? {color:'#FFD700',fontWeight:800} : null}>
-                            {it.relevant && '★ '}{it.label}
-                          </span>
-                        </React.Fragment>
-                      ));
-                    };
-                    return (
-                      <div key={tx.transaction_id || i}
-                           style={{padding:'12px 14px',
-                                   background: txRelevant ? '#1a1400' : '#0f0f0f',
-                                   border: txRelevant ? '1px solid #FFD70066' : '1px solid #1e1e1e',
-                                   borderRadius:8,marginBottom:10,fontSize:13}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
-                          <div style={{fontSize:11,color:'#FFD700',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
-                          <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{dateStr}</div>
-                        </div>
-                        <div style={{marginBottom:6}}>
-                          <span style={{color:'#10b981',fontWeight:800,fontSize:11,letterSpacing:0.5}}>RECEIVED:</span>
-                          <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>{renderItems(received, picksReceived, 'rec')}</div>
-                        </div>
-                        <div>
-                          <span style={{color:'#ef4444',fontWeight:800,fontSize:11,letterSpacing:0.5}}>SENT:</span>
-                          <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>{renderItems(sent, picksSent, 'snt')}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              );
-            })()}
-            <div style={{fontSize:10,color:'#555',marginTop:8,textAlign:'center'}}>★ = involves a player/pick from your current Trade Finder results · names via FantasyCalc index</div>
-          </div>
-        </div>
+      {/* Trade history modal — handed off to the shared RecentTradesModal so
+          Trade Finder + Sleeper Snapshot stay in sync. We pass the current
+          Trade Finder context (anchor + equivalents) so the ★ Relevant tab
+          can highlight trades involving assets the user is actively
+          considering. */}
+      {tradeModalUser && (
+        <RecentTradesModal
+          userInfo={tradeModalUser}
+          onClose={() => setTradeModalUser(null)}
+          resolvePlayerName={resolvePlayerName}
+          relevantContext={relevantContext}
+        />
       )}
     </div>
   );
