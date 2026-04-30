@@ -7063,17 +7063,59 @@ const ptdAdjust = (value, pos, passTd) => {
   return pos === 'QB' ? value * m : value;
 };
 
+// PPC (per-carry) and PPFD (per-first-down) multipliers — also not in FC's API.
+// Multipliers calibrated against 3-yr nflverse data (2022-2024) for the top
+// fantasy producers per position, scaled to PFK convention (~⅓ pass-through
+// of raw point bumps to match existing TEP_MULT / PTD_MULT scale).
+//
+// PPC 0.25:  RBs are nearly the only gainer (+23% raw → +10% mult). WR/TE flat.
+// PPFD 1.0:  RB > TE > WR > QB. RB rec_fd ratio confirmed at 34% (not 50%) —
+//            full derivation in PROJECT_STATUS.md.
+//
+// Calibrated for PPC=0.25 and PPFD=1; for other values we scale linearly from
+// baseline so a 0.5 PPC league or a 0.5 PPFD league get partial multipliers.
+const PPC_MULT_AT_QUARTER = {QB:1.02, RB:1.10, WR:1.00, TE:1.00};
+const PPFD_MULT_AT_ONE   = {QB:1.02, RB:1.09, WR:1.06, TE:1.07};
+
+const ppcAdjust = (value, pos, ppcLevel) => {
+  if(!ppcLevel || ppcLevel === 0) return value;
+  const m = PPC_MULT_AT_QUARTER[pos] ?? 1;
+  if(m === 1) return value;
+  return value * (1 + (m - 1) * (ppcLevel / 0.25));
+};
+const ppfdAdjust = (value, pos, ppfdLevel) => {
+  if(!ppfdLevel || ppfdLevel === 0) return value;
+  const m = PPFD_MULT_AT_ONE[pos] ?? 1;
+  if(m === 1) return value;
+  return value * (1 + (m - 1) * ppfdLevel);
+};
+
+// Extract PPC and PPFD levels from a Sleeper league.
+// PPFD: most leagues set rush_fd === rec_fd; if they differ we take the max
+// (small approximation — multipliers are calibrated for both = 1).
+const ppcLevelForLeague = (lg) => parseFloat(lg?.scoring_settings?.rush_att) || 0;
+const ppfdLevelForLeague = (lg) => {
+  const rush = parseFloat(lg?.scoring_settings?.rush_fd) || 0;
+  const rec  = parseFloat(lg?.scoring_settings?.rec_fd) || 0;
+  return Math.max(rush, rec);
+};
+
 // Pretty-print a format for the chip ("SF · 1.0 PPR · 0.5 TEP · 5pt PT · 12-team").
-// Optional `league` arg surfaces scoring fields FC doesn't take as params (pass TD).
-// When no league is provided we fall back to PFK's baseline pass TD (5pt) so the
-// default chip is fully transparent about what's being shown.
+// Optional `league` arg surfaces scoring fields FC doesn't take as params
+// (pass TD, PPC, PPFD — all applied via PFK multipliers). When no league is
+// provided we fall back to PFK's baseline pass TD (5pt) so the default chip
+// is fully transparent about what's being shown.
 const formatLabel = (fmt, league = null) => {
   const qb = fmt.numQbs === 2 ? 'SF' : '1QB';
   const ppr = fmt.ppr === 1 ? '1.0 PPR' : fmt.ppr === 0.5 ? '0.5 PPR' : '0 PPR';
   // tepLevel uses FC's int convention: 0=none, 1=0.5 TEP, 2=1.0 TEP
   const tep = fmt.tepLevel === 2 ? ' · 1.0 TEP' : fmt.tepLevel === 1 ? ' · 0.5 TEP' : '';
   const ptd = league?.scoring_settings?.pass_td ?? 5;
-  return `${qb} · ${ppr}${tep} · ${ptd}pt PT · ${fmt.numTeams}-team`;
+  const ppc = ppcLevelForLeague(league);
+  const ppfd = ppfdLevelForLeague(league);
+  const ppcStr  = ppc  > 0 ? ` · ${ppc} PPC` : '';
+  const ppfdStr = ppfd > 0 ? ` · ${ppfd} PPFD` : '';
+  return `${qb} · ${ppr}${tep} · ${ptd}pt PT${ppcStr}${ppfdStr} · ${fmt.numTeams}-team`;
 };
 
 // Normalize free-text pick input. Accepts "1.03", "2026 1.03", "1.3", "26 1.03"
@@ -7163,15 +7205,24 @@ function TradeFinderApp(){
     else localStorage.removeItem('pfk_sleeper_league');
   };
 
-  // displayAssets = FC values with PTD multiplier applied per position based on
-  // selected league's pass_td. FC's API doesn't differentiate values by pass TD
-  // scoring, so we use our own PTD_MULT table on top. When no league is linked
-  // (or pass_td is 5/null), this is a pass-through.
+  // displayAssets = FC values with PFK's per-position multipliers applied for
+  // scoring fields FC doesn't take as params: pass TD, PPC, PPFD. All three
+  // are independent and multiply through. When no league is linked (or none
+  // of the fields are set / non-baseline), this is a pass-through.
   const displayAssets = useMemo(() => {
     if(!assets) return null;
-    const ptd = selectedLeague?.scoring_settings?.pass_td;
-    if(!ptd || ptd === 5) return assets;
-    return assets.map(a => ({ ...a, value: ptdAdjust(a.value, a.pos, ptd) }));
+    const ptd  = selectedLeague?.scoring_settings?.pass_td;
+    const ppc  = ppcLevelForLeague(selectedLeague);
+    const ppfd = ppfdLevelForLeague(selectedLeague);
+    const ptdActive = ptd && ptd !== 5;
+    if(!ptdActive && !ppc && !ppfd) return assets;
+    return assets.map(a => {
+      let v = a.value;
+      if(ptdActive) v = ptdAdjust(v, a.pos, ptd);
+      if(ppc)       v = ppcAdjust(v, a.pos, ppc);
+      if(ppfd)      v = ppfdAdjust(v, a.pos, ppfd);
+      return { ...a, value: v };
+    });
   },[assets, selectedLeague]);
 
   // Anchor is stored as the asset object captured at selection time; if the league
