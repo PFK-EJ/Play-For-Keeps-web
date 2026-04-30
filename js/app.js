@@ -2841,13 +2841,13 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
   // Tab definitions — Power Rankings has been moved out of the public nav
   // and into the admin panel; we'll work on it there until it's ready to ship.
   // Each tab: [id, label, descriptionForTooltip, href, isInPageOnMainPage]
-  // Order locked by Evan: Rookie Ranks → Dispersal → Sleeper Snapshot → Trade Polls
+  // Order locked by Evan 2026-04-30: Trade Finder → Sleeper Snapshot → Dispersal → Trade Polls → Rookie Ranks
   const tabs = [
-    ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
-    ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
-    ["lookup","🔍 Sleeper Snapshot",sleeperLinked?.username?"Open your own Sleeper Snapshot — search any other username from inside":"Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in",lookupHref,false],
     ["trade","⚖️ Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
+    ["lookup","🔍 Sleeper Snapshot",sleeperLinked?.username?"Open your own Sleeper Snapshot — search any other username from inside":"Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in",lookupHref,false],
+    ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
     ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
+    ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
   ];
   const handleTabClick = (e, id, isInPage) => {
     if(isInPage && onSetTab){
