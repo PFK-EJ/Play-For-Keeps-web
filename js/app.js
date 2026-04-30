@@ -7957,13 +7957,10 @@ function TradeFinderApp(){
             <div style={{maxWidth:560,margin:'24px auto 0',padding:'14px 16px',background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:8,textAlign:'left',color:'#aaa',fontSize:12,lineHeight:1.6}}>
               <div style={{color:'#FFD700',fontWeight:800,letterSpacing:0.5,fontSize:11,marginBottom:8}}>👥 ABOUT LEAGUEMATE OWNERSHIP &amp; TRADE HISTORY</div>
               <div style={{marginBottom:6}}>
-                Once you link your Sleeper account in the toolbar and pick a league, every result will show <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> — the leaguemate in your league who currently rosters that player or pick (pulled live from Sleeper rosters and traded picks).
-              </div>
-              <div style={{marginBottom:6}}>
-                Tap any username to open a popup with their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong> — scanned across <em>every</em> dynasty league they're in (current + prior season), not just yours. Each trade card shows the league name, what they sent, what they received, with current-year picks resolved to slot (e.g. <code style={{color:'#FFD700'}}>2026 Pick 1.03</code>).
+                Once you link your Sleeper account in the toolbar and pick a league, every result will show <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> — the leaguemate in your league who currently rosters that player or pick.
               </div>
               <div>
-                Inside the popup, the <span style={{color:'#FFD700',fontWeight:800}}>★ Relevant</span> tab filters to trades involving any player or pick from your current Trade Finder results — the most actionable "what has this person paid for assets like the one I'm working with?" context.
+                Tap any username to open a popup with their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong>. The <span style={{color:'#FFD700',fontWeight:800}}>★ Relevant</span> tab filters to trades involving any player or pick from your current Trade Finder results — the most actionable "what has this person paid for assets like the one I'm working with?" context.
               </div>
             </div>
           </div>
