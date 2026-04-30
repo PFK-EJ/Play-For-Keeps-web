@@ -4522,6 +4522,35 @@ function DispersalSetup(){
   const [sleeperPlayersLoading,setSleeperPlayersLoading] = useState(false);
   const [sleeperBuilding,setSleeperBuilding] = useState(false);
   const [showTeamsHelp,setShowTeamsHelp] = useState(false);
+  // Linked Sleeper user (from the toolbar's global link). When present we can
+  // show a league dropdown instead of forcing the user to find + paste an ID.
+  const [sleeperLinkedUser] = useSleeperUser();
+  const [linkedLeagues,setLinkedLeagues] = useState(null); // null=not-fetched, []=empty, [...]=ready
+  useEffect(() => {
+    if(!sleeperLinkedUser?.user_id){
+      setLinkedLeagues(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try{
+        const yr = String(new Date().getFullYear());
+        const lgs = await fetch(`https://api.sleeper.app/v1/user/${sleeperLinkedUser.user_id}/leagues/nfl/${yr}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]);
+        if(cancelled) return;
+        // Show ALL league types (dispersals can be needed for redraft, keeper,
+        // dynasty — let the user choose). Sort dynasty first since they're the
+        // most common dispersal use case, then alpha within each group.
+        const sorted = (lgs||[]).slice().sort((a,b) => {
+          const at = (a?.settings?.type||0) === 2 ? 0 : 1;
+          const bt = (b?.settings?.type||0) === 2 ? 0 : 1;
+          if(at !== bt) return at - bt;
+          return (a.name||'').localeCompare(b.name||'');
+        });
+        setLinkedLeagues(sorted);
+      }catch(e){ setLinkedLeagues([]); }
+    })();
+    return () => { cancelled = true; };
+  },[sleeperLinkedUser?.user_id]);
   const [showModeHelp,setShowModeHelp] = useState(false);
   const [showPicksHelp,setShowPicksHelp] = useState(false);
   // Bulk-add picks ("all managers have own picks" shortcut). When checked, the year
@@ -4548,12 +4577,15 @@ function DispersalSetup(){
   const [leagueStarters,setLeagueStarters] = useState('');        // free text — "10", "11", etc.
   const [leaguePPC,setLeaguePPC] = useState('');                  // point-per-carry (rare); blank → hide
 
-  const fetchSleeperLeague = async () => {
+  const fetchSleeperLeague = async (overrideId) => {
+    // Optional override lets the league dropdown trigger a fetch immediately
+    // after setSleeperId without waiting for state to flush on the next render.
     setSleeperErr(''); setSleeperData(null);
-    if(!sleeperId.trim()){ setSleeperErr('Enter a league ID'); return; }
+    const id = (typeof overrideId === 'string' && overrideId.trim()) || sleeperId.trim();
+    if(!id){ setSleeperErr('Enter a league ID'); return; }
     setSleeperLoading(true);
     try{
-      const data = await sleeperLeague(sleeperId.trim());
+      const data = await sleeperLeague(id);
       setSleeperData(data);
       // Auto-select rosters with no owner (orphaned)
       const auto = new Set();
@@ -5038,13 +5070,43 @@ function DispersalSetup(){
           {/* SHARE DISPERSAL button — sits between league info and Sleeper League ID so
               the commish can advertise the dispersal BEFORE creating the draft. */}
           <button onClick={sharePoolImage} disabled={poolShareBusy||!sleeperData||sleeperSelected.size===0} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft" style={{padding:'14px 20px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1.5px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#FFD700'),borderRadius:8,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#FFD700',fontWeight:900,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13,letterSpacing:1.5}}>{poolShareBusy?'BUILDING IMAGE…':'📸 SHARE DISPERSAL'}</button>
+          {/* League dropdown — only when user has linked Sleeper in the toolbar.
+              Selecting auto-fills the league ID input and immediately fetches
+              so the user doesn't have to hunt for the long ID on Sleeper.
+              Falls back to the manual ID input below if the user prefers. */}
+          {sleeperLinkedUser && (
+            <div>
+              <label style={labelStyle}>YOUR LEAGUES</label>
+              {linkedLeagues === null && <div style={{fontSize:12,color:'#888',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>Loading your Sleeper leagues…</div>}
+              {linkedLeagues && linkedLeagues.length === 0 && <div style={{fontSize:12,color:'#888',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>No leagues found for {new Date().getFullYear()} on @{sleeperLinkedUser.username}.</div>}
+              {linkedLeagues && linkedLeagues.length > 0 && (
+                <select value={sleeperId} onChange={e => {
+                  const v = e.target.value;
+                  setSleeperId(v);
+                  if(v){
+                    // Defer the fetch so the input value commits first; fetchSleeperLeague
+                    // reads the latest sleeperId from state on the next tick.
+                    setTimeout(() => fetchSleeperLeague(v), 0);
+                  }
+                }} style={{...inputStyle,cursor:'pointer'}}>
+                  <option value="">— Pick a league —</option>
+                  {linkedLeagues.map(l => {
+                    const t = l?.settings?.type;
+                    const tag = t === 2 ? 'Dynasty' : t === 1 ? 'Keeper' : 'Redraft';
+                    return <option key={l.league_id} value={l.league_id}>{l.name} · {tag} · {l.total_rosters||'?'}-team</option>;
+                  })}
+                </select>
+              )}
+              <div style={{fontSize:11,color:'#666',marginTop:5}}>Or paste a league ID manually below — works for any league you're not in.</div>
+            </div>
+          )}
           <div>
             <label style={labelStyle}>SLEEPER LEAGUE ID</label>
             <div style={{display:'flex',gap:8}}>
               <input value={sleeperId} onChange={e=>setSleeperId(e.target.value)} onKeyDown={e=>e.key==='Enter'&&fetchSleeperLeague()} placeholder="e.g. 1042739852394871234" style={{...inputStyle,fontFamily:'monospace'}}/>
               <button type="button" onClick={fetchSleeperLeague} disabled={sleeperLoading} style={{padding:'10px 18px',background:sleeperLoading?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:sleeperLoading?'default':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>{sleeperLoading?'…':'FETCH'}</button>
             </div>
-            <div style={{fontSize:11,color:'#666',marginTop:5}}>Long number from <code style={{color:'#FFD700'}}>sleeper.com/leagues/&lt;id&gt;</code></div>
+            <div style={{fontSize:11,color:'#666',marginTop:5}}>Long number from <code style={{color:'#FFD700'}}>sleeper.com/leagues/&lt;id&gt;</code>{!sleeperLinkedUser && <> · or <strong style={{color:'#FFD700'}}>link Sleeper in the toolbar above</strong> to pick from a dropdown</>}</div>
           </div>
           <div>
             <label style={labelStyle}>DRAFT NAME</label>
