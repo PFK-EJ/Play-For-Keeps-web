@@ -7386,14 +7386,29 @@ function TradeFinderApp(){
           const myRoster = (rosters||[]).find(r => r.owner_id === userId || (r.co_owners||[]).includes(userId));
           if(!myRoster) return [];
           const myRosterId = myRoster.roster_id;
+          // Also fetch this league's draft slots in parallel with transactions —
+          // lets us resolve current-year pick trades to their slot ("2026 Pick 1.03"
+          // instead of generic "2026 1st"). Each league has its own draft order.
           const weeks = Array.from({length: 18}, (_, i) => i + 1);
-          const txArrays = await Promise.all(weeks.map(w =>
-            fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${w}`, {cache:'no-store'})
-              .then(r => r.ok ? r.json() : []).catch(() => [])
-          ));
+          const [draftSlots, ...txArrays] = await Promise.all([
+            lookupDraftSlots(lg.league_id, rosters),
+            ...weeks.map(w =>
+              fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${w}`, {cache:'no-store'})
+                .then(r => r.ok ? r.json() : []).catch(() => [])
+            ),
+          ]);
+          // Build roster_id → draft slot for this league's current rookie draft.
+          // (For trades involving picks from this draft year only — 2027+ has no
+          // assigned slot so those still display as generic round.)
+          const slotByRosterId = {};
+          if(draftSlots?.slotByRoster){
+            Object.entries(draftSlots.slotByRoster).forEach(([rid, slot]) => {
+              slotByRosterId[parseInt(rid)] = parseInt(slot);
+            });
+          }
           return txArrays.flat()
             .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(myRosterId))
-            .map(tx => ({ ...tx, _leagueName: lg.name, _myRosterId: myRosterId }));
+            .map(tx => ({ ...tx, _leagueName: lg.name, _myRosterId: myRosterId, _slotByRosterId: slotByRosterId, _draftSeason: String(lg.season) }));
         }catch(e){ return []; }
       }));
       const trades = tradesNested.flat()
@@ -7411,9 +7426,17 @@ function TradeFinderApp(){
     const hit = assets.find(a => a.sleeperId && String(a.sleeperId) === String(pid));
     return hit ? hit.name : `Player #${pid}`;
   };
-  const formatPickInTrade = (p) => {
+  // If the trade carries per-league slot info AND this pick is for THAT league's
+  // current draft year, show "2026 Pick 1.03" (slot-specific). Otherwise fall
+  // back to generic "2026 1st" — used for future-year picks where slot order
+  // isn't determined yet.
+  const formatPickInTrade = (p, slotByRosterId, draftSeason) => {
     const round = p.round === 1 ? '1st' : p.round === 2 ? '2nd' : p.round === 3 ? '3rd' : `${p.round}th`;
-    return `${p.season} ${round}`;
+    const generic = `${p.season} ${round}`;
+    if(!slotByRosterId || String(p.season) !== draftSeason) return generic;
+    const slot = slotByRosterId[p.roster_id];
+    if(!slot) return generic;
+    return `${p.season} Pick ${p.round}.${String(slot).padStart(2, '0')}`;
   };
 
   // displayAssets = FC values with PFK's per-position multipliers applied for
@@ -7803,7 +7826,7 @@ function TradeFinderApp(){
                     const renderItems = (playerIds, picks, kind) => {
                       const items = [
                         ...playerIds.map(pid => ({key:`${kind}-p-${pid}`, label:resolvePlayerName(pid), relevant:isRelevantPlayer(pid)})),
-                        ...picks.map(p => ({key:`${kind}-d-${p.season}-${p.round}`, label:formatPickInTrade(p), relevant:isRelevantPick(p)})),
+                        ...picks.map(p => ({key:`${kind}-d-${p.season}-${p.round}-${p.roster_id}`, label:formatPickInTrade(p, tx._slotByRosterId, tx._draftSeason), relevant:isRelevantPick(p)})),
                       ];
                       if(items.length === 0) return <span style={{color:'#666'}}>nothing</span>;
                       return items.map((it, idx) => (
