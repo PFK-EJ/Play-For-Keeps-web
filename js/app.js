@@ -4524,8 +4524,29 @@ function DispersalSetup(){
   const [showTeamsHelp,setShowTeamsHelp] = useState(false);
   // Linked Sleeper user (from the toolbar's global link). When present we can
   // show a league dropdown instead of forcing the user to find + paste an ID.
-  const [sleeperLinkedUser] = useSleeperUser();
+  const [sleeperLinkedUser, setSleeperLinkedUser] = useSleeperUser();
   const [linkedLeagues,setLinkedLeagues] = useState(null); // null=not-fetched, []=empty, [...]=ready
+  // Inline Sleeper link form state — lets users link RIGHT in the YOUR LEAGUES
+  // section instead of being told to scroll up to the toolbar. Same end result
+  // as the toolbar link (writes to the same global useSleeperUser hook).
+  const [inlineLinkInput,setInlineLinkInput] = useState('');
+  const [inlineLinkErr,setInlineLinkErr] = useState('');
+  const [inlineLinkBusy,setInlineLinkBusy] = useState(false);
+  const inlineLinkSubmit = async () => {
+    setInlineLinkErr('');
+    const q = (inlineLinkInput||'').trim();
+    if(!q){ setInlineLinkErr('Enter your Sleeper username'); return; }
+    setInlineLinkBusy(true);
+    try{
+      const u = await lookupResolveUser(q);
+      setSleeperLinkedUser({ user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null });
+      setInlineLinkInput('');
+    }catch(e){
+      setInlineLinkErr(e.message || 'Could not find that Sleeper user');
+    }finally{
+      setInlineLinkBusy(false);
+    }
+  };
   useEffect(() => {
     if(!sleeperLinkedUser?.user_id){
       setLinkedLeagues(null);
@@ -5079,11 +5100,23 @@ function DispersalSetup(){
             <label style={labelStyle}>YOUR LEAGUES <span style={{color:'#10b981',fontWeight:700,fontSize:10,letterSpacing:1.5,marginLeft:6}}>· FASTEST</span></label>
             {!sleeperLinkedUser && (
               <>
-                <select disabled value="" style={{...inputStyle,cursor:'not-allowed',opacity:0.55}}>
-                  <option value="">🔗 Link Sleeper in the toolbar above to pick from a dropdown</option>
-                </select>
-                <div style={{fontSize:11,color:'#FFD70099',marginTop:6,padding:'8px 10px',background:'#1a1400',border:'1px dashed #FFD70044',borderRadius:6,lineHeight:1.5}}>
-                  💡 <strong style={{color:'#FFD700'}}>Skip the league ID hunt.</strong> Tap <span style={{color:'#FFD700',fontWeight:800}}>🔗 Link Sleeper</span> in the toolbar — your leagues will appear in this dropdown so you can pick one in a single click.
+                <div style={{padding:'10px 12px',background:'#1a1400',border:'1px dashed #FFD70066',borderRadius:8}}>
+                  <div style={{fontSize:12,color:'#FFD700CC',marginBottom:8,lineHeight:1.5}}>
+                    💡 <strong style={{color:'#FFD700'}}>Skip the league ID hunt.</strong> Enter your Sleeper username — your leagues will load right here so you can pick one in a single click.
+                  </div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    <input value={inlineLinkInput} onChange={e=>{setInlineLinkInput(e.target.value); setInlineLinkErr('');}}
+                           onKeyDown={e=>e.key==='Enter'&&inlineLinkSubmit()}
+                           placeholder="Sleeper username"
+                           disabled={inlineLinkBusy}
+                           style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
+                    <button onClick={inlineLinkSubmit} disabled={inlineLinkBusy}
+                            style={{padding:'10px 18px',background:inlineLinkBusy?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:inlineLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>
+                      {inlineLinkBusy ? '…' : '🔗 LINK'}
+                    </button>
+                  </div>
+                  {inlineLinkErr && <div style={{color:'#ef4444',fontSize:12,marginTop:6}}>{inlineLinkErr}</div>}
+                  <div style={{fontSize:10,color:'#888',marginTop:6}}>Public Sleeper lookup — no password, no permission needed. Just your username.</div>
                 </div>
               </>
             )}
