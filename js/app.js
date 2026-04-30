@@ -6121,9 +6121,30 @@ function DispersalDraft({draftId}){
 
 // ---------- Top-level Dispersal page (route: /dispersal[/id]) ----------
 function DispersalApp({draftId}){
+  // Dev-only completed-drafts counter — moved here from the main page so it
+  // shows up across the whole dispersal flow (setup + live draft). Floating
+  // top-right badge, hidden on prod via isDevHost(). Tucks under the master
+  // toolbar so it doesn't overlap the brand on mobile.
+  const [completedDispersalCount,setCompletedDispersalCount] = useState(null);
+  useEffect(()=>{
+    if(!isDevHost() || !sb) return;
+    let cancelled = false;
+    (async () => {
+      try{
+        const { count } = await sb.from('dispersal_drafts').select('*', { count:'exact', head:true }).eq('status', 'complete');
+        if(!cancelled && typeof count === 'number') setCompletedDispersalCount(count);
+      }catch(e){}
+    })();
+    return ()=>{ cancelled = true; };
+  },[]);
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <MasterToolbar currentTab="dispersal"/>
+      {isDevHost() && completedDispersalCount !== null && (
+        <div style={{position:'fixed',top:12,right:12,zIndex:60,padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,boxShadow:'0 4px 12px rgba(0,0,0,0.6)',whiteSpace:'nowrap'}}>
+          🎲 {completedDispersalCount.toLocaleString()} completed drafts
+        </div>
+      )}
       {draftId ? <DispersalDraft draftId={draftId}/> : <DispersalSetup/>}
     </div>
   );
