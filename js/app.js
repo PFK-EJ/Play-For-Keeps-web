@@ -7411,9 +7411,12 @@ function TradeFinderApp(){
             .map(tx => ({ ...tx, _leagueName: lg.name, _myRosterId: myRosterId, _slotByRosterId: slotByRosterId, _draftSeason: String(lg.season) }));
         }catch(e){ return []; }
       }));
+      // Cap at 25 — generous enough to surface real patterns without making
+      // the modal an endless scroll. Beyond ~25 the older trades stop being
+      // useful context anyway since dynasty values drift fast.
       const trades = tradesNested.flat()
         .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
-        .slice(0, 5);
+        .slice(0, 25);
       // Default to ★ Relevant tab if any results actually relate to the current
       // Trade Finder context — that's the more useful view. Fall back to All
       // when there's nothing relevant so the modal isn't empty by default.
@@ -7680,9 +7683,9 @@ function TradeFinderApp(){
                   <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{liveAnchor.value.toLocaleString()}</div>
                   {anchorOwner && (
                     <button onClick={()=>openTradeHistory(anchorOwner)}
-                            data-tooltip={`Click to see ${anchorOwner.display_name}'s last 5 trades`}
+                            data-tooltip={`Click to see ${anchorOwner.display_name}'s recent trades`}
                             style={{flexBasis:'100%',marginTop:6,padding:'8px 12px',background:'#0a0a0a',border:'1px solid #10b98166',borderRadius:8,color:'#10b981',fontSize:13,fontWeight:800,cursor:'pointer',letterSpacing:0.3,textAlign:'left'}}>
-                      👤 owned by @{anchorOwner.username || anchorOwner.display_name} <span style={{color:'#666',fontWeight:700,fontSize:11}}>· tap to see their last 5 trades →</span>
+                      👤 owned by @{anchorOwner.username || anchorOwner.display_name} <span style={{color:'#666',fontWeight:700,fontSize:11}}>· tap to see their recent trades →</span>
                     </button>
                   )}
                   {!anchorOwner && ownership && !liveAnchor.isPick && (
@@ -7723,7 +7726,7 @@ function TradeFinderApp(){
                 at nothing. Mobile-first sizing (compact). */}
             {equivalents && equivalents.total > 0 && ownership && (
               <div style={{padding:'8px 12px',marginBottom:10,background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:6,fontSize:12,color:'#aaa',lineHeight:1.5}}>
-                💡 <strong style={{color:'#FFD700'}}>Tip:</strong> Click any <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> button below to see that leaguemate's <strong style={{color:'#fff'}}>last 5 trades</strong> across all their dynasty leagues — useful for sizing up the trade partner before reaching out.
+                💡 <strong style={{color:'#FFD700'}}>Tip:</strong> Click any <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> button below to see that leaguemate's <strong style={{color:'#fff'}}>recent trades</strong> across all their dynasty leagues — useful for sizing up the trade partner before reaching out.
               </div>
             )}
             {equivalents && equivalents.total > 0 && (
@@ -7761,7 +7764,7 @@ function TradeFinderApp(){
                             <span style={{color:deltaColor,fontSize:11,fontWeight:700,minWidth:48,textAlign:'right'}}>{deltaStr}</span>
                             {ownerInfo && (
                               <button onClick={()=>openTradeHistory(ownerInfo)}
-                                      data-tooltip={`Click to see ${ownerInfo.display_name}'s last 5 trades in this league`}
+                                      data-tooltip={`Click to see ${ownerInfo.display_name}'s recent trades in this league`}
                                       style={{flexBasis:'100%',marginTop:2,textAlign:'left',padding:'3px 8px',background:'transparent',border:'1px solid #1e1e1e',borderRadius:6,color:'#10b981',fontSize:11,fontWeight:700,cursor:'pointer',letterSpacing:0.3}}>
                                 👤 owned by @{ownerInfo.username || ownerInfo.display_name} →
                               </button>
@@ -7800,7 +7803,7 @@ function TradeFinderApp(){
                 : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(tradeModal.rosterInfo.display_name||'?')[0].toUpperCase()}</div>}
               <div style={{flex:1}}>
                 <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{tradeModal.rosterInfo.username || tradeModal.rosterInfo.display_name}</div>
-                <div style={{fontSize:11,color:'#888'}}>5 most recent trades{tradeModal.leagueCount ? ` · scanned ${tradeModal.leagueCount} dynasty league${tradeModal.leagueCount===1?'':'s'}` : ''}</div>
+                <div style={{fontSize:11,color:'#888'}}>{tradeModal.status === 'ready' ? `${tradeModal.trades.length} most recent trade${tradeModal.trades.length===1?'':'s'}` : 'Recent trades'}{tradeModal.leagueCount ? ` · scanned ${tradeModal.leagueCount} dynasty league${tradeModal.leagueCount===1?'':'s'}` : ''}</div>
               </div>
               <button onClick={()=>setTradeModal(null)}
                       style={{background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',padding:'4px 10px',cursor:'pointer',fontSize:14,fontWeight:700}}>×</button>
