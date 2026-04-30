@@ -7265,7 +7265,13 @@ function TradeFinderApp(){
   };
 
   // ---- Phase 2: leaguemate ownership + trade history ----
-  // ownership = { byPlayerId: {sleeperId -> rosterId}, byRosterId: {rosterId -> userInfo} }
+  // ownership = {
+  //   byPlayerId:  {sleeperId -> rosterId}        — current rostered player owners
+  //   byRosterId:  {rosterId  -> userInfo}        — roster → user profile
+  //   byPickName:  {fcPickName -> rosterId}       — current owner of slot-specific picks
+  //                                                  (CURRENT-year rookie draft only;
+  //                                                   future picks have no slot yet)
+  // }
   // Fetched eagerly when a league is selected so result rows show owner tags
   // the moment a user anchors on something. Trade history is fetched lazily
   // (on click) since most users won't open the modal.
@@ -7279,9 +7285,16 @@ function TradeFinderApp(){
     (async () => {
       try{
         const lid = selectedLeague.league_id;
-        const [rosters, users] = await Promise.all([
-          fetch(`https://api.sleeper.app/v1/league/${lid}/rosters`, {cache:'no-store'}).then(r=>r.json()),
+        // Fetch rosters first since lookupDraftSlots needs them; the rest in parallel.
+        const rosters = await fetch(`https://api.sleeper.app/v1/league/${lid}/rosters`, {cache:'no-store'}).then(r=>r.json());
+        if(cancelled) return;
+        const [users, draftSlots, tradedPicks] = await Promise.all([
           fetch(`https://api.sleeper.app/v1/league/${lid}/users`, {cache:'no-store'}).then(r=>r.json()),
+          // Reuse the same draft-slot resolver Power Rankings uses (slot_to_roster_id
+          // first, draft_order fallback). Returns null for auction drafts or leagues
+          // with no rookie draft yet.
+          lookupDraftSlots(lid, rosters),
+          fetch(`https://api.sleeper.app/v1/league/${lid}/traded_picks`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
         ]);
         if(cancelled) return;
         const byUserId = {};
@@ -7299,7 +7312,34 @@ function TradeFinderApp(){
           };
           (r.players || []).forEach(pid => { byPlayerId[String(pid)] = r.roster_id; });
         });
-        setOwnership({ byPlayerId, byRosterId });
+        // Build slot-specific pick → current owner map. CURRENT-year picks only —
+        // future-year slots aren't determined yet (no draft order set), and FC's
+        // pick names are slot-specific so we'd be guessing for 2027+.
+        const byPickName = {};
+        if(draftSlots?.slotByRoster){
+          // Reverse: slot → original-owner roster_id
+          const rosterBySlot = {};
+          Object.entries(draftSlots.slotByRoster).forEach(([rid, slot]) => {
+            rosterBySlot[parseInt(slot)] = parseInt(rid);
+          });
+          const seasonStr = String(selectedLeague.season || new Date().getFullYear());
+          const N = (rosters||[]).length;
+          // Walk every rookie-draft slot × every plausible round (1-5).
+          // FC names are formatted "YYYY Pick R.PP" with zero-padded slot.
+          for(let round = 1; round <= 5; round++){
+            for(let slot = 1; slot <= N; slot++){
+              const originalRid = rosterBySlot[slot];
+              if(!originalRid) continue;
+              const tp = (tradedPicks||[]).find(t =>
+                String(t.season) === seasonStr && t.round === round && t.roster_id === originalRid
+              );
+              const currentOwnerRid = tp ? tp.owner_id : originalRid;
+              const slotPad = String(slot).padStart(2, '0');
+              byPickName[`${seasonStr} Pick ${round}.${slotPad}`] = currentOwnerRid;
+            }
+          }
+        }
+        setOwnership({ byPlayerId, byRosterId, byPickName });
       }catch(e){
         if(!cancelled) setOwnership(null);
       }
@@ -7652,9 +7692,17 @@ function TradeFinderApp(){
                         // Red = worth LESS (you'd be giving up value)
                         // Neutral gray for a near-perfect match (within 0.1%).
                         const deltaColor = Math.abs(delta) < 0.1 ? '#888' : delta > 0 ? '#10b981' : '#ef4444';
-                        // Phase 2: leaguemate ownership tag. Only resolves for players
-                        // (picks need draft-slot mapping which is a separate problem).
-                        const ownerRosterId = !a.isPick && ownership && a.sleeperId ? ownership.byPlayerId[String(a.sleeperId)] : null;
+                        // Phase 2: leaguemate ownership tag. Players resolve via
+                        // sleeperId → roster map. CURRENT-year picks (e.g. "2026
+                        // Pick 1.03") resolve via the slot-specific byPickName map
+                        // built from this league's draft order + traded_picks.
+                        // Future-year picks (2027+) have no slot mapping yet, so
+                        // they silently fall through to "no badge".
+                        const ownerRosterId = ownership ? (
+                          a.isPick
+                            ? ownership.byPickName?.[a.name]
+                            : (a.sleeperId ? ownership.byPlayerId[String(a.sleeperId)] : null)
+                        ) : null;
                         const ownerInfo = ownerRosterId ? ownership.byRosterId[ownerRosterId] : null;
                         return (
                           <div key={a.name} style={{padding:'9px 14px',borderBottom:'1px solid #131313',display:'flex',alignItems:'center',gap:8,fontSize:13,flexWrap:'wrap'}}>
