@@ -7628,6 +7628,14 @@ function TradeFinderApp(){
               </div>
             )}
 
+            {/* Hint that owner badges are clickable. Only renders when owner
+                data is actually populated so we don't dangle a tip pointing
+                at nothing. Mobile-first sizing (compact). */}
+            {equivalents && equivalents.total > 0 && ownership && (
+              <div style={{padding:'8px 12px',marginBottom:10,background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:6,fontSize:12,color:'#aaa',lineHeight:1.5}}>
+                💡 <strong style={{color:'#FFD700'}}>Tip:</strong> Click any <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> button below to see that leaguemate's <strong style={{color:'#fff'}}>last 5 trades</strong> across all their dynasty leagues — useful for sizing up the trade partner before reaching out.
+              </div>
+            )}
             {equivalents && equivalents.total > 0 && (
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
                 {['QB','RB','WR','TE','PICK','OTHER'].filter(k => equivalents.groups[k].length > 0).map(k => (
