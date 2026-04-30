@@ -7264,6 +7264,82 @@ function TradeFinderApp(){
     else localStorage.removeItem('pfk_sleeper_league');
   };
 
+  // ---- Phase 2: leaguemate ownership + trade history ----
+  // ownership = { byPlayerId: {sleeperId -> rosterId}, byRosterId: {rosterId -> userInfo} }
+  // Fetched eagerly when a league is selected so result rows show owner tags
+  // the moment a user anchors on something. Trade history is fetched lazily
+  // (on click) since most users won't open the modal.
+  const [ownership, setOwnership] = useState(null);
+  useEffect(() => {
+    if(!selectedLeague?.league_id){
+      setOwnership(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try{
+        const lid = selectedLeague.league_id;
+        const [rosters, users] = await Promise.all([
+          fetch(`https://api.sleeper.app/v1/league/${lid}/rosters`, {cache:'no-store'}).then(r=>r.json()),
+          fetch(`https://api.sleeper.app/v1/league/${lid}/users`, {cache:'no-store'}).then(r=>r.json()),
+        ]);
+        if(cancelled) return;
+        const byUserId = {};
+        (users||[]).forEach(u => { byUserId[u.user_id] = u; });
+        const byRosterId = {};
+        const byPlayerId = {};
+        (rosters||[]).forEach(r => {
+          const u = byUserId[r.owner_id];
+          byRosterId[r.roster_id] = {
+            roster_id: r.roster_id,
+            user_id: r.owner_id,
+            username: u?.username || null,
+            display_name: u?.display_name || u?.username || `Roster ${r.roster_id}`,
+            avatar: u?.avatar || null,
+          };
+          (r.players || []).forEach(pid => { byPlayerId[String(pid)] = r.roster_id; });
+        });
+        setOwnership({ byPlayerId, byRosterId });
+      }catch(e){
+        if(!cancelled) setOwnership(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  },[selectedLeague?.league_id]);
+
+  // Trade history modal state — opens when user clicks an owner badge.
+  // { rosterInfo: ownership.byRosterId entry, status: 'loading'|'ready'|'error', trades: [...] }
+  const [tradeModal, setTradeModal] = useState(null);
+  const openTradeHistory = async (rosterInfo) => {
+    setTradeModal({ rosterInfo, status: 'loading', trades: [] });
+    try{
+      const lid = selectedLeague.league_id;
+      const weeks = Array.from({length: 18}, (_, i) => i + 1);
+      const txArrays = await Promise.all(weeks.map(w =>
+        fetch(`https://api.sleeper.app/v1/league/${lid}/transactions/${w}`, {cache:'no-store'})
+          .then(r => r.ok ? r.json() : []).catch(() => [])
+      ));
+      const trades = txArrays.flat()
+        .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(rosterInfo.roster_id))
+        .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
+        .slice(0, 5);
+      setTradeModal(m => m && m.rosterInfo.roster_id === rosterInfo.roster_id ? { ...m, status: 'ready', trades } : m);
+    }catch(e){
+      setTradeModal(m => m ? { ...m, status: 'error' } : m);
+    }
+  };
+  // Resolve a Sleeper player_id to a readable name using FC's name index (covers
+  // the ~500 players users actually trade). Falls back to "Player #id" for the rest.
+  const resolvePlayerName = (pid) => {
+    if(!assets || !pid) return `Player #${pid}`;
+    const hit = assets.find(a => a.sleeperId && String(a.sleeperId) === String(pid));
+    return hit ? hit.name : `Player #${pid}`;
+  };
+  const formatPickInTrade = (p) => {
+    const round = p.round === 1 ? '1st' : p.round === 2 ? '2nd' : p.round === 3 ? '3rd' : `${p.round}th`;
+    return `${p.season} ${round}`;
+  };
+
   // displayAssets = FC values with PFK's per-position multipliers applied for
   // scoring fields FC doesn't take as params: pass TD, PPC, PPFD. All three
   // are independent and multiply through. When no league is linked (or none
@@ -7483,11 +7559,22 @@ function TradeFinderApp(){
                         // Red = worth LESS (you'd be giving up value)
                         // Neutral gray for a near-perfect match (within 0.1%).
                         const deltaColor = Math.abs(delta) < 0.1 ? '#888' : delta > 0 ? '#10b981' : '#ef4444';
+                        // Phase 2: leaguemate ownership tag. Only resolves for players
+                        // (picks need draft-slot mapping which is a separate problem).
+                        const ownerRosterId = !a.isPick && ownership && a.sleeperId ? ownership.byPlayerId[String(a.sleeperId)] : null;
+                        const ownerInfo = ownerRosterId ? ownership.byRosterId[ownerRosterId] : null;
                         return (
-                          <div key={a.name} style={{padding:'9px 14px',borderBottom:'1px solid #131313',display:'flex',alignItems:'center',gap:8,fontSize:13}}>
-                            <span style={{flex:1,color:'#eee',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.name}</span>
+                          <div key={a.name} style={{padding:'9px 14px',borderBottom:'1px solid #131313',display:'flex',alignItems:'center',gap:8,fontSize:13,flexWrap:'wrap'}}>
+                            <span style={{flex:1,minWidth:120,color:'#eee',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.name}</span>
                             <span style={{color:'#FFD700',fontWeight:800,minWidth:48,textAlign:'right'}}>{a.value.toLocaleString()}</span>
                             <span style={{color:deltaColor,fontSize:11,fontWeight:700,minWidth:48,textAlign:'right'}}>{deltaStr}</span>
+                            {ownerInfo && (
+                              <button onClick={()=>openTradeHistory(ownerInfo)}
+                                      data-tooltip={`Click to see ${ownerInfo.display_name}'s last 5 trades in this league`}
+                                      style={{flexBasis:'100%',marginTop:2,textAlign:'left',padding:'3px 8px',background:'transparent',border:'1px solid #1e1e1e',borderRadius:6,color:'#10b981',fontSize:11,fontWeight:700,cursor:'pointer',letterSpacing:0.3}}>
+                                👤 owned by @{ownerInfo.username || ownerInfo.display_name} →
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -7507,6 +7594,63 @@ function TradeFinderApp(){
           </div>
         )}
       </div>
+
+      {/* Trade history modal — opens when user clicks an owner badge.
+          Shows the leaguemate's last 5 completed trades in this league with
+          player names resolved via FC's index (covers most relevant pieces). */}
+      {tradeModal && (
+        <div onClick={()=>setTradeModal(null)}
+             style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div onClick={e=>e.stopPropagation()}
+               style={{background:'#0a0a0a',border:'2px solid #FFD700',borderRadius:14,padding:20,maxWidth:560,width:'100%',maxHeight:'80vh',overflowY:'auto'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,paddingBottom:12,borderBottom:'1px solid #1e1e1e'}}>
+              {tradeModal.rosterInfo.avatar
+                ? <img src={`https://sleepercdn.com/avatars/thumbs/${tradeModal.rosterInfo.avatar}`} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
+                : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(tradeModal.rosterInfo.display_name||'?')[0].toUpperCase()}</div>}
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{tradeModal.rosterInfo.username || tradeModal.rosterInfo.display_name}</div>
+                <div style={{fontSize:11,color:'#888'}}>Last 5 trades · {selectedLeague?.name}</div>
+              </div>
+              <button onClick={()=>setTradeModal(null)}
+                      style={{background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',padding:'4px 10px',cursor:'pointer',fontSize:14,fontWeight:700}}>×</button>
+            </div>
+            {tradeModal.status === 'loading' && <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>Scanning league transactions…</div>}
+            {tradeModal.status === 'error' && <div style={{padding:20,textAlign:'center',color:'#ef4444',fontSize:13}}>Couldn't load trades — try again.</div>}
+            {tradeModal.status === 'ready' && tradeModal.trades.length === 0 && (
+              <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No completed trades found for this leaguemate in {selectedLeague?.name}.</div>
+            )}
+            {tradeModal.status === 'ready' && tradeModal.trades.length > 0 && tradeModal.trades.map((tx,i) => {
+              const myRosterId = tradeModal.rosterInfo.roster_id;
+              // Players THIS leaguemate received in the trade (adds keyed by their roster_id)
+              const received = Object.entries(tx.adds || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
+              const sent     = Object.entries(tx.drops || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
+              // Picks: tx.draft_picks lists each pick's owner_id (post-trade) and previous_owner_id
+              const picksReceived = (tx.draft_picks || []).filter(p => p.owner_id === myRosterId && p.previous_owner_id !== myRosterId);
+              const picksSent     = (tx.draft_picks || []).filter(p => p.previous_owner_id === myRosterId && p.owner_id !== myRosterId);
+              const date = tx.status_updated || tx.created;
+              const dateStr = date ? new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
+              return (
+                <div key={tx.transaction_id || i} style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,marginBottom:10,fontSize:13}}>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5,marginBottom:8}}>{dateStr}</div>
+                  <div style={{marginBottom:6}}>
+                    <span style={{color:'#10b981',fontWeight:800,fontSize:11,letterSpacing:0.5}}>RECEIVED:</span>
+                    <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>
+                      {[...received.map(resolvePlayerName), ...picksReceived.map(formatPickInTrade)].join(' · ') || <span style={{color:'#666'}}>nothing</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{color:'#ef4444',fontWeight:800,fontSize:11,letterSpacing:0.5}}>SENT:</span>
+                    <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>
+                      {[...sent.map(resolvePlayerName), ...picksSent.map(formatPickInTrade)].join(' · ') || <span style={{color:'#666'}}>nothing</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{fontSize:10,color:'#555',marginTop:8,textAlign:'center'}}>Player names resolved via FantasyCalc index — uncommon names may appear as Player #ID.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
