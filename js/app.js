@@ -5070,36 +5070,51 @@ function DispersalSetup(){
           {/* SHARE DISPERSAL button — sits between league info and Sleeper League ID so
               the commish can advertise the dispersal BEFORE creating the draft. */}
           <button onClick={sharePoolImage} disabled={poolShareBusy||!sleeperData||sleeperSelected.size===0} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft" style={{padding:'14px 20px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1.5px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#FFD700'),borderRadius:8,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#FFD700',fontWeight:900,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13,letterSpacing:1.5}}>{poolShareBusy?'BUILDING IMAGE…':'📸 SHARE DISPERSAL'}</button>
-          {/* League dropdown — only when user has linked Sleeper in the toolbar.
-              Selecting auto-fills the league ID input and immediately fetches
-              so the user doesn't have to hunt for the long ID on Sleeper.
-              Falls back to the manual ID input below if the user prefers. */}
-          {sleeperLinkedUser && (
-            <div>
-              <label style={labelStyle}>YOUR LEAGUES</label>
-              {linkedLeagues === null && <div style={{fontSize:12,color:'#888',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>Loading your Sleeper leagues…</div>}
-              {linkedLeagues && linkedLeagues.length === 0 && <div style={{fontSize:12,color:'#888',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>No leagues found for {new Date().getFullYear()} on @{sleeperLinkedUser.username}.</div>}
-              {linkedLeagues && linkedLeagues.length > 0 && (
-                <select value={sleeperId} onChange={e => {
-                  const v = e.target.value;
-                  setSleeperId(v);
-                  if(v){
-                    // Defer the fetch so the input value commits first; fetchSleeperLeague
-                    // reads the latest sleeperId from state on the next tick.
-                    setTimeout(() => fetchSleeperLeague(v), 0);
-                  }
-                }} style={{...inputStyle,cursor:'pointer'}}>
-                  <option value="">— Pick a league —</option>
-                  {linkedLeagues.map(l => {
-                    const t = l?.settings?.type;
-                    const tag = t === 2 ? 'Dynasty' : t === 1 ? 'Keeper' : 'Redraft';
-                    return <option key={l.league_id} value={l.league_id}>{l.name} · {tag} · {l.total_rosters||'?'}-team</option>;
-                  })}
+          {/* League dropdown — always visible so users see the incentive to
+              link Sleeper. Disabled tease state when not linked, fully
+              functional dropdown when linked. Manual ID input stays available
+              below for users who don't want to link or are setting up a draft
+              for a league they're not in. */}
+          <div>
+            <label style={labelStyle}>YOUR LEAGUES <span style={{color:'#10b981',fontWeight:700,fontSize:10,letterSpacing:1.5,marginLeft:6}}>· FASTEST</span></label>
+            {!sleeperLinkedUser && (
+              <>
+                <select disabled value="" style={{...inputStyle,cursor:'not-allowed',opacity:0.55}}>
+                  <option value="">🔗 Link Sleeper in the toolbar above to pick from a dropdown</option>
                 </select>
-              )}
+                <div style={{fontSize:11,color:'#FFD70099',marginTop:6,padding:'8px 10px',background:'#1a1400',border:'1px dashed #FFD70044',borderRadius:6,lineHeight:1.5}}>
+                  💡 <strong style={{color:'#FFD700'}}>Skip the league ID hunt.</strong> Tap <span style={{color:'#FFD700',fontWeight:800}}>🔗 Link Sleeper</span> in the toolbar — your leagues will appear in this dropdown so you can pick one in a single click.
+                </div>
+              </>
+            )}
+            {sleeperLinkedUser && linkedLeagues === null && (
+              <div style={{fontSize:12,color:'#888',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>Loading your Sleeper leagues…</div>
+            )}
+            {sleeperLinkedUser && linkedLeagues && linkedLeagues.length === 0 && (
+              <div style={{fontSize:12,color:'#888',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>No leagues found for {new Date().getFullYear()} on @{sleeperLinkedUser.username}.</div>
+            )}
+            {sleeperLinkedUser && linkedLeagues && linkedLeagues.length > 0 && (
+              <select value={sleeperId} onChange={e => {
+                const v = e.target.value;
+                setSleeperId(v);
+                if(v){
+                  // Defer the fetch so the input value commits first; fetchSleeperLeague
+                  // accepts an override id so we don't depend on the next render either.
+                  setTimeout(() => fetchSleeperLeague(v), 0);
+                }
+              }} style={{...inputStyle,cursor:'pointer'}}>
+                <option value="">— Pick a league —</option>
+                {linkedLeagues.map(l => {
+                  const t = l?.settings?.type;
+                  const tag = t === 2 ? 'Dynasty' : t === 1 ? 'Keeper' : 'Redraft';
+                  return <option key={l.league_id} value={l.league_id}>{l.name} · {tag} · {l.total_rosters||'?'}-team</option>;
+                })}
+              </select>
+            )}
+            {sleeperLinkedUser && (
               <div style={{fontSize:11,color:'#666',marginTop:5}}>Or paste a league ID manually below — works for any league you're not in.</div>
-            </div>
-          )}
+            )}
+          </div>
           <div>
             <label style={labelStyle}>SLEEPER LEAGUE ID</label>
             <div style={{display:'flex',gap:8}}>
