@@ -7309,39 +7309,51 @@ function TradeFinderApp(){
 
   // Trade history modal state — opens when user clicks an owner badge.
   // { rosterInfo: ownership.byRosterId entry, status: 'loading'|'ready'|'error', trades: [...] }
+  //
+  // Strategy: instead of digging deep into one league's history (where old trades
+  // tell you nothing about the leaguemate today — dynasty values change fast),
+  // we scan ALL of their current-year dynasty leagues and surface the 5 MOST
+  // RECENT trades regardless of which league. Each trade card shows the league
+  // name so the user has context.
   const [tradeModal, setTradeModal] = useState(null);
   const openTradeHistory = async (rosterInfo) => {
     setTradeModal({ rosterInfo, status: 'loading', trades: [] });
     try{
-      // Walk the previous_league_id chain back so we capture trade history across
-      // multiple dynasty seasons. Sleeper persists roster_id across the chain
-      // (same owner = same roster_id year over year), so the same filter works.
-      // In April (early preseason), the current league_id often has zero trades
-      // yet — most recent activity is in the prior season's league_id.
-      const leagueIds = [selectedLeague.league_id];
-      let cursor = selectedLeague;
-      for(let i = 0; i < 3 && cursor?.previous_league_id && cursor.previous_league_id !== '0'; i++){
+      const userId = rosterInfo.user_id;
+      if(!userId) throw new Error('No user_id on this roster');
+      // Pull all dynasty leagues for this leaguemate (current year + prior year)
+      // — prior year covers winter trade window when current year league_ids
+      // may have few/no trades yet.
+      const yrCur = String(new Date().getFullYear());
+      const yrPrev = String(new Date().getFullYear() - 1);
+      const [lgsCur, lgsPrev] = await Promise.all([
+        fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${yrCur}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${yrPrev}`, {cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      ]);
+      const dynasty = [...lgsCur, ...lgsPrev].filter(l => l?.settings?.type === 2);
+      // For each league: fetch rosters to find this user's roster_id in that
+      // league (it's not necessarily the same as in selectedLeague), then scan
+      // every week of transactions.
+      const tradesNested = await Promise.all(dynasty.map(async (lg) => {
         try{
-          const prev = await fetch(`https://api.sleeper.app/v1/league/${cursor.previous_league_id}`, {cache:'no-store'}).then(r=>r.json());
-          if(!prev?.league_id) break;
-          leagueIds.push(prev.league_id);
-          cursor = prev;
-        }catch(e){ break; }
-      }
-      // Scan every week (1-18) across every league instance in parallel.
-      // ~72 calls for 4 league instances — acceptable for an opt-in modal click.
-      const weeks = Array.from({length: 18}, (_, i) => i + 1);
-      const allTxArrays = await Promise.all(
-        leagueIds.flatMap(lid => weeks.map(w =>
-          fetch(`https://api.sleeper.app/v1/league/${lid}/transactions/${w}`, {cache:'no-store'})
-            .then(r => r.ok ? r.json() : []).catch(() => [])
-        ))
-      );
-      const trades = allTxArrays.flat()
-        .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(rosterInfo.roster_id))
+          const rosters = await fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/rosters`, {cache:'no-store'}).then(r=>r.json());
+          const myRoster = (rosters||[]).find(r => r.owner_id === userId || (r.co_owners||[]).includes(userId));
+          if(!myRoster) return [];
+          const myRosterId = myRoster.roster_id;
+          const weeks = Array.from({length: 18}, (_, i) => i + 1);
+          const txArrays = await Promise.all(weeks.map(w =>
+            fetch(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${w}`, {cache:'no-store'})
+              .then(r => r.ok ? r.json() : []).catch(() => [])
+          ));
+          return txArrays.flat()
+            .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(myRosterId))
+            .map(tx => ({ ...tx, _leagueName: lg.name, _myRosterId: myRosterId }));
+        }catch(e){ return []; }
+      }));
+      const trades = tradesNested.flat()
         .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
         .slice(0, 5);
-      setTradeModal(m => m && m.rosterInfo.roster_id === rosterInfo.roster_id ? { ...m, status: 'ready', trades, leagueCount: leagueIds.length } : m);
+      setTradeModal(m => m && m.rosterInfo.user_id === rosterInfo.user_id ? { ...m, status: 'ready', trades, leagueCount: dynasty.length } : m);
     }catch(e){
       setTradeModal(m => m ? { ...m, status: 'error' } : m);
     }
@@ -7627,7 +7639,7 @@ function TradeFinderApp(){
                 : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(tradeModal.rosterInfo.display_name||'?')[0].toUpperCase()}</div>}
               <div style={{flex:1}}>
                 <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{tradeModal.rosterInfo.username || tradeModal.rosterInfo.display_name}</div>
-                <div style={{fontSize:11,color:'#888'}}>Last 5 trades · {selectedLeague?.name}{tradeModal.leagueCount > 1 ? ` (across ${tradeModal.leagueCount} seasons)` : ''}</div>
+                <div style={{fontSize:11,color:'#888'}}>5 most recent trades{tradeModal.leagueCount ? ` · scanned ${tradeModal.leagueCount} dynasty league${tradeModal.leagueCount===1?'':'s'}` : ''}</div>
               </div>
               <button onClick={()=>setTradeModal(null)}
                       style={{background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',padding:'4px 10px',cursor:'pointer',fontSize:14,fontWeight:700}}>×</button>
@@ -7635,10 +7647,12 @@ function TradeFinderApp(){
             {tradeModal.status === 'loading' && <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>Scanning league transactions…</div>}
             {tradeModal.status === 'error' && <div style={{padding:20,textAlign:'center',color:'#ef4444',fontSize:13}}>Couldn't load trades — try again.</div>}
             {tradeModal.status === 'ready' && tradeModal.trades.length === 0 && (
-              <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No completed trades found for this leaguemate in {selectedLeague?.name}.</div>
+              <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No completed trades found across this leaguemate's dynasty leagues.</div>
             )}
             {tradeModal.status === 'ready' && tradeModal.trades.length > 0 && tradeModal.trades.map((tx,i) => {
-              const myRosterId = tradeModal.rosterInfo.roster_id;
+              // Each trade carries the user's roster_id IN THAT LEAGUE (different
+              // leagues = different roster_ids for the same user).
+              const myRosterId = tx._myRosterId;
               // Players THIS leaguemate received in the trade (adds keyed by their roster_id)
               const received = Object.entries(tx.adds || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
               const sent     = Object.entries(tx.drops || {}).filter(([_,rid]) => rid === myRosterId).map(([pid]) => pid);
@@ -7649,7 +7663,10 @@ function TradeFinderApp(){
               const dateStr = date ? new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
               return (
                 <div key={tx.transaction_id || i} style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,marginBottom:10,fontSize:13}}>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5,marginBottom:8}}>{dateStr}</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
+                    <div style={{fontSize:11,color:'#FFD700',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
+                    <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{dateStr}</div>
+                  </div>
                   <div style={{marginBottom:6}}>
                     <span style={{color:'#10b981',fontWeight:800,fontSize:11,letterSpacing:0.5}}>RECEIVED:</span>
                     <div style={{color:'#eee',marginTop:2,lineHeight:1.5}}>
