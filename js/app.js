@@ -7656,14 +7656,36 @@ function TradeFinderApp(){
 
         {liveAnchor && (
           <>
-            <div style={{background:'linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)',border:'2px solid #FFD700',borderRadius:12,padding:'16px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-              <span style={{padding:'4px 10px',background:posColor(liveAnchor.pos),color:'#000',borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:0.5}}>{liveAnchor.pos}</span>
-              <div style={{flex:1,minWidth:160}}>
-                <div style={{fontSize:18,fontWeight:900,color:'#fff'}}>{liveAnchor.name}</div>
-                <div style={{fontSize:12,color:'#888',marginTop:2}}>Anchor value</div>
-              </div>
-              <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{liveAnchor.value.toLocaleString()}</div>
-            </div>
+            {(() => {
+              // Resolve owner of the anchor itself — players via sleeperId,
+              // current-year picks via byPickName. Same pattern as equivalents.
+              const anchorRosterId = ownership ? (
+                liveAnchor.isPick
+                  ? ownership.byPickName?.[liveAnchor.name]
+                  : (liveAnchor.sleeperId ? ownership.byPlayerId[String(liveAnchor.sleeperId)] : null)
+              ) : null;
+              const anchorOwner = anchorRosterId ? ownership.byRosterId[anchorRosterId] : null;
+              return (
+                <div style={{background:'linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)',border:'2px solid #FFD700',borderRadius:12,padding:'16px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+                  <span style={{padding:'4px 10px',background:posColor(liveAnchor.pos),color:'#000',borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:0.5}}>{liveAnchor.pos}</span>
+                  <div style={{flex:1,minWidth:160}}>
+                    <div style={{fontSize:18,fontWeight:900,color:'#fff'}}>{liveAnchor.name}</div>
+                    <div style={{fontSize:12,color:'#888',marginTop:2}}>Anchor value</div>
+                  </div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{liveAnchor.value.toLocaleString()}</div>
+                  {anchorOwner && (
+                    <button onClick={()=>openTradeHistory(anchorOwner)}
+                            data-tooltip={`Click to see ${anchorOwner.display_name}'s last 5 trades`}
+                            style={{flexBasis:'100%',marginTop:6,padding:'8px 12px',background:'#0a0a0a',border:'1px solid #10b98166',borderRadius:8,color:'#10b981',fontSize:13,fontWeight:800,cursor:'pointer',letterSpacing:0.3,textAlign:'left'}}>
+                      👤 owned by @{anchorOwner.username || anchorOwner.display_name} <span style={{color:'#666',fontWeight:700,fontSize:11}}>· tap to see their last 5 trades →</span>
+                    </button>
+                  )}
+                  {!anchorOwner && ownership && !liveAnchor.isPick && (
+                    <div style={{flexBasis:'100%',marginTop:4,fontSize:11,color:'#666'}}>👤 not currently rostered in {selectedLeague?.name}</div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:18,display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
               <div style={{flex:'1 1 280px',display:'flex',flexDirection:'column',gap:6}}>
