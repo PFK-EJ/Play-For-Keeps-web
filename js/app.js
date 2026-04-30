@@ -7063,29 +7063,64 @@ const ptdAdjust = (value, pos, passTd) => {
   return pos === 'QB' ? value * m : value;
 };
 
-// PPC (per-carry) and PPFD (per-first-down) multipliers — also not in FC's API.
-// Multipliers calibrated against 3-yr nflverse data (2022-2024) for the top
-// fantasy producers per position, scaled to PFK convention (~⅓ pass-through
-// of raw point bumps to match existing TEP_MULT / PTD_MULT scale).
+// PPC (per-carry) and PPFD (per-first-down) multipliers — not in FC's API.
+// Calibrated against 3-yr nflverse data (2022-2024) for top fantasy producers
+// per position, scaled to PFK convention (~⅓ pass-through of raw point bumps
+// to match existing TEP_MULT / PTD_MULT scale).
 //
-// PPC 0.25:  RBs are nearly the only gainer (+23% raw → +10% mult). WR/TE flat.
-// PPFD 1.0:  RB > TE > WR > QB. RB rec_fd ratio confirmed at 34% (not 50%) —
-//            full derivation in PROJECT_STATUS.md.
+// RB multipliers are TIERED by FC value. Workhorse RBs (Bijan/Gibbs tier) get
+// 2-3x the carries of fringe starters and 5-10x the carries of FAAB depth, so
+// the per-carry / per-first-down value bump is much bigger at the top of the
+// position. Brackets calibrated from analyst pick-value tier sheets (2026-04-29).
 //
-// Calibrated for PPC=0.25 and PPFD=1; for other values we scale linearly from
-// baseline so a 0.5 PPC league or a 0.5 PPFD league get partial multipliers.
-const PPC_MULT_AT_QUARTER = {QB:1.02, RB:1.10, WR:1.00, TE:1.00};
-const PPFD_MULT_AT_ONE   = {QB:1.02, RB:1.09, WR:1.06, TE:1.07};
+// QB/WR/TE stay flat — receptions don't fall off as steeply by FC value rank.
+//
+// PPC 0.25:  RBs nearly the only gainer (+23% raw → +10-15% mult tiered).
+// PPFD 1.0:  RB > TE > WR > QB; RB rec_fd ratio confirmed at 34% (not 50%).
+//            Full derivation in ~/pfk_research/PROJECT_STATUS.md.
+//
+// Calibrated for PPC=0.25 and PPFD=1; for other values we scale linearly.
 
-const ppcAdjust = (value, pos, ppcLevel) => {
+// Tier brackets (descending min FC value → multiplier).
+const RB_PPC_TIERS = [
+  { min: 6500, mult: 1.15 },  // Elite young workhorse (Bijan/Gibbs tier)
+  { min: 4000, mult: 1.10 },  // Solid RB1/RB2 starter
+  { min: 2000, mult: 1.06 },  // Low-end starter / committee back
+  { min: 800,  mult: 1.03 },  // Depth / handcuff with role
+  { min: 0,    mult: 1.00 },  // Pure FAAB
+];
+const RB_PPFD_TIERS = [
+  { min: 6500, mult: 1.13 },
+  { min: 4000, mult: 1.09 },
+  { min: 2000, mult: 1.05 },
+  { min: 800,  mult: 1.02 },
+  { min: 0,    mult: 1.00 },
+];
+const lookupTierMult = (tiers, baseValue) => {
+  for(const t of tiers) if(baseValue >= t.min) return t.mult;
+  return 1.0;
+};
+
+// Per-position multiplier resolvers. RB consults tier brackets using the
+// player's BASE FC value (pre-adjustment); other positions are flat.
+const ppcMultiplier = (pos, baseValue) => {
+  if(pos === 'RB') return lookupTierMult(RB_PPC_TIERS, baseValue);
+  return ({QB:1.02, WR:1.00, TE:1.00}[pos]) ?? 1.00;
+};
+const ppfdMultiplier = (pos, baseValue) => {
+  if(pos === 'RB') return lookupTierMult(RB_PPFD_TIERS, baseValue);
+  return ({QB:1.02, WR:1.06, TE:1.07}[pos]) ?? 1.00;
+};
+
+const ppcAdjust = (value, pos, ppcLevel, baseValue) => {
   if(!ppcLevel || ppcLevel === 0) return value;
-  const m = PPC_MULT_AT_QUARTER[pos] ?? 1;
+  const m = ppcMultiplier(pos, baseValue ?? value);
   if(m === 1) return value;
   return value * (1 + (m - 1) * (ppcLevel / 0.25));
 };
-const ppfdAdjust = (value, pos, ppfdLevel) => {
+const ppfdAdjust = (value, pos, ppfdLevel, baseValue) => {
   if(!ppfdLevel || ppfdLevel === 0) return value;
-  const m = PPFD_MULT_AT_ONE[pos] ?? 1;
+  const m = ppfdMultiplier(pos, baseValue ?? value);
   if(m === 1) return value;
   return value * (1 + (m - 1) * ppfdLevel);
 };
@@ -7217,10 +7252,13 @@ function TradeFinderApp(){
     const ptdActive = ptd && ptd !== 5;
     if(!ptdActive && !ppc && !ppfd) return assets;
     return assets.map(a => {
-      let v = a.value;
+      const baseValue = a.value;
+      let v = baseValue;
       if(ptdActive) v = ptdAdjust(v, a.pos, ptd);
-      if(ppc)       v = ppcAdjust(v, a.pos, ppc);
-      if(ppfd)      v = ppfdAdjust(v, a.pos, ppfd);
+      // PPC/PPFD bracket the multiplier off the BASE FC value (not the
+      // post-PTD value) so RB tier lookup is stable.
+      if(ppc)       v = ppcAdjust(v, a.pos, ppc, baseValue);
+      if(ppfd)      v = ppfdAdjust(v, a.pos, ppfd, baseValue);
       return { ...a, value: v };
     });
   },[assets, selectedLeague]);
