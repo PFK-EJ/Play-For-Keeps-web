@@ -7970,6 +7970,13 @@ const dispersalMatch = path.match(/^\/dispersal(?:\/([0-9a-f-]+))?$/i);
 const lookupMatch = path.match(/^\/lookup(?:\/([^/]+))?$/i);
 const isTradeFinderRoute = path === '/trade-finder';
 const isDeadRoute = path === '/zolty' || path === '/compare';
+// Root path defaults to Trade Finder (PFK's most-used tool). The legacy App
+// (Rookie Ranks / Trade Polls) still renders at root if a relevant query
+// param is present — `?tab=pfk`, `?tab=polls`, etc. for direct nav, or
+// `?signin=1` for cross-page sign-in links.
+const _rootParams = new URLSearchParams(window.location.search);
+const rootGoesToApp = path === '' && (_rootParams.has('tab') || _rootParams.has('signin'));
+const rootGoesToTradeFinder = path === '' && !rootGoesToApp;
 function NotFoundPage(){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
@@ -7986,6 +7993,7 @@ ReactDOM.render(
   : dispersalMatch ? <DispersalApp draftId={dispersalMatch[1] || null}/>
   : lookupMatch ? <LookupApp identifier={lookupMatch[1] ? decodeURIComponent(lookupMatch[1]) : null}/>
   : isTradeFinderRoute ? <TradeFinderApp/>
+  : rootGoesToTradeFinder ? <TradeFinderApp/>
   : isDeadRoute ? <NotFoundPage/>
   : <App/>,
   document.getElementById("root")
