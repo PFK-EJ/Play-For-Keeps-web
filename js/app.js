@@ -4579,6 +4579,9 @@ function DispersalSetup(){
   // generic pick lines to the picks textarea.
   const [allHavePicks,setAllHavePicks] = useState(false);
   const [bulkPicksYears,setBulkPicksYears] = useState(()=>new Set([2026,2027,2028,2029]));
+  // Customize / add more picks expandable toggle. Closed by default so the
+  // primary "Pull from Sleeper" action stays the headline.
+  const [showCustomizePicks,setShowCustomizePicks] = useState(false);
   // Sleeper traded_picks cache for the "Pull actual ownership" button. Lazy
   // loaded on first click since most commishes will use the assumed-clean-slate
   // bulk-add and we don't want to fetch unnecessary data.
@@ -5019,8 +5022,12 @@ function DispersalSetup(){
   // so the commish can see whose pick is which once they're in the pool.
   // Picks are round-only (e.g. "2027 1st") since Sleeper doesn't assign slots
   // to future drafts — that's how Sleeper itself displays pre-draft picks.
-  const applyPullSleeperPicks = async () => {
-    if(setupMode !== 'sleeper' || !sleeperData || sleeperSelected.size === 0 || bulkPicksYears.size === 0) return;
+  const applyPullSleeperPicks = async (yearsOverride) => {
+    // yearsOverride lets the simple primary button pull "all years" with one
+    // click (defaults to PICK_YEARS) without forcing the user to interact with
+    // the customize-section year chips.
+    const yearsSource = yearsOverride || bulkPicksYears;
+    if(setupMode !== 'sleeper' || !sleeperData || sleeperSelected.size === 0 || yearsSource.size === 0) return;
     setPullingSleeperPicks(true);
     setPullPicksMsg('');
     try{
@@ -5038,7 +5045,7 @@ function DispersalSetup(){
         return u?.display_name || u?.username || `Team ${rid}`;
       };
       const roundLabel = (n) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`;
-      const years = Array.from(bulkPicksYears).sort();
+      const years = Array.from(yearsSource).sort();
       const rounds = [1, 2, 3, 4];
       const lines = [];
       sleeperSelected.forEach(rid => {
@@ -5087,60 +5094,74 @@ function DispersalSetup(){
   // All three flow into the same picksText textarea, so commish can mix-and-match
   // and edit freely.
   const isSleeperMode = setupMode === 'sleeper';
-  const yearsLabel = bulkPicksYears.size === 0 ? 'no years selected' : `${bulkPicksYears.size} year${bulkPicksYears.size===1?'':'s'} selected`;
+  const allYearsSet = new Set(PICK_YEARS);
   const bulkPicksControls = (
-    <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:8,display:'flex',flexDirection:'column',gap:14}}>
-      {/* Shared year picker — applies to BOTH bulk buttons below. */}
-      <div>
-        <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>YEARS TO APPLY · {yearsLabel}</div>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          {PICK_YEARS.map(y => {
-            const sel = bulkPicksYears.has(y);
-            return (
-              <button key={y} type="button" onClick={()=>toggleBulkYear(y)} style={{padding:'6px 14px',background:sel?'#FFD700':'#0a0a0a',color:sel?'#000':'#888',border:'1px solid '+(sel?'#FFD700':'#333'),borderRadius:14,fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:0.5}}>{sel?'✓ ':''}{y}</button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* OPTION 1 — Pull from Sleeper (primary). Only visible in Sleeper mode. */}
+    <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:8}}>
+      {/* PRIMARY — Pull from Sleeper. One small button, no year picker
+          (defaults to all years). Only visible in Sleeper mode. */}
       {isSleeperMode && (
-        <div style={{padding:'12px 14px',background:'#16102b',border:'1.5px solid #a78bfa66',borderRadius:8}}>
-          <div style={{fontSize:12,fontWeight:900,color:'#a78bfa',letterSpacing:1,marginBottom:4}}>✨ PULL SELECTED TEAMS' PICKS <span style={{color:'#10b981',fontSize:9,letterSpacing:1.5,marginLeft:4}}>· RECOMMENDED</span></div>
-          <div style={{fontSize:11,color:'#aaa',marginBottom:10,lineHeight:1.5}}>Reads <code style={{color:'#a78bfa'}}>traded_picks</code> from Sleeper and adds each selected manager's actual current pick inventory — including picks they've acquired, excluding ones they've traded away. Each pick tagged "via {'{original-owner}'}".</div>
-          <button type="button" onClick={applyPullSleeperPicks}
-            disabled={!sleeperData || sleeperSelected.size===0 || bulkPicksYears.size===0 || pullingSleeperPicks}
-            style={{width:'100%',padding:'10px 14px',background:(!sleeperData||sleeperSelected.size===0||bulkPicksYears.size===0||pullingSleeperPicks)?'#222':'#a78bfa',border:'none',borderRadius:6,color:(!sleeperData||sleeperSelected.size===0||bulkPicksYears.size===0||pullingSleeperPicks)?'#666':'#000',fontWeight:900,cursor:(!sleeperData||sleeperSelected.size===0||bulkPicksYears.size===0||pullingSleeperPicks)?'default':'pointer',fontSize:13,letterSpacing:1}}>
+        <div>
+          <button type="button" onClick={() => applyPullSleeperPicks(allYearsSet)}
+            disabled={!sleeperData || sleeperSelected.size===0 || pullingSleeperPicks}
+            style={{width:'100%',padding:'10px 14px',background:(!sleeperData||sleeperSelected.size===0||pullingSleeperPicks)?'#222':'#a78bfa',border:'none',borderRadius:6,color:(!sleeperData||sleeperSelected.size===0||pullingSleeperPicks)?'#666':'#000',fontWeight:900,cursor:(!sleeperData||sleeperSelected.size===0||pullingSleeperPicks)?'default':'pointer',fontSize:13,letterSpacing:1}}>
             {pullingSleeperPicks
               ? 'PULLING FROM SLEEPER…'
               : !sleeperData
-              ? 'FETCH A SLEEPER LEAGUE FIRST'
+              ? '✨ PULL SELECTED TEAMS\' DRAFT PICKS · fetch a league first'
               : sleeperSelected.size===0
-              ? 'SELECT MANAGERS FIRST'
-              : bulkPicksYears.size===0
-              ? 'PICK AT LEAST ONE YEAR'
-              : `✨ PULL SELECTED TEAMS' PICKS`}
+              ? '✨ PULL SELECTED TEAMS\' DRAFT PICKS · select managers first'
+              : `✨ PULL SELECTED TEAMS' DRAFT PICKS`}
           </button>
-          {pullPicksMsg && <div style={{fontSize:11,color:pullPicksMsg.startsWith('Added')?'#10b981':'#f59e0b',marginTop:6,textAlign:'center',fontWeight:700}}>{pullPicksMsg}</div>}
+          <div style={{fontSize:11,color:'#666',marginTop:5,lineHeight:1.5}}>Reads <code style={{color:'#a78bfa'}}>traded_picks</code> and adds each selected manager's actual current pick inventory — including picks they've acquired, excluding ones they've traded away.</div>
+          {pullPicksMsg && <div style={{fontSize:11,color:pullPicksMsg.startsWith('Added')?'#10b981':'#f59e0b',marginTop:5,fontWeight:700}}>{pullPicksMsg}</div>}
         </div>
       )}
 
-      {/* OPTION 2 — Quick-fill (every manager owns their own picks). Always visible. */}
-      <div style={{padding:'12px 14px',background:'#0a1a0d',border:'1.5px solid #10b98166',borderRadius:8}}>
-        <div style={{fontSize:12,fontWeight:900,color:'#10b981',letterSpacing:1,marginBottom:4}}>🪄 ALL TEAMS HAVE ALL FUTURE PICKS</div>
-        <div style={{fontSize:11,color:'#aaa',marginBottom:10,lineHeight:1.5}}>Quick-fill assuming a clean slate — every selected manager gets their own 4 picks per selected year. Use this if your league hasn't traded picks yet, or for non-Sleeper leagues.</div>
-        <button type="button" onClick={applyBulkPicks} disabled={managerCountForBulk===0 || bulkPicksYears.size===0}
-          style={{width:'100%',padding:'10px 14px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'#222':'#10b981',border:'none',borderRadius:6,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#666':'#000',fontWeight:900,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:13,letterSpacing:1}}>
-          {managerCountForBulk===0
-            ? (isSleeperMode ? 'SELECT MANAGERS FIRST' : 'TYPE MANAGER USERNAMES FIRST')
-            : bulkPicksYears.size===0
-              ? 'PICK AT LEAST ONE YEAR'
-              : `🪄 ADD ${bulkPicksTotal} PICKS  ·  ${managerCountForBulk} mgrs × 4 rounds × ${bulkPicksYears.size} ${bulkPicksYears.size===1?'yr':'yrs'}`}
-        </button>
-      </div>
+      {/* SECONDARY — Customize / add more picks. Closed by default. Holds the
+          year-by-year dropdowns AND the clean-slate "all teams have own picks"
+          bulk button so the primary action stays uncluttered. */}
+      <button type="button" onClick={()=>setShowCustomizePicks(v=>!v)}
+        style={{padding:'8px 12px',background:'transparent',border:'1px dashed #FFD70066',borderRadius:6,color:'#FFD700',fontWeight:700,cursor:'pointer',fontSize:12,letterSpacing:0.5,textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+        <span>⚙️ Customize / add more picks</span>
+        <span style={{fontSize:14}}>{showCustomizePicks ? '▲' : '▼'}</span>
+      </button>
+      {showCustomizePicks && (
+        <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,padding:'12px 14px',display:'flex',flexDirection:'column',gap:14}}>
+          {/* Shared year selector — used by both the year-dropdowns AND the
+              clean-slate bulk button below. */}
+          <div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>YEARS TO APPLY · {bulkPicksYears.size} of {PICK_YEARS.length}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {PICK_YEARS.map(y => {
+                const sel = bulkPicksYears.has(y);
+                return (
+                  <button key={y} type="button" onClick={()=>toggleBulkYear(y)} style={{padding:'6px 14px',background:sel?'#FFD700':'#0a0a0a',color:sel?'#000':'#888',border:'1px solid '+(sel?'#FFD700':'#333'),borderRadius:14,fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:0.5}}>{sel?'✓ ':''}{y}</button>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* OPTION 3 lives below the textarea via the existing PickYearDropdowns. */}
-      <div style={{fontSize:11,color:'#666',textAlign:'center',lineHeight:1.5}}>Or build it pick-by-pick using the year dropdowns below the textarea.<br/>All three options append to the same list — your existing entries stay.</div>
+          {/* Year dropdowns — add picks one at a time, optionally tagged "via @user". */}
+          <div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>+ ADD ONE AT A TIME</div>
+            <PickYearDropdowns/>
+          </div>
+
+          {/* Clean-slate bulk button — every selected manager gets own picks. */}
+          <div>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>OR BULK FILL</div>
+            <button type="button" onClick={applyBulkPicks} disabled={managerCountForBulk===0 || bulkPicksYears.size===0}
+              style={{width:'100%',padding:'10px 14px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'#222':'#10b981',border:'none',borderRadius:6,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#666':'#000',fontWeight:900,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:13,letterSpacing:1}}>
+              {managerCountForBulk===0
+                ? (isSleeperMode ? '🪄 ALL TEAMS HAVE ALL FUTURE PICKS · select managers first' : '🪄 ALL TEAMS HAVE ALL FUTURE PICKS · type managers first')
+                : bulkPicksYears.size===0
+                  ? '🪄 ALL TEAMS HAVE ALL FUTURE PICKS · pick a year'
+                  : `🪄 ADD ${bulkPicksTotal} PICKS · ${managerCountForBulk} mgrs × 4 rounds × ${bulkPicksYears.size} ${bulkPicksYears.size===1?'yr':'yrs'}`}
+            </button>
+            <div style={{fontSize:11,color:'#666',marginTop:5,lineHeight:1.5}}>Quick-fill assuming a clean slate — every selected manager gets their own 4 picks per selected year. Use for non-Sleeper leagues or pre-trade-window dispersals.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
   const PickYearDropdowns = () => (
@@ -5317,7 +5338,6 @@ function DispersalSetup(){
               </div>
             )}
             {bulkPicksControls}
-            <PickYearDropdowns/>
             <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to add a pick`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
           </div>
           <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
@@ -5381,7 +5401,6 @@ function DispersalSetup(){
             </div>
           )}
           {bulkPicksControls}
-            <PickYearDropdowns/>
           <textarea value={picksText} onChange={e=>setPicksText(e.target.value)} placeholder={`Click a year dropdown above to add a pick, then type the original owner's username after "via"`} rows={4} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
