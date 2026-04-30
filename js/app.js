@@ -7313,17 +7313,35 @@ function TradeFinderApp(){
   const openTradeHistory = async (rosterInfo) => {
     setTradeModal({ rosterInfo, status: 'loading', trades: [] });
     try{
-      const lid = selectedLeague.league_id;
+      // Walk the previous_league_id chain back so we capture trade history across
+      // multiple dynasty seasons. Sleeper persists roster_id across the chain
+      // (same owner = same roster_id year over year), so the same filter works.
+      // In April (early preseason), the current league_id often has zero trades
+      // yet — most recent activity is in the prior season's league_id.
+      const leagueIds = [selectedLeague.league_id];
+      let cursor = selectedLeague;
+      for(let i = 0; i < 3 && cursor?.previous_league_id && cursor.previous_league_id !== '0'; i++){
+        try{
+          const prev = await fetch(`https://api.sleeper.app/v1/league/${cursor.previous_league_id}`, {cache:'no-store'}).then(r=>r.json());
+          if(!prev?.league_id) break;
+          leagueIds.push(prev.league_id);
+          cursor = prev;
+        }catch(e){ break; }
+      }
+      // Scan every week (1-18) across every league instance in parallel.
+      // ~72 calls for 4 league instances — acceptable for an opt-in modal click.
       const weeks = Array.from({length: 18}, (_, i) => i + 1);
-      const txArrays = await Promise.all(weeks.map(w =>
-        fetch(`https://api.sleeper.app/v1/league/${lid}/transactions/${w}`, {cache:'no-store'})
-          .then(r => r.ok ? r.json() : []).catch(() => [])
-      ));
-      const trades = txArrays.flat()
+      const allTxArrays = await Promise.all(
+        leagueIds.flatMap(lid => weeks.map(w =>
+          fetch(`https://api.sleeper.app/v1/league/${lid}/transactions/${w}`, {cache:'no-store'})
+            .then(r => r.ok ? r.json() : []).catch(() => [])
+        ))
+      );
+      const trades = allTxArrays.flat()
         .filter(tx => tx.type === 'trade' && tx.status === 'complete' && (tx.roster_ids||[]).includes(rosterInfo.roster_id))
         .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
         .slice(0, 5);
-      setTradeModal(m => m && m.rosterInfo.roster_id === rosterInfo.roster_id ? { ...m, status: 'ready', trades } : m);
+      setTradeModal(m => m && m.rosterInfo.roster_id === rosterInfo.roster_id ? { ...m, status: 'ready', trades, leagueCount: leagueIds.length } : m);
     }catch(e){
       setTradeModal(m => m ? { ...m, status: 'error' } : m);
     }
@@ -7609,7 +7627,7 @@ function TradeFinderApp(){
                 : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(tradeModal.rosterInfo.display_name||'?')[0].toUpperCase()}</div>}
               <div style={{flex:1}}>
                 <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{tradeModal.rosterInfo.username || tradeModal.rosterInfo.display_name}</div>
-                <div style={{fontSize:11,color:'#888'}}>Last 5 trades · {selectedLeague?.name}</div>
+                <div style={{fontSize:11,color:'#888'}}>Last 5 trades · {selectedLeague?.name}{tradeModal.leagueCount > 1 ? ` (across ${tradeModal.leagueCount} seasons)` : ''}</div>
               </div>
               <button onClick={()=>setTradeModal(null)}
                       style={{background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',padding:'4px 10px',cursor:'pointer',fontSize:14,fontWeight:700}}>×</button>
