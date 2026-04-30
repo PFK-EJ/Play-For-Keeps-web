@@ -7414,6 +7414,11 @@ function TradeFinderApp(){
       const trades = tradesNested.flat()
         .sort((a,b) => (b.status_updated || b.created || 0) - (a.status_updated || a.created || 0))
         .slice(0, 5);
+      // Default to ★ Relevant tab if any results actually relate to the current
+      // Trade Finder context — that's the more useful view. Fall back to All
+      // when there's nothing relevant so the modal isn't empty by default.
+      const hasRelevant = trades.some(tradeIsRelevant);
+      if(hasRelevant) setTradeFilterMode('relevant');
       setTradeModal(m => m && m.rosterInfo.user_id === rosterInfo.user_id ? { ...m, status: 'ready', trades, leagueCount: dynasty.length } : m);
     }catch(e){
       setTradeModal(m => m ? { ...m, status: 'error' } : m);
@@ -7826,8 +7831,8 @@ function TradeFinderApp(){
               return (
                 <>
                   <div style={{display:'flex',gap:6,marginBottom:14}}>
-                    {tabBtn('all', 'All trades', tradeModal.trades.length, false)}
                     {tabBtn('relevant', '★ Relevant', relevantTrades.length, !hasRelevant)}
+                    {tabBtn('all', 'All trades', tradeModal.trades.length, false)}
                   </div>
                   {tradeFilterMode === 'relevant' && relevantTrades.length === 0 && (
                     <div style={{padding:20,textAlign:'center',color:'#888',fontSize:13}}>No trades involve any player or pick from your current Trade Finder results.</div>
