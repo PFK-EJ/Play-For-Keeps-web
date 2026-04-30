@@ -7883,8 +7883,19 @@ function TradeFinderApp(){
                 data is actually populated so we don't dangle a tip pointing
                 at nothing. Mobile-first sizing (compact). */}
             {equivalents && equivalents.total > 0 && ownership && (
-              <div style={{padding:'8px 12px',marginBottom:10,background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:6,fontSize:12,color:'#aaa',lineHeight:1.5}}>
-                💡 <strong style={{color:'#FFD700'}}>Tip:</strong> Click any <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> button below to see that leaguemate's <strong style={{color:'#fff'}}>recent trades</strong> across all their dynasty leagues — useful for sizing up the trade partner before reaching out.
+              <div style={{padding:'10px 14px',marginBottom:10,background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:6,fontSize:12,color:'#aaa',lineHeight:1.55}}>
+                <div style={{marginBottom:6}}>
+                  💡 <strong style={{color:'#FFD700'}}>How leaguemate trade history works:</strong>
+                </div>
+                <div style={{marginBottom:5}}>
+                  • The <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> button under each result shows which person in <strong style={{color:'#fff'}}>{selectedLeague?.name || 'your league'}</strong> currently rosters that asset (pulled live from Sleeper rosters + traded picks).
+                </div>
+                <div style={{marginBottom:5}}>
+                  • Tap a username to open their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong> — scanned across <em>every</em> dynasty league they're in (current + prior season), not just this one. Each trade card shows the league name, what they sent, and what they received, with current-year picks resolved to slot (e.g. <code style={{color:'#FFD700'}}>2026 Pick 1.03</code>).
+                </div>
+                <div>
+                  • The <span style={{color:'#FFD700',fontWeight:800}}>★ Relevant</span> tab inside the modal filters to trades that involved any player or pick from your current Trade Finder results — the most useful "what has this person paid for assets like the one I'm working with?" context.
+                </div>
               </div>
             )}
             {equivalents && equivalents.total > 0 && (
