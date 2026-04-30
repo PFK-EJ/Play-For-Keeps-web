@@ -7082,6 +7082,15 @@ const ptdAdjust = (value, pos, passTd) => {
 // Calibrated for PPC=0.25 and PPFD=1; for other values we scale linearly.
 
 // Tier brackets (descending min FC value → multiplier).
+//
+// RB tiering is the biggest impact — workhorses get ~5x the carries of FAAB
+// depth. QB tiering matters too because elite mobile QBs (Hurts/Jackson/Allen/
+// Daniels) get ~5x the carries and ~9x the rush 1D of pocket-leaning starters.
+// Validated against 72 player-seasons of nflverse data, 2022-2024.
+//
+// Per Evan: "the further from the top of the list, the less the multiplier
+// matters" — low-value QBs aren't long-term dynasty assets even if they run,
+// so bottom-tier multiplier returns 1.00.
 const RB_PPC_TIERS = [
   { min: 6500, mult: 1.15 },  // Elite young workhorse (Bijan/Gibbs tier)
   { min: 4000, mult: 1.10 },  // Solid RB1/RB2 starter
@@ -7096,20 +7105,35 @@ const RB_PPFD_TIERS = [
   { min: 800,  mult: 1.02 },
   { min: 0,    mult: 1.00 },
 ];
+const QB_PPC_TIERS = [
+  { min: 7500, mult: 1.04 },  // Elite mobile (Hurts/Jackson/Allen/Daniels)
+  { min: 4500, mult: 1.02 },  // Solid mobile starter
+  { min: 2000, mult: 1.01 },  // Mostly pocket starter
+  { min: 0,    mult: 1.00 },  // Fringe / backup — multiplier doesn't matter
+];
+const QB_PPFD_TIERS = [
+  { min: 7500, mult: 1.06 },  // Elite mobile QB rush 1D conversion is ~0.41 (high)
+  { min: 4500, mult: 1.03 },
+  { min: 2000, mult: 1.02 },
+  { min: 0,    mult: 1.00 },
+];
 const lookupTierMult = (tiers, baseValue) => {
   for(const t of tiers) if(baseValue >= t.min) return t.mult;
   return 1.0;
 };
 
-// Per-position multiplier resolvers. RB consults tier brackets using the
-// player's BASE FC value (pre-adjustment); other positions are flat.
+// Per-position multiplier resolvers. RB and QB consult tier brackets using the
+// player's BASE FC value (pre-adjustment); WR and TE are flat (receptions
+// don't drop as steeply by FC value rank as carries / rush first downs do).
 const ppcMultiplier = (pos, baseValue) => {
   if(pos === 'RB') return lookupTierMult(RB_PPC_TIERS, baseValue);
-  return ({QB:1.02, WR:1.00, TE:1.00}[pos]) ?? 1.00;
+  if(pos === 'QB') return lookupTierMult(QB_PPC_TIERS, baseValue);
+  return ({WR:1.00, TE:1.00}[pos]) ?? 1.00;
 };
 const ppfdMultiplier = (pos, baseValue) => {
   if(pos === 'RB') return lookupTierMult(RB_PPFD_TIERS, baseValue);
-  return ({QB:1.02, WR:1.06, TE:1.07}[pos]) ?? 1.00;
+  if(pos === 'QB') return lookupTierMult(QB_PPFD_TIERS, baseValue);
+  return ({WR:1.06, TE:1.07}[pos]) ?? 1.00;
 };
 
 const ppcAdjust = (value, pos, ppcLevel, baseValue) => {
