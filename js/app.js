@@ -6122,27 +6122,38 @@ function DispersalDraft({draftId}){
 // ---------- Top-level Dispersal page (route: /dispersal[/id]) ----------
 function DispersalApp({draftId}){
   // Dev-only completed-drafts counter — moved here from the main page so it
-  // shows up across the whole dispersal flow (setup + live draft). Floating
-  // top-right badge, hidden on prod via isDevHost(). Tucks under the master
-  // toolbar so it doesn't overlap the brand on mobile.
+  // shows across the whole dispersal flow (setup + live draft). Tucks under
+  // the master toolbar (top:80) so it doesn't overlap the toolbar's right
+  // controls on mobile. Also renders placeholder text while loading or on
+  // error so Evan can SEE the badge exists even if the query is misbehaving.
   const [completedDispersalCount,setCompletedDispersalCount] = useState(null);
+  const [counterErr,setCounterErr] = useState(null);
   useEffect(()=>{
     if(!isDevHost() || !sb) return;
     let cancelled = false;
     (async () => {
       try{
-        const { count } = await sb.from('dispersal_drafts').select('*', { count:'exact', head:true }).eq('status', 'complete');
-        if(!cancelled && typeof count === 'number') setCompletedDispersalCount(count);
-      }catch(e){}
+        const res = await sb.from('dispersal_drafts').select('*', { count:'exact', head:true }).eq('status', 'complete');
+        if(cancelled) return;
+        if(res?.error){ setCounterErr(res.error.message || 'query error'); return; }
+        if(typeof res?.count === 'number') setCompletedDispersalCount(res.count);
+        else setCounterErr('no count returned');
+      }catch(e){
+        if(!cancelled) setCounterErr(e?.message || 'fetch failed');
+      }
     })();
     return ()=>{ cancelled = true; };
   },[]);
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <MasterToolbar currentTab="dispersal"/>
-      {isDevHost() && completedDispersalCount !== null && (
-        <div style={{position:'fixed',top:12,right:12,zIndex:60,padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,boxShadow:'0 4px 12px rgba(0,0,0,0.6)',whiteSpace:'nowrap'}}>
-          🎲 {completedDispersalCount.toLocaleString()} completed drafts
+      {isDevHost() && (
+        <div style={{position:'fixed',top:80,right:12,zIndex:60,padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,boxShadow:'0 4px 12px rgba(0,0,0,0.6)',whiteSpace:'nowrap'}}>
+          {completedDispersalCount !== null
+            ? <>🎲 {completedDispersalCount.toLocaleString()} completed drafts</>
+            : counterErr
+            ? <span style={{color:'#ef4444'}}>🎲 counter: {counterErr}</span>
+            : <span style={{color:'#888'}}>🎲 counter: loading…</span>}
         </div>
       )}
       {draftId ? <DispersalDraft draftId={draftId}/> : <DispersalSetup/>}
