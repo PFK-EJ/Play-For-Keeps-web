@@ -5427,6 +5427,21 @@ function DispersalSetup(){
 function DispersalDraft({draftId}){
   const [draft,setDraft] = useState(null);
   const [loading,setLoading] = useState(true);
+  // Rosters panel collapse state — fixes the mobile complaint where the panel
+  // ate most of the screen and blocked the player list. Default collapsed on
+  // narrow viewports; remembers user preference across visits.
+  const [rostersCollapsed,setRostersCollapsed] = useState(() => {
+    const saved = typeof window!=='undefined' ? localStorage.getItem('pfk_disp_rosters_collapsed') : null;
+    if(saved !== null) return saved === '1';
+    return typeof window !== 'undefined' && window.innerWidth < 600;
+  });
+  const toggleRostersCollapsed = () => {
+    setRostersCollapsed(prev => {
+      const next = !prev;
+      try{ localStorage.setItem('pfk_disp_rosters_collapsed', next ? '1' : '0'); }catch(e){}
+      return next;
+    });
+  };
   // Spectator mode: ?spectate=1 in URL hides claim/pick UI; the user can watch
   // but never interact. Useful for league mates not in the disperse pool.
   const isSpectator = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('spectate')==='1';
@@ -5940,13 +5955,24 @@ function DispersalDraft({draftId}){
             </div>
           )}
 
-          {/* Rosters — sticky-bottom on viewport so they're always in view as you scroll the pool */}
-          <div className="pfk-disp-rosters" style={{position:'fixed',left:0,right:0,bottom:0,background:'#080808',borderTop:'2px solid #FFD700',padding:'10px 14px',maxHeight:'42vh',overflowY:'auto',zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)'}}>
+          {/* Rosters — sticky-bottom on viewport so they're always in view as you scroll the pool.
+              Collapsible (default collapsed on mobile) so the panel doesn't eat the player list. */}
+          <div className={"pfk-disp-rosters" + (rostersCollapsed ? " collapsed" : "")} style={{position:'fixed',left:0,right:0,bottom:0,background:'#080808',borderTop:'2px solid #FFD700',padding:'10px 14px',maxHeight: rostersCollapsed ? 'auto' : '42vh',overflowY: rostersCollapsed ? 'visible' : 'auto',zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)'}}>
             <div style={{maxWidth:1240,margin:'0 auto'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
-                <span>ROSTERS · {rosters.length} teams</span>
-                {status==='complete' && <span style={{color:'#a78bfa'}}>· tap 📸 on any roster to download</span>}
-              </div>
+              <button onClick={toggleRostersCollapsed}
+                      style={{width:'100%',display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',color:'inherit',cursor:'pointer',padding:'4px 0',marginBottom: rostersCollapsed ? 0 : 8,textAlign:'left',flexWrap:'wrap'}}>
+                <span style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>ROSTERS · {rosters.length} teams</span>
+                {(() => {
+                  const onClockTeam = rosters.find(t => onClockSlot === t.slot);
+                  return onClockTeam && status!=='complete' ? (
+                    <span style={{fontSize:11,fontWeight:800,color:'#10b981',letterSpacing:0.5}}>· ON CLOCK: @{onClockTeam.username}</span>
+                  ) : null;
+                })()}
+                {status==='complete' && !rostersCollapsed && <span style={{fontSize:11,color:'#a78bfa',letterSpacing:1.5}}>· tap 📸 on any roster to download</span>}
+                <span style={{flex:1}}/>
+                <span style={{fontSize:13,color:'#FFD700',fontWeight:800,padding:'2px 8px',border:'1px solid #FFD70066',borderRadius:6,letterSpacing:0.5}}>{rostersCollapsed ? '▲ SHOW' : '▼ HIDE'}</span>
+              </button>
+              {!rostersCollapsed && (
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
                 {rosters.map(t=>{
                   const isOnClock = onClockSlot === t.slot;
@@ -5974,6 +6000,7 @@ function DispersalDraft({draftId}){
                   );
                 })}
               </div>
+              )}
             </div>
           </div>
         </>

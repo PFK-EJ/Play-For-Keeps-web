@@ -97,7 +97,10 @@ input, select { font-family:inherit; }
   .pfk-disp-pool-item .pfk-disp-pool-name { font-size:16px !important; flex:1 1 100% !important; order:2; }
   .pfk-disp-pool-item .pfk-disp-pool-badge { order:1; font-size:11px !important; }
   .pfk-disp-pool-item .pfk-disp-pool-action { order:3; flex:1 1 100% !important; text-align:center; padding:10px !important; background:#10b981 !important; color:#000 !important; border-radius:6px; font-size:14px !important; }
-  /* Sticky rosters bar takes more screen room on mobile */
-  .pfk-disp-rosters { max-height:50vh !important; padding:8px 10px !important; }
+  /* Sticky rosters bar takes more screen room on mobile when expanded.
+     When collapsed, JS sets max-height:auto inline — the :not selector keeps
+     this rule from clobbering that. */
+  .pfk-disp-rosters:not(.collapsed) { max-height:50vh !important; padding:8px 10px !important; }
+  .pfk-disp-rosters.collapsed { padding:8px 10px !important; }
   .pfk-disp-rosters > div > div[style*="grid-template-columns"] { grid-template-columns:1fr !important; }
 }
