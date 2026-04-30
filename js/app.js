@@ -6148,12 +6148,14 @@ function DispersalApp({draftId}){
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <MasterToolbar currentTab="dispersal"/>
       {isDevHost() && (
-        <div style={{position:'fixed',top:80,right:12,zIndex:60,padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,boxShadow:'0 4px 12px rgba(0,0,0,0.6)',whiteSpace:'nowrap'}}>
-          {completedDispersalCount !== null
-            ? <>🎲 {completedDispersalCount.toLocaleString()} completed drafts</>
-            : counterErr
-            ? <span style={{color:'#ef4444'}}>🎲 counter: {counterErr}</span>
-            : <span style={{color:'#888'}}>🎲 counter: loading…</span>}
+        <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 14px 0',maxWidth:1240,margin:'0 auto'}}>
+          <div style={{display:'inline-block',padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,whiteSpace:'nowrap'}}>
+            {completedDispersalCount !== null
+              ? <>🎲 {completedDispersalCount.toLocaleString()} completed drafts</>
+              : counterErr
+              ? <span style={{color:'#ef4444'}}>🎲 counter: {counterErr}</span>
+              : <span style={{color:'#888'}}>🎲 counter: loading…</span>}
+          </div>
         </div>
       )}
       {draftId ? <DispersalDraft draftId={draftId}/> : <DispersalSetup/>}
