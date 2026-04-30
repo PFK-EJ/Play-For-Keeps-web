@@ -5102,7 +5102,7 @@ function DispersalSetup(){
               <>
                 <div style={{padding:'10px 12px',background:'#1a1400',border:'1px dashed #FFD70066',borderRadius:8}}>
                   <div style={{fontSize:12,color:'#FFD700CC',marginBottom:8,lineHeight:1.5}}>
-                    💡 <strong style={{color:'#FFD700'}}>Skip the league ID hunt.</strong> Enter your Sleeper username — your leagues will load right here so you can pick one in a single click.
+                    💡 Link your Sleeper username for easy league select.
                   </div>
                   <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                     <input value={inlineLinkInput} onChange={e=>{setInlineLinkInput(e.target.value); setInlineLinkErr('');}}
