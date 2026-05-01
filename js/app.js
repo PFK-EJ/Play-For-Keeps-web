@@ -2818,7 +2818,7 @@ function SleeperLink(){
 //   onSignInClick   — only set on the main App; opens its full auth modal
 //                     when not provided, "Sign In" navigates to /?signin=1 instead
 // ============================================================================
-function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName }){
+function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, compact }){
   const [session, setSession] = useState(null);
   // Read the linked Sleeper user so the Sleeper Snapshot tab can deep-link to
   // YOUR OWN profile instead of the empty search page when you're linked.
@@ -2887,14 +2887,25 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
              style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
             📧 Email Support
           </a>
-          <SleeperLink/>
-          {session ? (
-            <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
-          ) : (
-            <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
+          {/* In compact mode (live dispersal draft) we hide the Sleeper link
+              chip + Sign In/Out so the toolbar slims down to just brand +
+              support contacts. Live drafts need every pixel for the player
+              pool and rosters; account controls are one tap away on other pages. */}
+          {!compact && (
+            <>
+              <SleeperLink/>
+              {session ? (
+                <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
+              ) : (
+                <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
+              )}
+            </>
           )}
         </div>
-        {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line */}
+        {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line.
+            Hidden in compact mode so dispersal-draft view recovers the screen
+            real estate that the multi-row mobile toolbar normally consumes. */}
+        {!compact && (
         <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-start"}}>
           {tabs.map(([id,label,desc,href,isInPage])=>{
             const active = isActiveTab(id);
@@ -2904,6 +2915,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName })
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
@@ -6304,7 +6316,7 @@ function DispersalApp({draftId}){
   },[]);
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <MasterToolbar currentTab="dispersal"/>
+      <MasterToolbar currentTab="dispersal" compact={!!draftId}/>
       {isDevHost() && (
         <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 14px 0',maxWidth:1240,margin:'0 auto'}}>
           <div style={{display:'inline-block',padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,whiteSpace:'nowrap'}}>
