@@ -4606,6 +4606,7 @@ function DispersalSetup(){
   const [leagueTEP,setLeagueTEP] = useState('0.5');               // 0 | 0.5 | 0.75 | 1.0
   const [leagueStarters,setLeagueStarters] = useState('');        // free text — "10", "11", etc.
   const [leaguePPC,setLeaguePPC] = useState('');                  // point-per-carry (rare); blank → hide
+  const [leaguePPFD,setLeaguePPFD] = useState('');                // point-per-first-down; blank → hide
 
   const fetchSleeperLeague = async (overrideId) => {
     // Optional override lets the league dropdown trigger a fetch immediately
@@ -4660,6 +4661,10 @@ function DispersalSetup(){
       // Point per carry: rush_att in scoring_settings (rare scoring rule)
       const ppc = ss.rush_att ?? 0;
       setLeaguePPC(ppc ? String(ppc) : '');
+      // Point per first down: rec_fd + rush_fd in scoring_settings. Most PPFD
+      // leagues set both to the same value; if they differ we surface the higher.
+      const ppfd = Math.max(parseFloat(ss.rec_fd ?? 0) || 0, parseFloat(ss.rush_fd ?? 0) || 0);
+      setLeaguePPFD(ppfd > 0 ? String(ppfd) : '');
     }catch(e){ setSleeperErr(e.message || 'Fetch failed'); }
     finally{ setSleeperLoading(false); }
   };
@@ -4852,6 +4857,7 @@ function DispersalSetup(){
     ];
     if(leagueStarters && leagueStarters.trim()) settingsParts.push(`START ${leagueStarters.trim()}`);
     if(leaguePPC && parseFloat(leaguePPC) > 0) settingsParts.push(`${leaguePPC} PPC`);
+    if(leaguePPFD && parseFloat(leaguePPFD) > 0) settingsParts.push(`${leaguePPFD} PPFD`);
     const settingsLine = settingsParts.filter(Boolean).join(' · ');
     return {
       draftName, players, playersByPos, picks, managersNeeded, posOrder: POS_ORDER,
@@ -4967,6 +4973,10 @@ function DispersalSetup(){
           <div style={{flex:'1 1 130px'}}>
             <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:4}}>POINT PER CARRY</div>
             <input value={leaguePPC} onChange={e=>setLeaguePPC(e.target.value)} placeholder="leave blank if none" style={inputStyle}/>
+          </div>
+          <div style={{flex:'1 1 130px'}}>
+            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:4}}>POINT PER FIRST DOWN</div>
+            <input value={leaguePPFD} onChange={e=>setLeaguePPFD(e.target.value)} placeholder="leave blank if none" style={inputStyle}/>
           </div>
         </div>
       </div>
