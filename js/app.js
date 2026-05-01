@@ -5174,18 +5174,26 @@ function DispersalSetup(){
             <PickYearDropdowns/>
           </div>
 
-          {/* Clean-slate bulk button — every selected manager gets own picks. */}
+          {/* Clean-slate quick-fill — small checkbox UX (back to original style).
+              Toggle reveals a compact "Add N picks" link-button. No emoji,
+              no big green slab. */}
           <div>
-            <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>OR BULK FILL</div>
-            <button type="button" onClick={applyBulkPicks} disabled={managerCountForBulk===0 || bulkPicksYears.size===0}
-              style={{width:'100%',padding:'10px 14px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'#222':'#10b981',border:'none',borderRadius:6,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#666':'#000',fontWeight:900,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:13,letterSpacing:1}}>
-              {managerCountForBulk===0
-                ? (isSleeperMode ? '🪄 ALL TEAMS HAVE ALL FUTURE PICKS · select managers first' : '🪄 ALL TEAMS HAVE ALL FUTURE PICKS · type managers first')
-                : bulkPicksYears.size===0
-                  ? '🪄 ALL TEAMS HAVE ALL FUTURE PICKS · pick a year'
-                  : `🪄 ADD ${bulkPicksTotal} PICKS · ${managerCountForBulk} mgrs × 4 rounds × ${bulkPicksYears.size} ${bulkPicksYears.size===1?'yr':'yrs'}`}
-            </button>
-            <div style={{fontSize:11,color:'#666',marginTop:5,lineHeight:1.5}}>Quick-fill assuming a clean slate — every selected manager gets their own 4 picks per selected year. Use for non-Sleeper leagues or pre-trade-window dispersals.</div>
+            <label style={{display:'flex',alignItems:'center',gap:9,cursor:'pointer',fontSize:13,color:'#ddd',fontWeight:700}}>
+              <input type="checkbox" checked={allHavePicks} onChange={e=>setAllHavePicks(e.target.checked)} style={{width:16,height:16,accentColor:'#FFD700',cursor:'pointer'}}/>
+              All managers have all future picks
+            </label>
+            {allHavePicks && (
+              <div style={{marginTop:8,paddingLeft:25,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                <button type="button" onClick={applyBulkPicks} disabled={managerCountForBulk===0 || bulkPicksYears.size===0}
+                  style={{padding:'5px 11px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'transparent':'#0a0a0a',border:'1px solid '+((managerCountForBulk===0||bulkPicksYears.size===0)?'#333':'#FFD70066'),borderRadius:5,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#555':'#FFD700',fontWeight:700,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:12,letterSpacing:0.4}}>
+                  {managerCountForBulk===0
+                    ? (isSleeperMode ? 'select managers first' : 'type managers first')
+                    : bulkPicksYears.size===0
+                      ? 'pick a year first'
+                      : `+ Add ${bulkPicksTotal} picks (${managerCountForBulk} mgrs × 4 rounds × ${bulkPicksYears.size} ${bulkPicksYears.size===1?'yr':'yrs'})`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
