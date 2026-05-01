@@ -4701,7 +4701,7 @@ function DispersalSetup(){
           if(!p) return;
           const fullName = p.full_name || `${p.first_name||''} ${p.last_name||''}`.trim() || pid;
           const pos = p.position || '';
-          poolItems.push({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name: pos ? `${fullName} (${pos})` : fullName, sleeperId:String(pid) });
+          poolItems.push({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name: pos ? `${fullName} (${pos})` : fullName, sleeperId:String(pid), pos: (pos||'').toUpperCase() });
         });
       });
       // Append manual future picks
@@ -4770,7 +4770,13 @@ function DispersalSetup(){
     if(players.length === 0 && futurePicks.length === 0){ setErr('Pool is empty — paste players and/or future picks'); return; }
     if(usernames.length < 2){ setErr('Need at least 2 teams'); return; }
     const pool = [
-      ...players.map(n => ({ id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name:n })),
+      ...players.map(n => {
+        // Parse "(POS)" suffix off the player name (e.g. "Justin Jefferson (WR)")
+        // so position-tab filters in the live draft work.
+        const m = (n||'').match(/\(([A-Za-z]+)\)\s*$/);
+        const pos = m ? m[1].toUpperCase() : '';
+        return { id:dispGenItemId(), type:DISP_POOL_TYPES.PLAYER, name:n, pos };
+      }),
       ...futurePicks.map(n => ({ id:dispGenItemId(), type:DISP_POOL_TYPES.PICK, name:n })),
     ];
     // Pick order = order in the textarea (commish controls this — see Randomize button).
@@ -6190,15 +6196,23 @@ function DispersalDraft({draftId}){
           {/* Pool — flows in normal page scroll, has padding-bottom so it isn't hidden by the sticky-bottom rosters bar */}
           <div className="pfk-disp-pool-block" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,paddingBottom:14}}>
             {(()=>{
+              // Derive position from item.pos OR fallback to "(POS)" suffix on
+              // the name. Older drafts in the DB may not have pos set on items,
+              // so this keeps the position tabs working for them too.
+              const posOf = (it) => {
+                if(it.pos) return it.pos.toUpperCase();
+                const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
+                return m ? m[1].toUpperCase() : '';
+              };
               // Compute available counts per filter once so the tab badges stay
               // honest (e.g. "QB · 0" if all QBs are drafted).
               const undrafted = pool.filter(p => !p.drafted);
               const counts = {
                 all: undrafted.length,
-                QB: undrafted.filter(p => p.type !== 'pick' && p.pos === 'QB').length,
-                RB: undrafted.filter(p => p.type !== 'pick' && p.pos === 'RB').length,
-                WR: undrafted.filter(p => p.type !== 'pick' && p.pos === 'WR').length,
-                TE: undrafted.filter(p => p.type !== 'pick' && p.pos === 'TE').length,
+                QB: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'QB').length,
+                RB: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'RB').length,
+                WR: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'WR').length,
+                TE: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'TE').length,
                 picks: undrafted.filter(p => p.type === 'pick').length,
               };
               // Position tab styling — gold for ALL/picks, position-color for the
@@ -6233,11 +6247,18 @@ function DispersalDraft({draftId}){
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
               {(()=>{
+                // Same pos fallback as the tab counts above — handles items
+                // saved before we started storing pos on each pool item.
+                const posOf = (it) => {
+                  if(it.pos) return it.pos.toUpperCase();
+                  const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
+                  return m ? m[1].toUpperCase() : '';
+                };
                 // Filter pipeline: undrafted → tab filter → search filter
                 const matchesTab = (p) => {
                   if(poolTab === 'all') return true;
                   if(poolTab === 'picks') return p.type === 'pick';
-                  return p.type !== 'pick' && p.pos === poolTab;
+                  return p.type !== 'pick' && posOf(p) === poolTab;
                 };
                 let items = pool.filter(p => !p.drafted)
                   .filter(matchesTab)
@@ -6259,17 +6280,22 @@ function DispersalDraft({draftId}){
                 return (
                   <div key={item.id} className="pfk-disp-pool-item"
                     style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
-                    <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':(item.pos||'PLAYER')}</span>
+                    <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':(item.pos||(item.name||'').match(/\(([A-Za-z]+)\)\s*$/)?.[1]?.toUpperCase()||'PLAYER')}</span>
                     <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
                     {clickable && <button onClick={()=>setPickConfirm(item)} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background:'#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'6px 12px',cursor:'pointer'}}>DRAFT →</button>}
                   </div>
                 );
               })}
               {(() => {
+                const posOf = (it) => {
+                  if(it.pos) return it.pos.toUpperCase();
+                  const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
+                  return m ? m[1].toUpperCase() : '';
+                };
                 const visibleCount = pool.filter(p => !p.drafted).filter(p => {
                   if(poolTab === 'all') return true;
                   if(poolTab === 'picks') return p.type === 'pick';
-                  return p.type !== 'pick' && p.pos === poolTab;
+                  return p.type !== 'pick' && posOf(p) === poolTab;
                 }).filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).length;
                 if(visibleCount > 0) return null;
                 const emptyMsg = poolTab === 'all' ? 'No assets left.'
