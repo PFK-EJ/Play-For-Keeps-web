@@ -5694,13 +5694,14 @@ function DispersalSetup(){
 function DispersalDraft({draftId}){
   const [draft,setDraft] = useState(null);
   const [loading,setLoading] = useState(true);
-  // Rosters panel collapse state — fixes the mobile complaint where the panel
-  // ate most of the screen and blocked the player list. Default collapsed on
-  // narrow viewports; remembers user preference across visits.
+  // Rosters panel collapse state. First-visit default is EXPANDED (per Evan —
+  // users should see rosters out of the box, can hide if they want more screen
+  // for the player list). User's choice still persists across visits via
+  // localStorage so once they hide, it stays hidden until they reopen.
   const [rostersCollapsed,setRostersCollapsed] = useState(() => {
     const saved = typeof window!=='undefined' ? localStorage.getItem('pfk_disp_rosters_collapsed') : null;
     if(saved !== null) return saved === '1';
-    return typeof window !== 'undefined' && window.innerWidth < 600;
+    return false;
   });
   const toggleRostersCollapsed = () => {
     setRostersCollapsed(prev => {
@@ -6237,7 +6238,7 @@ function DispersalDraft({draftId}){
                 })()}
                 {status==='complete' && !rostersCollapsed && <span style={{fontSize:11,color:'#a78bfa',letterSpacing:1.5}}>· tap 📸 on any roster to download</span>}
                 <span style={{flex:1}}/>
-                <span style={{fontSize:13,color:'#FFD700',fontWeight:800,padding:'2px 8px',border:'1px solid #FFD70066',borderRadius:6,letterSpacing:0.5}}>{rostersCollapsed ? '▲ SHOW' : '▼ HIDE'}</span>
+                <span style={{fontSize:13,color:'#FFD700',fontWeight:800,padding:'2px 8px',border:'1px solid #FFD70066',borderRadius:6,letterSpacing:0.5}}>{rostersCollapsed ? '▲ SHOW ROSTERS' : '▼ HIDE ROSTERS'}</span>
               </button>
               {!rostersCollapsed && (
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
