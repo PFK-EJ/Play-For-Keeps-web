@@ -5274,6 +5274,19 @@ function DispersalSetup(){
                            onKeyDown={e=>e.key==='Enter'&&inlineLinkSubmit()}
                            placeholder="Sleeper username"
                            disabled={inlineLinkBusy}
+                           name="sleeper-handle"
+                           autoComplete="off"
+                           autoCorrect="off"
+                           autoCapitalize="none"
+                           spellCheck={false}
+                           data-1p-ignore="true"
+                           data-lpignore="true"
+                           /* iOS Safari saw "username" in the placeholder + saved Safari
+                              credentials for the site and was auto-triggering its password
+                              autofill prompt — that prompt focuses the input and scrolls the
+                              page past the top of the dispersal form. The full autofill-off
+                              combo (autoComplete off + neutral name + 1p/lp ignore hints)
+                              tells iOS, 1Password, and LastPass to leave this field alone. */
                            style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
                     <button onClick={inlineLinkSubmit} disabled={inlineLinkBusy}
                             style={{padding:'10px 18px',background:inlineLinkBusy?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:inlineLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>
