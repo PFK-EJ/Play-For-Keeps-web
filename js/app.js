@@ -5843,6 +5843,32 @@ function DispersalDraft({draftId}){
     await dispUpdate(draftId, { teams:newTeams });
   };
 
+  // Recover a claim — for users who got locked out (cleared cache, switched
+  // device, etc.) and the team's still marked joined in the DB but their
+  // local "me" identity is gone. Sets me to that slot so they can draft again.
+  // Trust-based: anyone on the page can technically click this. In practice
+  // dispersal participants are in a Discord/text thread, so abuse is socially
+  // visible. Confirmation copy makes the intent crystal-clear.
+  const recoverSlot = async (slot) => {
+    const team = draft.teams.find(t => t.slot===slot);
+    if(!team) return;
+    const ok = confirm(`Take over team "${team.username}"?\n\nUse this ONLY if you're the original manager who claimed this team but lost your session (cleared cache, switched browser, switched device, etc.). This sets you as the active claimer for this team going forward.`);
+    if(!ok) return;
+    // If this user already had a different slot claimed, release it so they don't
+    // hold two simultaneously.
+    let newTeams = draft.teams;
+    let needsSync = false;
+    if(me && me.slot !== slot){
+      newTeams = newTeams.map(t => t.slot===me.slot ? {...t, joined:false} : t);
+      needsSync = true;
+    }
+    setDraft(d => d ? {...d, teams:newTeams} : d);
+    const meNew = { slot:team.slot, username:team.username };
+    try{ localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew)); }catch(e){}
+    setMe(meNew);
+    if(needsSync) await dispUpdate(draftId, { teams:newTeams });
+  };
+
   // Two-step start: lobby → ready (commish + everyone now in the draft view) → live (picks begin)
   const goToDraft = async () => {
     if(draft.teams.some(t=>!t.joined)){
@@ -5856,15 +5882,19 @@ function DispersalDraft({draftId}){
     await dispUpdate(draftId, { status:'live', pick_deadline:deadline });
   };
 
-  const makePick = async (poolItemId) => {
+  const makePick = async (poolItemId, slotOverride) => {
     setPickErr('');
-    if(!me){ setPickErr('You must claim a team first'); return; }
+    // slotOverride lets the commish make a pick on behalf of the on-clock team
+    // (used by the "DRAFT FOR @username" button when a manager is stuck).
+    // For normal picks, slotOverride is undefined and we use me.slot.
+    const pickerSlot = (typeof slotOverride === 'number') ? slotOverride : me?.slot;
+    if(pickerSlot == null){ setPickErr('You must claim a team first'); return; }
     const onClockSlot = dispSlotForPick(draft.current_pick_idx, teams.length, draft.snake, draft.pick_order);
-    if(onClockSlot !== me.slot){ setPickErr('Not your turn'); return; }
+    if(onClockSlot !== pickerSlot){ setPickErr('Not the on-clock team'); return; }
     const item = draft.pool.find(p => p.id === poolItemId);
     if(!item || item.drafted){ setPickErr('Already drafted'); return; }
     const newPool = draft.pool.map(p => p.id===poolItemId ? {...p, drafted:true} : p);
-    const newPicks = [...draft.picks, { pickIdx:draft.current_pick_idx, slot:me.slot, poolItemId, ts:new Date().toISOString() }];
+    const newPicks = [...draft.picks, { pickIdx:draft.current_pick_idx, slot:pickerSlot, poolItemId, ts:new Date().toISOString() }];
     const newIdx = draft.current_pick_idx + 1;
     const totalPicks = draft.pool.length;
     const newStatus = newIdx >= totalPicks ? 'complete' : 'live';
@@ -6079,6 +6109,10 @@ function DispersalDraft({draftId}){
                       <div style={{fontSize:11,color:'#666'}}>Pick #{i+1}</div>
                     </div>
                     {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'5px 11px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:11,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                    {/* Recover claim — for users who lost their session (cleared cache /
+                        switched device) and need to re-attach as the original claimer. */}
+                    {t.joined && !isMine && !isSpectator && <button onClick={()=>recoverSlot(t.slot)} title="Take over this team — only if you're the original claimer and lost your session"
+                      style={{padding:'5px 9px',background:'transparent',border:'1px solid #FFD70066',borderRadius:5,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>↻ RECOVER</button>}
                     {/* User-facing unclaim — lets a manager release their own claim if
                         they grabbed the wrong team and need to switch. Same path as
                         the commish release. */}
@@ -6296,7 +6330,11 @@ function DispersalDraft({draftId}){
                 }
                 return items;
               })().map(item=>{
-                const clickable = myTurn && status==='live';
+                // Commish can pick on behalf of the on-clock team when that team
+                // isn't the commish's own (handles stuck-user scenarios). Same
+                // confirmation modal flow as a regular pick.
+                const commishOverride = isCommish && status==='live' && onClockSlot != null && (!me || me.slot !== onClockSlot);
+                const clickable = (myTurn || commishOverride) && status==='live';
                 // Position-color the badge to match the rest of the site
                 // (Trade Finder posColor convention). Strip the "(POS)" suffix
                 // off the display name so position isn't shown twice — the
@@ -6310,7 +6348,7 @@ function DispersalDraft({draftId}){
                     style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
                     <span className="pfk-disp-pool-badge" style={{padding:'2px 7px',borderRadius:4,fontSize:10,fontWeight:800,background:badgeColor+'22',color:badgeColor,border:'1px solid '+badgeColor+'55',minWidth:36,textAlign:'center'}}>{badgeLabel}</span>
                     <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{cleanName}</span>
-                    {clickable && <button onClick={()=>setPickConfirm(item)} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background:'#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'6px 12px',cursor:'pointer'}}>DRAFT →</button>}
+                    {clickable && <button onClick={()=>setPickConfirm({...item, _commishOverride: !myTurn && commishOverride, _onClockSlot: onClockSlot, _onClockUsername: onClockTeam?.username})} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background: !myTurn && commishOverride ? '#a78bfa' : '#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'6px 12px',cursor:'pointer'}}>{!myTurn && commishOverride ? `DRAFT FOR @${onClockTeam?.username||'team'} →` : 'DRAFT →'}</button>}
                   </div>
                 );
               })}
@@ -6334,17 +6372,26 @@ function DispersalDraft({draftId}){
             </div>
           </div>
 
-          {/* Pick confirmation modal */}
+          {/* Pick confirmation modal — surfaces commish-override state so the
+              commish knows they're picking on someone else's behalf. */}
           {pickConfirm && (
             <div onClick={()=>setPickConfirm(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-              <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:380,background:'#0f0f0f',border:'2px solid #10b981',borderRadius:12,padding:'22px 24px',textAlign:'center'}}>
-                <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:8}}>CONFIRM PICK</div>
+              <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:380,background:'#0f0f0f',border:'2px solid '+(pickConfirm._commishOverride ? '#a78bfa' : '#10b981'),borderRadius:12,padding:'22px 24px',textAlign:'center'}}>
+                <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:8}}>{pickConfirm._commishOverride ? 'COMMISH OVERRIDE PICK' : 'CONFIRM PICK'}</div>
                 <div style={{fontSize:14,color:'#aaa',marginBottom:6}}>Draft</div>
                 <div style={{fontSize:22,fontWeight:900,color:'#FFD700',marginBottom:6,wordBreak:'break-word'}}>{pickConfirm.name}</div>
+                {pickConfirm._commishOverride && pickConfirm._onClockUsername && (
+                  <div style={{fontSize:13,fontWeight:700,color:'#a78bfa',marginBottom:8}}>on behalf of @{pickConfirm._onClockUsername}</div>
+                )}
                 <div style={{fontSize:12,color:'#666',marginBottom:18}}>This pick is final once confirmed.</div>
                 <div style={{display:'flex',gap:8}}>
                   <button onClick={()=>setPickConfirm(null)} style={{flex:1,padding:'12px',background:'transparent',border:'1px solid #555',borderRadius:7,color:'#aaa',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>NO, BACK</button>
-                  <button onClick={()=>{ const id=pickConfirm.id; setPickConfirm(null); makePick(id); }} style={{flex:1,padding:'12px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>YES, DRAFT</button>
+                  <button onClick={()=>{
+                    const id = pickConfirm.id;
+                    const slot = pickConfirm._commishOverride ? pickConfirm._onClockSlot : undefined;
+                    setPickConfirm(null);
+                    makePick(id, slot);
+                  }} style={{flex:1,padding:'12px',background: pickConfirm._commishOverride ? '#a78bfa' : '#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>YES, DRAFT</button>
                 </div>
               </div>
             </div>
@@ -6380,6 +6427,9 @@ function DispersalDraft({draftId}){
                         <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0,color:t.joined?'#eee':'#888'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11,fontWeight:700}}>(you)</span>}</span>
                         {isOnClock && <span style={{fontSize:9,color:'#10b981',fontWeight:800,padding:'2px 5px',background:'#0a2a1a',borderRadius:3,letterSpacing:0.5,flexShrink:0}}>ON CLOCK</span>}
                         {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'4px 9px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:10,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                        {/* Recover claim — same as in the lobby. */}
+                        {t.joined && !isMine && !isSpectator && <button onClick={()=>recoverSlot(t.slot)} title="Take over this team — only if you're the original claimer and lost your session"
+                          style={{padding:'3px 7px',background:'transparent',border:'1px solid #FFD70066',borderRadius:5,color:'#FFD700',cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>↻ RECOVER</button>}
                         {/* User-facing unclaim — same as in the lobby. */}
                         {isMine && <button onClick={()=>releaseSlot(t.slot)} title="Unclaim this team — frees it up so you can claim a different one"
                           style={{padding:'3px 7px',background:'transparent',border:'1px solid #ef444466',borderRadius:5,color:'#ef4444',cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>✕ UNCLAIM</button>}
