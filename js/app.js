@@ -4553,6 +4553,13 @@ function DispersalSetup(){
       const u = await lookupResolveUser(q);
       setSleeperLinkedUser({ user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null });
       setInlineLinkInput('');
+      // After link succeeds the inline form unmounts and the new YOUR LEAGUES
+      // dropdown takes its place — content above the cursor shrinks, so iOS
+      // ends up showing a stale scroll position that's BELOW the dropdown.
+      // Scroll back to the top of the form so the dropdown is in view.
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
     }catch(e){
       setInlineLinkErr(e.message || 'Could not find that Sleeper user');
     }finally{
