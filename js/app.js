@@ -5766,6 +5766,12 @@ function DispersalDraft({draftId}){
     if(isSpectator) return null;
     try{ return JSON.parse(localStorage.getItem('pfk_disp_'+draftId) || 'null'); }catch(e){ return null; }
   });
+  // Tier S: Sleeper-tied persistent claims. We tag teams with sleeper_user_id
+  // when a linked user claims them, so if their localStorage ever evaporates
+  // (clear cache, device switch, iOS eviction) we can silently restore their
+  // identity by matching on their Sleeper account. RECOVER button stays as the
+  // last-resort fallback for unlinked users.
+  const [sleeperLinkedUser] = useSleeperUser();
   const [claimUser,setClaimUser] = useState('');
   const [claimPass,setClaimPass] = useState('');
   const [claimErr,setClaimErr] = useState('');
@@ -5819,12 +5825,50 @@ function DispersalDraft({draftId}){
     return ()=>{ cancelled = true; clearInterval(t); if(channel && sb?.removeChannel) sb.removeChannel(channel); };
   },[draftId]);
 
+  // Tier S — silent auto-recover: when the draft loads, if the user has no
+  // localStorage claim BUT they have a linked Sleeper account AND a team in
+  // this draft is tagged with their sleeper_user_id, restore them silently.
+  // This is the "lockout never happens for linked users" payoff.
+  // Tight defensive conditions:
+  //   - me must be null (don't override an active claim)
+  //   - sleeperLinkedUser must exist (user has linked Sleeper)
+  //   - draft.teams must have a team with matching sleeper_user_id
+  // Spectator mode bypasses this (spectators shouldn't auto-claim).
+  useEffect(() => {
+    if(isSpectator) return;
+    if(me) return;
+    if(!sleeperLinkedUser?.user_id) return;
+    if(!draft?.teams) return;
+    const myTeam = draft.teams.find(t => t.sleeper_user_id === sleeperLinkedUser.user_id && t.joined);
+    if(!myTeam) return;
+    const meNew = { slot: myTeam.slot, username: myTeam.username };
+    try{ localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew)); }catch(e){}
+    setMe(meNew);
+  },[me, sleeperLinkedUser?.user_id, draft?.teams, isSpectator, draftId]);
+
+  // Tier S — silent upgrade: when the user has a valid localStorage claim AND
+  // a linked Sleeper account AND their team isn't yet tagged with their
+  // sleeper_user_id, opportunistically tag it in the background. Protects them
+  // from future lockouts on the next load. Fires once per page load.
+  useEffect(() => {
+    if(!me || !sleeperLinkedUser?.user_id || !draft?.teams) return;
+    const myTeam = draft.teams.find(t => t.slot === me.slot);
+    if(!myTeam || myTeam.sleeper_user_id === sleeperLinkedUser.user_id) return; // nothing to upgrade
+    const newTeams = draft.teams.map(t => t.slot===me.slot ? {...t, sleeper_user_id: sleeperLinkedUser.user_id} : t);
+    setDraft(d => d ? {...d, teams:newTeams} : d);
+    dispUpdate(draftId, { teams:newTeams }).catch(()=>{}); // fire-and-forget
+  },[me?.slot, sleeperLinkedUser?.user_id, draft?.teams, draftId]);
+
   const claimSlot = async (slot) => {
     setClaimErr('');
     const team = draft.teams.find(t => t.slot===slot);
     if(!team){ setClaimErr('Team not found'); return; }
     if(team.joined){ setClaimErr('Already claimed — pick another team'); return; }
-    const newTeams = draft.teams.map(t => t.slot===slot ? {...t, joined:true} : t);
+    // Tag the team with the user's Sleeper user_id when linked so we can
+    // silently auto-recover their claim if their localStorage ever evaporates.
+    // Field is optional — unlinked users still claim normally.
+    const tagged = sleeperLinkedUser?.user_id ? { joined:true, sleeper_user_id: sleeperLinkedUser.user_id } : { joined:true };
+    const newTeams = draft.teams.map(t => t.slot===slot ? {...t, ...tagged} : t);
     const meNew = { slot:team.slot, username:team.username };
     setDraft(d => d ? {...d, teams:newTeams} : d); // optimistic
     try{ localStorage.setItem('pfk_disp_'+draftId, JSON.stringify(meNew)); }catch(e){}
@@ -5860,6 +5904,11 @@ function DispersalDraft({draftId}){
     let needsSync = false;
     if(me && me.slot !== slot){
       newTeams = newTeams.map(t => t.slot===me.slot ? {...t, joined:false} : t);
+      needsSync = true;
+    }
+    // Re-tag with sleeper_user_id on recover too, so future evictions auto-recover.
+    if(sleeperLinkedUser?.user_id){
+      newTeams = newTeams.map(t => t.slot===slot ? {...t, sleeper_user_id: sleeperLinkedUser.user_id} : t);
       needsSync = true;
     }
     setDraft(d => d ? {...d, teams:newTeams} : d);
