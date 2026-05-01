@@ -5228,9 +5228,6 @@ function DispersalSetup(){
       {setupMode==='sleeper' && (
         <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
           {leagueInfoInputs}
-          {/* SHARE DISPERSAL button — sits between league info and Sleeper League ID so
-              the commish can advertise the dispersal BEFORE creating the draft. */}
-          <button onClick={sharePoolImage} disabled={poolShareBusy||!sleeperData||sleeperSelected.size===0} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft" style={{padding:'14px 20px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1.5px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#FFD700'),borderRadius:8,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#FFD700',fontWeight:900,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13,letterSpacing:1.5}}>{poolShareBusy?'BUILDING IMAGE…':'📸 SHARE DISPERSAL'}</button>
           {/* League dropdown — always visible so users see the incentive to
               link Sleeper. Disabled tease state when not linked, fully
               functional dropdown when linked. Manual ID input stays available
@@ -5379,6 +5376,13 @@ function DispersalSetup(){
               )}
               {timer !== 'off' && !autoPick && <div style={{fontSize:11,color:'#666',marginTop:5}}>When a pick clock expires, the draft pauses for the commish to advance.</div>}
             </div>
+            {/* SHARE DISPERSAL — moved here per Evan so it sits next to the
+                draft timer at the bottom of the form. Same action as before. */}
+            <div>
+              <label style={labelStyle}>SHARE</label>
+              <button onClick={sharePoolImage} disabled={poolShareBusy||!sleeperData||sleeperSelected.size===0} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft"
+                style={{padding:'8px 14px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#FFD700'),borderRadius:6,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#FFD700',fontWeight:800,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13}}>{poolShareBusy?'BUILDING…':'📸 SHARE DISPERSAL'}</button>
+            </div>
           </div>
           {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
           <button onClick={createFromSleeper} disabled={creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2} style={{padding:'14px 24px',background:(creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2)?'#444':'#10b981',border:'none',borderRadius:8,color:'#000',fontWeight:900,cursor:(creating||sleeperBuilding||!sleeperData||sleeperSelected.size<2)?'default':'pointer',fontSize:14,letterSpacing:1.5}}>{sleeperBuilding?'BUILDING POOL FROM SLEEPER…':creating?'CREATING…':'CREATE DRAFT'}</button>
@@ -5388,9 +5392,6 @@ function DispersalSetup(){
       {setupMode==='custom' && (
       <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
         {leagueInfoInputs}
-        {/* SHARE DISPERSAL button — sits between league info and the rest of the form
-            so the commish can advertise the dispersal BEFORE creating the draft. */}
-        <button onClick={sharePoolImage} disabled={poolShareBusy||(!poolText.trim()&&!picksText.trim())} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft" style={{padding:'14px 20px',background:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#222':'transparent',border:'1.5px solid '+((poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#444':'#FFD700'),borderRadius:8,color:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#666':'#FFD700',fontWeight:900,cursor:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'default':'pointer',fontSize:13,letterSpacing:1.5}}>{poolShareBusy?'BUILDING IMAGE…':'📸 SHARE DISPERSAL'}</button>
         <div>
           <label style={labelStyle}>DRAFT NAME</label>
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
@@ -5437,6 +5438,13 @@ function DispersalSetup(){
               ))}
             </div>
             <div style={{fontSize:11,color:'#666',marginTop:5}}>When a pick clock expires, the draft pauses for the commish to advance.</div>
+          </div>
+          {/* SHARE DISPERSAL — moved here per Evan so it sits next to the
+              draft timer at the bottom of the form. Same action as before. */}
+          <div>
+            <label style={labelStyle}>SHARE</label>
+            <button onClick={sharePoolImage} disabled={poolShareBusy||(!poolText.trim()&&!picksText.trim())} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft"
+              style={{padding:'8px 14px',background:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#222':'transparent',border:'1px solid '+((poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#444':'#FFD700'),borderRadius:6,color:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#666':'#FFD700',fontWeight:800,cursor:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'default':'pointer',fontSize:13}}>{poolShareBusy?'BUILDING…':'📸 SHARE DISPERSAL'}</button>
           </div>
         </div>
         {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
