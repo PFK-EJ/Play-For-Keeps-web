@@ -6023,6 +6023,14 @@ function DispersalDraft({draftId}){
         {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
       </div>
 
+      {/* Quick how-it-works strip — only during lobby phase. Tells the commish
+          what to do: copy the link to leaguemates, have them claim teams. */}
+      {status === 'lobby' && (
+        <div style={{background:'#0f0a00',border:'1px dashed #FFD70066',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'#ddd',lineHeight:1.55}}>
+          💡 <strong style={{color:'#FFD700'}}>How this works:</strong> Tap <span style={{color:'#000',background:'#FFD700',padding:'1px 6px',borderRadius:3,fontWeight:800,fontSize:11}}>🔗 COPY LINK</span> above and send it to your league. Each manager opens the link and claims their team below — once everyone's joined, the commish hits <span style={{color:'#10b981',fontWeight:800}}>▶ GO TO DRAFT</span>. Claimed the wrong team by mistake? Tap <span style={{color:'#888',fontWeight:800}}>✕ UNCLAIM</span> on your card to release it and pick a different one.
+        </div>
+      )}
+
       {/* Lobby phase */}
       {status === 'lobby' && (
         <>
@@ -6045,6 +6053,11 @@ function DispersalDraft({draftId}){
                       <div style={{fontSize:11,color:'#666'}}>Pick #{i+1}</div>
                     </div>
                     {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'5px 11px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:11,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                    {/* User-facing unclaim — lets a manager release their own claim if
+                        they grabbed the wrong team and need to switch. Same path as
+                        the commish release. */}
+                    {isMine && <button onClick={()=>releaseSlot(t.slot)} title="Unclaim this team — frees it up so you can claim a different one"
+                      style={{padding:'5px 9px',background:'transparent',border:'1px solid #ef444466',borderRadius:5,color:'#ef4444',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>✕ UNCLAIM</button>}
                     {t.joined && isCommish && !isMine && <button onClick={()=>releaseSlot(t.slot)} title="Release this claim" style={{padding:'3px 7px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11,flexShrink:0}}>✕</button>}
                   </div>
                 );
@@ -6313,6 +6326,9 @@ function DispersalDraft({draftId}){
                         <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0,color:t.joined?'#eee':'#888'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11,fontWeight:700}}>(you)</span>}</span>
                         {isOnClock && <span style={{fontSize:9,color:'#10b981',fontWeight:800,padding:'2px 5px',background:'#0a2a1a',borderRadius:3,letterSpacing:0.5,flexShrink:0}}>ON CLOCK</span>}
                         {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'4px 9px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:10,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                        {/* User-facing unclaim — same as in the lobby. */}
+                        {isMine && <button onClick={()=>releaseSlot(t.slot)} title="Unclaim this team — frees it up so you can claim a different one"
+                          style={{padding:'3px 7px',background:'transparent',border:'1px solid #ef444466',borderRadius:5,color:'#ef4444',cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>✕ UNCLAIM</button>}
                         {t.joined && isCommish && !isMine && <button onClick={()=>releaseSlot(t.slot)} title="Release this claim" style={{padding:'2px 6px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11,flexShrink:0}}>✕</button>}
                         <span style={{fontSize:11,color:'#666',flexShrink:0}}>{t.picks.length}p</span>
                         {status==='complete' && <button onClick={()=>screenshotRoster(t.slot, t.username)} title={`Download ${t.username}'s roster as PNG`} style={{padding:'2px 6px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11,flexShrink:0}}>📸</button>}
