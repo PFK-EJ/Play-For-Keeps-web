@@ -5745,7 +5745,10 @@ function DispersalDraft({draftId}){
   const [claimErr,setClaimErr] = useState('');
   const [pickErr,setPickErr] = useState('');
   const [poolFilter,setPoolFilter] = useState('');
-  const [poolTab,setPoolTab] = useState('players'); // 'players' | 'picks'
+  // Pool tab: 'all' shows every undrafted asset; QB/RB/WR/TE filter players by
+  // position; 'picks' shows draft picks only. Default 'all' so users see the
+  // whole pool out of the box without having to hunt through tabs.
+  const [poolTab,setPoolTab] = useState('all');
   const [pickConfirm,setPickConfirm] = useState(null); // pool item awaiting Yes/No
   const [linkCopied,setLinkCopied] = useState(false);
   const [fcValues,setFcValues] = useState(null); // {bySleeperId, byName} from FantasyCalc — silent sort
@@ -6174,29 +6177,63 @@ function DispersalDraft({draftId}){
           {/* Pool — flows in normal page scroll, has padding-bottom so it isn't hidden by the sticky-bottom rosters bar */}
           <div className="pfk-disp-pool-block" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,paddingBottom:14}}>
             {(()=>{
-              const playersAvail = pool.filter(p=>!p.drafted && p.type!=='pick').length;
-              const picksAvail = pool.filter(p=>!p.drafted && p.type==='pick').length;
+              // Compute available counts per filter once so the tab badges stay
+              // honest (e.g. "QB · 0" if all QBs are drafted).
+              const undrafted = pool.filter(p => !p.drafted);
+              const counts = {
+                all: undrafted.length,
+                QB: undrafted.filter(p => p.type !== 'pick' && p.pos === 'QB').length,
+                RB: undrafted.filter(p => p.type !== 'pick' && p.pos === 'RB').length,
+                WR: undrafted.filter(p => p.type !== 'pick' && p.pos === 'WR').length,
+                TE: undrafted.filter(p => p.type !== 'pick' && p.pos === 'TE').length,
+                picks: undrafted.filter(p => p.type === 'pick').length,
+              };
+              // Position tab styling — gold for ALL/picks, position-color for the
+              // four position tabs (matches Trade Finder's posColor convention).
+              const tabDef = [
+                { id:'all',   label:'🌐 ALL',  active:'#FFD700',   inactiveColor:'#888' },
+                { id:'QB',    label:'QB',      active:'#a78bfa',   inactiveColor:'#888' },
+                { id:'RB',    label:'RB',      active:'#34d399',   inactiveColor:'#888' },
+                { id:'WR',    label:'WR',      active:'#60a5fa',   inactiveColor:'#888' },
+                { id:'TE',    label:'TE',      active:'#fb923c',   inactiveColor:'#888' },
+                { id:'picks', label:'🎟 PICKS', active:'#a78bfa',   inactiveColor:'#888' },
+              ];
               return (
-                <div style={{display:'flex',gap:6,marginBottom:10,padding:4,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8}}>
-                  <button onClick={()=>setPoolTab('players')} style={{flex:1,padding:'9px 12px',background:poolTab==='players'?'#FFD700':'transparent',border:'none',borderRadius:6,color:poolTab==='players'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>👥 PLAYERS · {playersAvail}</button>
-                  <button onClick={()=>setPoolTab('picks')} style={{flex:1,padding:'9px 12px',background:poolTab==='picks'?'#a78bfa':'transparent',border:'none',borderRadius:6,color:poolTab==='picks'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎟 DRAFT PICKS · {picksAvail}</button>
+                // Tabs — single horizontally-scrollable row on mobile so 6 fit
+                // without wrapping. flex-shrink:0 keeps each tab readable.
+                <div style={{display:'flex',gap:6,marginBottom:10,padding:4,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+                  {tabDef.map(t => {
+                    const sel = poolTab === t.id;
+                    return (
+                      <button key={t.id} onClick={()=>setPoolTab(t.id)}
+                        style={{flexShrink:0,padding:'8px 12px',background:sel?t.active:'transparent',border:'none',borderRadius:6,color:sel?'#000':t.inactiveColor,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>
+                        {t.label} <span style={{opacity:0.75,fontWeight:700,marginLeft:3}}>· {counts[t.id]}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               );
             })()}
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>AVAILABLE · {pool.filter(p=>!p.drafted && (poolTab==='picks'?p.type==='pick':p.type!=='pick')).length}</div>
-              <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder={poolTab==='picks'?'Search picks…':'Search players…'} style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+              <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder={poolTab==='picks'?'Search picks…':poolTab==='all'?'Search assets…':`Search ${poolTab}s…`} style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
               {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
               {(()=>{
-                // Sort player tab by FantasyCalc dynasty value (silent — no value shown).
-                // Match by sleeperId first, fall back to normalized name; missing values sort to bottom.
-                let items = pool.filter(p=>!p.drafted).filter(p=>poolTab==='picks'?p.type==='pick':p.type!=='pick').filter(p=>!poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase()));
-                if(poolTab !== 'picks' && fcValues){
+                // Filter pipeline: undrafted → tab filter → search filter
+                const matchesTab = (p) => {
+                  if(poolTab === 'all') return true;
+                  if(poolTab === 'picks') return p.type === 'pick';
+                  return p.type !== 'pick' && p.pos === poolTab;
+                };
+                let items = pool.filter(p => !p.drafted)
+                  .filter(matchesTab)
+                  .filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase()));
+                // Sort by FantasyCalc dynasty value (silent — no value shown).
+                // Picks have FC values too (slot-specific) so the sort works for them as well.
+                if(fcValues){
                   const valueOf = (it) => {
                     if(it.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
-                    // Strip "(POS)" suffix from name before normalizing
                     const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
                     const k = normDraftName(stripped);
                     return fcValues.byName[k] != null ? fcValues.byName[k] : -1;
@@ -6209,13 +6246,24 @@ function DispersalDraft({draftId}){
                 return (
                   <div key={item.id} className="pfk-disp-pool-item"
                     style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
-                    <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':'PLAYER'}</span>
+                    <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':(item.pos||'PLAYER')}</span>
                     <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
                     {clickable && <button onClick={()=>setPickConfirm(item)} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background:'#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'6px 12px',cursor:'pointer'}}>DRAFT →</button>}
                   </div>
                 );
               })}
-              {pool.filter(p=>!p.drafted).filter(p=>poolTab==='picks'?p.type==='pick':p.type!=='pick').length===0 && <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>{poolTab==='picks' ? 'No draft picks left.' : 'No players left.'}</div>}
+              {(() => {
+                const visibleCount = pool.filter(p => !p.drafted).filter(p => {
+                  if(poolTab === 'all') return true;
+                  if(poolTab === 'picks') return p.type === 'pick';
+                  return p.type !== 'pick' && p.pos === poolTab;
+                }).filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).length;
+                if(visibleCount > 0) return null;
+                const emptyMsg = poolTab === 'all' ? 'No assets left.'
+                  : poolTab === 'picks' ? 'No draft picks left.'
+                  : `No ${poolTab}s left.`;
+                return <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>{poolFilter ? `No matches for "${poolFilter}".` : emptyMsg}</div>;
+              })()}
             </div>
           </div>
 
