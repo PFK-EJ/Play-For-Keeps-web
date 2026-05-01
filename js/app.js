@@ -6277,11 +6277,19 @@ function DispersalDraft({draftId}){
                 return items;
               })().map(item=>{
                 const clickable = myTurn && status==='live';
+                // Position-color the badge to match the rest of the site
+                // (Trade Finder posColor convention). Strip the "(POS)" suffix
+                // off the display name so position isn't shown twice — the
+                // colored badge already conveys it.
+                const inferredPos = item.pos || (item.name||'').match(/\(([A-Za-z]+)\)\s*$/)?.[1]?.toUpperCase() || '';
+                const badgeLabel = item.type === 'pick' ? 'PICK' : (inferredPos || 'PLAYER');
+                const badgeColor = ({QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#FFD700'}[badgeLabel]) || '#9ca3af';
+                const cleanName = (item.name || '').replace(/\s*\([A-Za-z]+\)\s*$/, '');
                 return (
                   <div key={item.id} className="pfk-disp-pool-item"
                     style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
-                    <span className="pfk-disp-pool-badge" style={{padding:'2px 6px',borderRadius:4,fontSize:10,fontWeight:800,background:'#111',color:item.type==='pick'?'#a78bfa':'#FFD700',border:'1px solid '+(item.type==='pick'?'#a78bfa55':'#FFD70055')}}>{item.type==='pick'?'PICK':(item.pos||(item.name||'').match(/\(([A-Za-z]+)\)\s*$/)?.[1]?.toUpperCase()||'PLAYER')}</span>
-                    <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{item.name}</span>
+                    <span className="pfk-disp-pool-badge" style={{padding:'2px 7px',borderRadius:4,fontSize:10,fontWeight:800,background:badgeColor+'22',color:badgeColor,border:'1px solid '+badgeColor+'55',minWidth:36,textAlign:'center'}}>{badgeLabel}</span>
+                    <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{cleanName}</span>
                     {clickable && <button onClick={()=>setPickConfirm(item)} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background:'#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'6px 12px',cursor:'pointer'}}>DRAFT →</button>}
                   </div>
                 );
