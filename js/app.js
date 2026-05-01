@@ -4812,10 +4812,10 @@ function DispersalSetup(){
     const draftName = name.trim() || 'Dispersal Draft';
     const pickLines = picksText.split('\n').map(s=>s.trim()).filter(Boolean);
     let players = [];
-    // managersNeeded = how many of the selected rosters actually need a new manager.
-    // Sleeper mode: count of selected rosters where original owner_id is null/undefined
-    //   (same orphan signal we use for auto-selection on FETCH).
-    // Custom mode: total team count — there's no orphan distinction so all are "needed".
+    // managersNeeded = how many of the selected rosters need a new manager.
+    // Reflects the commish's selection regardless of whether each roster has
+    // an owner_id on Sleeper — once they're picked for the dispersal pool,
+    // they need a new manager by definition (e.g. league re-form, mass disperse).
     let managersNeeded = 0;
     if(setupMode === 'sleeper'){
       if(!sleeperData || sleeperSelected.size === 0) return null;
@@ -4832,7 +4832,7 @@ function DispersalSetup(){
           players.push({ id:'p_'+pid, name: pos ? `${fullName} (${pos})` : fullName, sleeperId:String(pid), pos });
         });
       });
-      managersNeeded = selectedRosters.filter(r => !r.owner_id).length;
+      managersNeeded = selectedRosters.length;
     } else {
       const lines = poolText.split('\n').map(s=>s.trim()).filter(Boolean);
       players = lines.map((n,i) => {
