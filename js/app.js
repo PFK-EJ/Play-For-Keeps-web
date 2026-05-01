@@ -5237,12 +5237,12 @@ function DispersalSetup(){
 
       {setupMode==='sleeper' && (
         <div style={{display:'flex',flexDirection:'column',gap:18,background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:'22px 24px'}}>
-          {leagueInfoInputs}
           {/* League dropdown — always visible so users see the incentive to
               link Sleeper. Disabled tease state when not linked, fully
               functional dropdown when linked. Manual ID input stays available
               below for users who don't want to link or are setting up a draft
-              for a league they're not in. */}
+              for a league they're not in. Lives ABOVE the league-info snapshot
+              card per Evan — fetching a league should be the first action. */}
           <div>
             <label style={labelStyle}>YOUR LEAGUES <span style={{color:'#10b981',fontWeight:700,fontSize:10,letterSpacing:1.5,marginLeft:6}}>· FASTEST</span></label>
             {!sleeperLinkedUser && (
@@ -5303,6 +5303,7 @@ function DispersalSetup(){
             </div>
             <div style={{fontSize:11,color:'#666',marginTop:5}}>Long number from <code style={{color:'#FFD700'}}>sleeper.com/leagues/&lt;id&gt;</code>{!sleeperLinkedUser && <> · or <strong style={{color:'#FFD700'}}>link Sleeper in the toolbar above</strong> to pick from a dropdown</>}</div>
           </div>
+          {leagueInfoInputs}
           <div>
             <label style={labelStyle}>DRAFT NAME</label>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Big Money League — Spring 2026 Disperse" style={inputStyle}/>
