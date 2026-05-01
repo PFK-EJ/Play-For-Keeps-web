@@ -5083,6 +5083,33 @@ function DispersalSetup(){
       setPullingSleeperPicks(false);
     }
   };
+  // PickYearDropdowns — must be defined BEFORE bulkPicksControls because
+  // bulkPicksControls now references <PickYearDropdowns/> inside its JSX.
+  // JSX evaluates immediately at const initialization, so any reference
+  // to a not-yet-defined const throws a temporal-dead-zone ReferenceError
+  // (which manifested as a blank screen when the customize section toggled).
+  const PickYearDropdowns = () => (
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+      {PICK_YEARS.map(y => (
+        <select key={y} value="" onChange={e=>{ if(e.target.value){ addPickFromDropdown(e.target.value); e.target.value=''; } }}
+          style={{flex:'1 1 130px',padding:'7px 9px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+          <option value="">+ Add {y} pick</option>
+          {setupMode==='sleeper'
+            ? PICK_ROUNDS.flatMap(([rk,rl]) => [
+                <option key={`${rk}-generic`} value={`${y} ${rl}`}>{y} {rl}</option>,
+                ...usernamesForDropdowns.map(u => (
+                  <option key={`${rk}-${u}`} value={`${y} ${rl} via ${u}`}>{rl} via {u}</option>
+                ))
+              ])
+            : PICK_ROUNDS.flatMap(([rk,rl]) => [
+                <option key={`${rk}-generic`} value={`${y} ${rl}`}>{y} {rl}</option>,
+                <option key={rk} value={`${y} ${rl} via `}>{rl} via</option>
+              ])
+          }
+        </select>
+      ))}
+    </div>
+  );
   // Bulk-picks controls UI — defined as a JSX value (not a Component) so React
   // reconciles in place. (Same lesson as the leagueInfoInputs focus-loss fix.)
   //
@@ -5162,28 +5189,6 @@ function DispersalSetup(){
           </div>
         </div>
       )}
-    </div>
-  );
-  const PickYearDropdowns = () => (
-    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-      {PICK_YEARS.map(y => (
-        <select key={y} value="" onChange={e=>{ if(e.target.value){ addPickFromDropdown(e.target.value); e.target.value=''; } }}
-          style={{flex:'1 1 130px',padding:'7px 9px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:12,fontWeight:700,cursor:'pointer'}}>
-          <option value="">+ Add {y} pick</option>
-          {setupMode==='sleeper'
-            ? PICK_ROUNDS.flatMap(([rk,rl]) => [
-                <option key={`${rk}-generic`} value={`${y} ${rl}`}>{y} {rl}</option>,
-                ...usernamesForDropdowns.map(u => (
-                  <option key={`${rk}-${u}`} value={`${y} ${rl} via ${u}`}>{rl} via {u}</option>
-                ))
-              ])
-            : PICK_ROUNDS.flatMap(([rk,rl]) => [
-                <option key={`${rk}-generic`} value={`${y} ${rl}`}>{y} {rl}</option>,
-                <option key={rk} value={`${y} ${rl} via `}>{rl} via</option>
-              ])
-          }
-        </select>
-      ))}
     </div>
   );
 
