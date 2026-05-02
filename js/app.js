@@ -4455,15 +4455,41 @@ const dispFetch = async (id) => {
   if(error){ console.error(error); return null; }
   return data;
 };
+// Optional fields we attempt to persist when newer schemas have the columns
+// (roster_positions, sleeper_league_id). If the table doesn't have them yet,
+// PostgREST rejects the entire insert/update. dispCreate / dispUpdate retry
+// once with those fields stripped so older schemas keep working — the live
+// TEAM tab falls back to its default lineup when the field is missing.
+const _DISP_OPTIONAL_FIELDS = ['roster_positions','sleeper_league_id'];
+const _isMissingColumnErr = (err) => {
+  if(!err) return false;
+  const m = (err.message || '').toLowerCase();
+  if(err.code === 'PGRST204') return true;
+  if(m.includes('could not find') && m.includes('column')) return true;
+  if(m.includes('column') && m.includes('does not exist')) return true;
+  return _DISP_OPTIONAL_FIELDS.some(f => m.includes(f));
+};
+const _stripOptional = (obj) => {
+  const out = {...obj};
+  _DISP_OPTIONAL_FIELDS.forEach(f => { delete out[f]; });
+  return out;
+};
 const dispCreate = async (payload) => {
   if(!sb) return { error:'Supabase not loaded' };
-  const { data, error } = await sb.from('dispersal_drafts').insert(payload).select().single();
-  return { data, error };
+  let res = await sb.from('dispersal_drafts').insert(payload).select().single();
+  if(res.error && _isMissingColumnErr(res.error) && _DISP_OPTIONAL_FIELDS.some(f => f in payload)) {
+    res = await sb.from('dispersal_drafts').insert(_stripOptional(payload)).select().single();
+  }
+  return { data: res.data, error: res.error };
 };
 const dispUpdate = async (id, patch) => {
   if(!sb) return { error:'Supabase not loaded' };
-  const { error } = await sb.from('dispersal_drafts').update({...patch, updated_at:new Date().toISOString()}).eq('id', id);
-  return { error };
+  const stamped = {...patch, updated_at:new Date().toISOString()};
+  let res = await sb.from('dispersal_drafts').update(stamped).eq('id', id);
+  if(res.error && _isMissingColumnErr(res.error) && _DISP_OPTIONAL_FIELDS.some(f => f in stamped)) {
+    res = await sb.from('dispersal_drafts').update(_stripOptional(stamped)).eq('id', id);
+  }
+  return { error: res.error };
 };
 
 // Sleeper API helpers — public API, no auth needed.
