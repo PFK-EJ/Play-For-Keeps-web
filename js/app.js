@@ -4592,6 +4592,9 @@ function DispersalSetup(){
     return () => { cancelled = true; };
   },[sleeperLinkedUser?.user_id]);
   const [showModeHelp,setShowModeHelp] = useState(false);
+  // Top-of-page explainer for managers who've never run / been in a dispersal
+  // draft. Closed by default — only the curious tap it.
+  const [showWhatIsDispersal,setShowWhatIsDispersal] = useState(false);
   const [showPicksHelp,setShowPicksHelp] = useState(false);
   // Bulk-add picks ("all managers have own picks" shortcut). When checked, the year
   // toggle pills appear; clicking ADD appends N managers × 4 rounds × |selected years|
@@ -5156,25 +5159,49 @@ function DispersalSetup(){
   // All three flow into the same picksText textarea, so commish can mix-and-match
   // and edit freely.
   const isSleeperMode = setupMode === 'sleeper';
-  const allYearsSet = new Set(PICK_YEARS);
+  // Current rookie-draft year — drives the primary button's default. When the
+  // calendar rolls into 2027 the button auto-says "2027 ROOKIE PICKS" with no
+  // code change. The future-year chip row is also derived from this, showing
+  // the next 3 seasons.
+  const currentDraftYear = new Date().getFullYear();
+  const futureYearsForChips = [currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3];
+  const currentYearOnlySet = new Set([currentDraftYear]);
   const bulkPicksControls = (
     <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:8}}>
-      {/* PRIMARY — Pull from Sleeper. One small button, no year picker
-          (defaults to all years). Only visible in Sleeper mode. */}
+      {/* PRIMARY — Pull selected teams' CURRENT-YEAR rookie picks only.
+          Reflects the most common dispersal-draft norm (newcomer keeps their
+          own future picks; only this year's rookie picks come over with the
+          orphan team). Future years are additive via the chip row below. */}
       {isSleeperMode && (
         <div>
-          <button type="button" onClick={() => applyPullSleeperPicks(allYearsSet)}
+          <button type="button" onClick={() => applyPullSleeperPicks(currentYearOnlySet)}
             disabled={!sleeperData || sleeperSelected.size===0 || pullingSleeperPicks}
             style={{width:'100%',padding:'10px 14px',background:(!sleeperData||sleeperSelected.size===0||pullingSleeperPicks)?'#222':'#a78bfa',border:'none',borderRadius:6,color:(!sleeperData||sleeperSelected.size===0||pullingSleeperPicks)?'#666':'#000',fontWeight:900,cursor:(!sleeperData||sleeperSelected.size===0||pullingSleeperPicks)?'default':'pointer',fontSize:13,letterSpacing:1}}>
             {pullingSleeperPicks
               ? 'PULLING FROM SLEEPER…'
               : !sleeperData
-              ? '✨ PULL SELECTED TEAMS\' DRAFT PICKS · fetch a league first'
+              ? `✨ PULL SELECTED TEAMS' ${currentDraftYear} ROOKIE PICKS · fetch a league first`
               : sleeperSelected.size===0
-              ? '✨ PULL SELECTED TEAMS\' DRAFT PICKS · select managers first'
-              : `✨ PULL SELECTED TEAMS' DRAFT PICKS`}
+              ? `✨ PULL SELECTED TEAMS' ${currentDraftYear} ROOKIE PICKS · select managers first`
+              : `✨ PULL SELECTED TEAMS' ${currentDraftYear} ROOKIE PICKS`}
           </button>
-          <div style={{fontSize:11,color:'#666',marginTop:5,lineHeight:1.5}}>Reads <code style={{color:'#a78bfa'}}>traded_picks</code> and adds each selected manager's actual current pick inventory — including picks they've acquired, excluding ones they've traded away.</div>
+          <div style={{fontSize:11,color:'#666',marginTop:5,lineHeight:1.5}}>Reads <code style={{color:'#a78bfa'}}>traded_picks</code> and adds each selected manager's actual {currentDraftYear} rookie pick inventory — including picks they've acquired, excluding ones they've traded away.</div>
+          {/* Secondary additive chips — for leagues that disperse future-year
+              picks too. Each chip APPENDS to whatever's already in the textarea
+              so commish can stack them as needed. */}
+          {sleeperData && sleeperSelected.size > 0 && (
+            <div style={{marginTop:10,padding:'8px 10px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6}}>
+              <div style={{fontSize:11,color:'#888',fontWeight:700,marginBottom:6,letterSpacing:0.5}}>Need future picks too? <span style={{color:'#666',fontWeight:500}}>(some leagues disperse all future picks; most don't)</span></div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {futureYearsForChips.map(y => (
+                  <button key={y} type="button" onClick={() => applyPullSleeperPicks(new Set([y]))} disabled={pullingSleeperPicks}
+                    style={{padding:'6px 12px',background:'transparent',border:'1px solid #a78bfa66',borderRadius:14,color:'#a78bfa',fontWeight:800,fontSize:12,cursor:pullingSleeperPicks?'wait':'pointer',letterSpacing:0.3}}>
+                    + {y} picks
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {pullPicksMsg && <div style={{fontSize:11,color:pullPicksMsg.startsWith('Added')?'#10b981':'#f59e0b',marginTop:5,fontWeight:700}}>{pullPicksMsg}</div>}
         </div>
       )}
@@ -5237,9 +5264,21 @@ function DispersalSetup(){
 
   return (
     <div style={{maxWidth:760,margin:'24px auto',padding:'20px',color:'#eee'}}>
-      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
+      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18,flexWrap:'wrap'}}>
         <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:2}}>🎲 DISPERSAL DRAFT</div>
+        <button type="button" onClick={()=>setShowWhatIsDispersal(v=>!v)}
+          style={{padding:'4px 10px',background:'transparent',border:'1px solid #FFD70066',borderRadius:14,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.3}}>
+          ⓘ {showWhatIsDispersal ? 'hide' : 'what is a dispersal draft?'}
+        </button>
       </div>
+      {showWhatIsDispersal && (
+        <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'14px 16px',marginBottom:14,fontSize:13,color:'#ddd',lineHeight:1.65}}>
+          <div style={{fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:8}}>WHAT IS A DISPERSAL DRAFT?</div>
+          <div style={{marginBottom:8}}>A dispersal draft is how a fantasy league re-stocks one or more teams that have been abandoned by their previous managers. The orphaned team's players (and often their draft picks) go into a shared pool, and the new managers draft from it to build their team.</div>
+          <div style={{marginBottom:8}}>What goes in the pool is up to each league. Most commissioners disperse the orphan teams' <strong style={{color:'#fff'}}>current-year rookie picks</strong> only — the new manager keeps their own future picks since they're in for the long haul. Some leagues include <strong style={{color:'#fff'}}>all future picks</strong> too. PFK's setup form lets you do either with a single tap.</div>
+          <div style={{color:'#888',fontSize:12}}>Once the pool is built, you share a link, each new manager claims their team, and the snake draft runs from your phone or browser.</div>
+        </div>
+      )}
       <div style={{fontSize:13,color:'#888',marginBottom:18,lineHeight:1.6}}>Set up a snake dispersal draft. Pool the rosters and picks of the teams that are re-drafting, share the link with the new managers, and they each draft on their own device.</div>
 
       {/* Mode selector */}
