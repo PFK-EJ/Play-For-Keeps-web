@@ -8,13 +8,13 @@ input, select { font-family:inherit; }
 ::-webkit-scrollbar { width:6px; }
 ::-webkit-scrollbar-track { background:#111; }
 ::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
-@keyframes pfk-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,.5);} 50%{box-shadow:0 0 0 8px rgba(255,215,0,0);} }
+@keyframes pfk-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(221,179,77,.5);} 50%{box-shadow:0 0 0 8px rgba(221,179,77,0);} }
 
 /* Dispersal bottom-sheet — drag handle and snap buttons need quick visual
    feedback on press so the user knows their tap registered. The handle bar
    itself brightens slightly on press; the snap buttons invert briefly. */
-.pfk-disp-sheet-handle:active > div { background:#FFD700 !important; box-shadow:0 0 10px rgba(255,215,0,0.65) !important; }
-.pfk-disp-sheet-snap:active { background:#1a1400 !important; color:#FFD700 !important; }
+.pfk-disp-sheet-handle:active > div { background:#DDB34D !important; box-shadow:0 0 10px rgba(221,179,77,0.65) !important; }
+.pfk-disp-sheet-snap:active { background:#1a1400 !important; color:#DDB34D !important; }
 .pfk-disp-sheet-tab:active { background:#0a0a0a !important; }
 
 /* Custom tooltips — replace native browser title delay (~1s) with instant on-brand bubble.
@@ -28,7 +28,7 @@ input, select { font-family:inherit; }
   transform:translateX(-50%);
   background:#0f0f0f;
   color:#fff;
-  border:1px solid #FFD700;
+  border:1px solid #DDB34D;
   padding:8px 12px;
   border-radius:6px;
   font-size:12px;

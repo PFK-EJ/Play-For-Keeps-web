@@ -6,11 +6,11 @@
 <title>Play For Keeps — Download</title>
 <style>
   body { background:#080808; color:#f0f0f0; font-family:'Inter','Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; margin:0; padding:20px; box-sizing:border-box; }
-  h1 { color:#FFD700; font-size:28px; letter-spacing:3px; margin-bottom:6px; text-shadow:0 0 20px #FFD70055; }
+  h1 { color:#DDB34D; font-size:28px; letter-spacing:3px; margin-bottom:6px; text-shadow:0 0 20px #DDB34D55; }
   p { color:#8B6914; font-size:13px; letter-spacing:2px; margin-bottom:40px; }
-  .btn { display:inline-block; padding:14px 32px; background:#FFD700; color:#000; font-weight:900; font-size:15px; border-radius:10px; text-decoration:none; cursor:pointer; border:none; letter-spacing:1px; margin:8px; transition:opacity 0.2s; }
+  .btn { display:inline-block; padding:14px 32px; background:#DDB34D; color:#000; font-weight:900; font-size:15px; border-radius:10px; text-decoration:none; cursor:pointer; border:none; letter-spacing:1px; margin:8px; transition:opacity 0.2s; }
   .btn:hover { opacity:0.85; }
-  .btn.secondary { background:transparent; color:#FFD700; border:2px solid #FFD700; }
+  .btn.secondary { background:transparent; color:#DDB34D; border:2px solid #DDB34D; }
   .note { color:#444; font-size:12px; margin-top:30px; max-width:500px; text-align:center; line-height:1.7; }
 </style>
 </head>
@@ -44,7 +44,7 @@ input, select { font-family:inherit; }
 <script type="text/babel">
 const { useState, useRef, useCallback } = React;
 
-const TIER_COLORS = ["#FFD700","#FFC107","#FFAA00","#E09000","#B8860B","#8B6914","#6B5010","#4a3a0a","#555","#444"];
+const TIER_COLORS = ["#DDB34D","#FFC107","#FFAA00","#E09000","#B8860B","#8B6914","#6B5010","#4a3a0a","#555","#444"];
 const POS_COLORS = { WR:"#3b82f6", RB:"#10b981", TE:"#f59e0b", QB:"#ef4444" };
 const INITIAL_TIERS = ["Untouchable","X-Factor","Super-Star","Star","Starter","Good Depth","Bench Player","Roster Clogger","Taxi Squad","Waivers"];
 
@@ -150,7 +150,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
               {isRen?(
                 <><input value={tierNameDraft} onChange={e=>setTierNameDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onRenameSave()} autoFocus
                   style={{fontSize:16,fontWeight:900,background:"#1a1200",border:"1px solid "+col,borderRadius:6,color:col,padding:"4px 10px",width:180}}/>
-                <button onPointerDown={e=>e.stopPropagation()} onClick={onRenameSave} style={{padding:"4px 12px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Save</button>
+                <button onPointerDown={e=>e.stopPropagation()} onClick={onRenameSave} style={{padding:"4px 12px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Save</button>
                 <button onPointerDown={e=>e.stopPropagation()} onClick={onRenameCancel} style={{padding:"4px 8px",background:"transparent",border:"1px solid #333",borderRadius:6,color:"#777",cursor:"pointer",fontSize:12}}>✕</button></>
               ):(
                 <><span style={{fontSize:20,fontWeight:900,color:col,textTransform:"uppercase",letterSpacing:2,flex:1}}>{item.name}</span>
@@ -168,7 +168,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
         }
         const pidx=getPlayerIndex(item.id,src),slot=slotLabel(pidx),tname=getPlayerTier(item.id,src),col=getTierColor(tname,src),isEd=editingPlayer===item.id;
         if(isEd)return(
-          <div key={item.id} style={{background:"#1a1200",border:"1px solid #FFD700",borderRadius:10,padding:"14px 16px"}}>
+          <div key={item.id} style={{background:"#1a1200",border:"1px solid #DDB34D",borderRadius:10,padding:"14px 16px"}}>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end",marginBottom:10}}>
               <div style={{display:"flex",flexDirection:"column",gap:3,flex:2,minWidth:120}}>
                 <label style={{fontSize:10,color:"#888"}}>NAME</label>
@@ -188,7 +188,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
               ))}
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={onSavePlayer} style={{padding:"7px 18px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Save</button>
+              <button onClick={onSavePlayer} style={{padding:"7px 18px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Save</button>
               <button onClick={onCancelEdit} style={{padding:"7px 12px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:12}}>Cancel</button>
             </div>
           </div>
@@ -197,7 +197,7 @@ function RenderList({src,allowEdit,onReorder,onMove,onEdit,onRemove,onRenameStar
           <div key={item.id} ref={el=>rowRefs.current[item.id]=el}
             onPointerDown={allowEdit?e=>onPD(e,item.id):undefined}
             onPointerMove={allowEdit?onPM:undefined} onPointerUp={allowEdit?onPU:undefined} onPointerCancel={allowEdit?onPU:undefined}
-            style={{background:isDrag?col+"22":isOver?"#1a1a0a":"#0f0f0f",border:"2px solid "+(isDrag?col:isOver?"#FFD70077":"#1e1e1e"),borderRadius:10,padding:"10px 14px",cursor:allowEdit?"grab":"default",userSelect:"none",opacity:isDrag?0.45:1,transform:isOver?"translateY(-2px)":"none",transition:"border-color 0.1s,transform 0.1s",boxShadow:isOver?"0 4px 14px #FFD70022":"none"}}>
+            style={{background:isDrag?col+"22":isOver?"#1a1a0a":"#0f0f0f",border:"2px solid "+(isDrag?col:isOver?"#DDB34D77":"#1e1e1e"),borderRadius:10,padding:"10px 14px",cursor:allowEdit?"grab":"default",userSelect:"none",opacity:isDrag?0.45:1,transform:isOver?"translateY(-2px)":"none",transition:"border-color 0.1s,transform 0.1s",boxShadow:isOver?"0 4px 14px #DDB34D22":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               {allowEdit&&<span style={{color:"#555",fontSize:18,flexShrink:0}}>⠿</span>}
               <span style={{width:44,textAlign:"center",fontSize:11,fontWeight:800,flexShrink:0,color:slot==="FAAB"?"#e0a800":col,letterSpacing:0.5}}>{slot}</span>
@@ -250,13 +250,13 @@ function App(){
 
   const inp=ex=>({padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:12,...ex});
   const avgAge=teamRoster.length?(teamRoster.reduce((s,p)=>s+Number(p.age||25),0)/teamRoster.length).toFixed(1):"—";
-  const grade=(()=>{let s=Math.min(picks.length*5,20)+( Number(avgAge)<=24?15:Number(avgAge)<=26?8:0);if(s>=30)return{g:"A",l:"Championship Window",c:"#FFD700"};if(s>=20)return{g:"B+",l:"Contender",c:"#FFC107"};return{g:"B",l:"Building",c:"#e0a800"};})();
+  const grade=(()=>{let s=Math.min(picks.length*5,20)+( Number(avgAge)<=24?15:Number(avgAge)<=26?8:0);if(s>=30)return{g:"A",l:"Championship Window",c:"#DDB34D"};if(s>=20)return{g:"B+",l:"Contender",c:"#FFC107"};return{g:"B",l:"Building",c:"#e0a800"};})();
 
   const FilterBar=()=>(
     <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
       <span style={{color:"#666",fontSize:12,fontWeight:700}}>POS:</span>
       {["ALL","WR","RB","TE","QB"].map(p=>(
-        <button key={p} onClick={()=>setPosFilter(p)} style={{padding:"5px 11px",borderRadius:20,fontSize:11,fontWeight:700,cursor:"pointer",border:posFilter===p?"2px solid "+(POS_COLORS[p]||"#FFD700"):"2px solid #2a2a2a",background:posFilter===p?(POS_COLORS[p]||"#FFD700")+"22":"transparent",color:posFilter===p?(POS_COLORS[p]||"#FFD700"):"#777"}}>{p}</button>
+        <button key={p} onClick={()=>setPosFilter(p)} style={{padding:"5px 11px",borderRadius:20,fontSize:11,fontWeight:700,cursor:"pointer",border:posFilter===p?"2px solid "+(POS_COLORS[p]||"#DDB34D"):"2px solid #2a2a2a",background:posFilter===p?(POS_COLORS[p]||"#DDB34D")+"22":"transparent",color:posFilter===p?(POS_COLORS[p]||"#DDB34D"):"#777"}}>{p}</button>
       ))}
     </div>
   );
@@ -265,16 +265,16 @@ function App(){
 
   return(
     <div style={{background:"#080808",minHeight:"100vh",color:"#f0f0f0",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0a0a,#1a1200,#0a0a0a)",borderBottom:"2px solid #FFD700",padding:"12px 20px"}}>
+      <div style={{background:"linear-gradient(135deg,#0a0a0a,#1a1200,#0a0a0a)",borderBottom:"2px solid #DDB34D",padding:"12px 20px"}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
           <img src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:54,height:54,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
           <div>
-            <div style={{fontSize:21,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD70055"}}>PLAY FOR KEEPS</div>
+            <div style={{fontSize:21,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D55"}}>PLAY FOR KEEPS</div>
             <div style={{fontSize:10,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Fantasy Football · Dynasty Analyzer</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
             {[["pfk","👑 PFK Ranks"],["custom","✏️ My Rankings"],["team","📋 My Team"],["outlook","🔮 Outlook"]].map(([t,l])=>(
-              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #FFD700":"2px solid #2a2a2a",background:tab===t?"#FFD700":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
+              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:8,border:tab===t?"2px solid #DDB34D":"2px solid #2a2a2a",background:tab===t?"#DDB34D":"transparent",color:tab===t?"#000":"#999",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase",letterSpacing:1}}>{l}</button>
             ))}
           </div>
         </div>
@@ -282,9 +282,9 @@ function App(){
       <div style={{maxWidth:1140,margin:"0 auto",padding:"20px 14px"}}>
         {tab==="pfk"&&(
           <div>
-            <div style={{background:"linear-gradient(90deg,#1a1200,#0a0a0a)",border:"1px solid #FFD70033",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{background:"linear-gradient(90deg,#1a1200,#0a0a0a)",border:"1px solid #DDB34D33",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
               <span style={{fontSize:18}}>👑</span>
-              <div><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:11,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class · PFK Staff Rankings</div></div>
+              <div><div style={{fontSize:14,fontWeight:900,color:"#DDB34D",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL RANKINGS</div><div style={{fontSize:11,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class · PFK Staff Rankings</div></div>
             </div>
             <FilterBar/>
             <RenderList src={PFK_LIST} allowEdit={false} {...commonProps}/>
@@ -292,24 +292,24 @@ function App(){
         )}
         {tab==="custom"&&(
           <div>
-            <div style={{background:"#111",border:"1px solid #FFD70055",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <span style={{fontSize:13,fontWeight:800,color:"#FFD700"}}>✏️ My Rankings</span>
+            <div style={{background:"#111",border:"1px solid #DDB34D55",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,fontWeight:800,color:"#DDB34D"}}>✏️ My Rankings</span>
               <span style={{fontSize:11,color:"#666",flex:1}}>Hold ⠿ to drag players or tier banners · ▲▼ nudge · tiers auto-assign</span>
-              <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#1a1200",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontWeight:700,cursor:"pointer",fontSize:12}}>+ Tier</button>
+              <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#1a1200",border:"1px solid #DDB34D",borderRadius:7,color:"#DDB34D",fontWeight:700,cursor:"pointer",fontSize:12}}>+ Tier</button>
               <button onClick={()=>setShowAdd(v=>!v)} style={{padding:"6px 12px",background:"#222",border:"1px solid #444",borderRadius:7,color:"#ccc",fontWeight:700,cursor:"pointer",fontSize:12}}>+ Player</button>
-              <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#FFD700":"#333"),borderRadius:7,color:history.length?"#FFD700":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:12}}>↩ Undo</button>
+              <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#DDB34D":"#333"),borderRadius:7,color:history.length?"#DDB34D":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:12}}>↩ Undo</button>
               <button onClick={()=>{setHistory([]);setList(buildInitialList());}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:12}}>↺ Reset</button>
             </div>
-            {showAddTier&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
+            {showAddTier&&(<div style={{background:"#111",border:"1px solid #DDB34D",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
               <input value={newTierName} onChange={e=>setNewTierName(e.target.value)} placeholder="Tier name" onKeyDown={e=>e.key==="Enter"&&addTier()} style={{flex:1,padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:13}}/>
-              <button onClick={addTier} style={{padding:"7px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Add</button>
+              <button onClick={addTier} style={{padding:"7px 16px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Add</button>
               <button onClick={()=>setShowAddTier(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:12}}>✕</button>
             </div>)}
-            {showAdd&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+            {showAdd&&(<div style={{background:"#111",border:"1px solid #DDB34D",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
               <div style={{display:"flex",flexDirection:"column",gap:3,flex:2,minWidth:110}}><label style={{fontSize:10,color:"#666"}}>NAME</label><input value={newPlayer.name} onChange={e=>setNewPlayer({...newPlayer,name:e.target.value})} placeholder="Player name" style={inp({width:"100%"})}/></div>
               <div style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:10,color:"#666"}}>POS</label><select value={newPlayer.pos} onChange={e=>setNewPlayer({...newPlayer,pos:e.target.value})} style={inp({})}>{["WR","RB","TE","QB"].map(o=><option key={o}>{o}</option>)}</select></div>
               {[["age","AGE","22"],["college","SCHOOL","School"],["nflTeam","NFL","TBD"]].map(([k,l,ph])=>(<div key={k} style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:10,color:"#666"}}>{l}</label><input value={newPlayer[k]||""} onChange={e=>setNewPlayer({...newPlayer,[k]:e.target.value})} placeholder={ph} style={inp({width:k==="college"?90:58})}/></div>))}
-              <button onClick={addNew} style={{padding:"7px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Add</button>
+              <button onClick={addNew} style={{padding:"7px 16px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>Add</button>
               <button onClick={()=>setShowAdd(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:12}}>✕</button>
             </div>)}
             <FilterBar/>
@@ -319,7 +319,7 @@ function App(){
         {tab==="team"&&(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:20}}>
             <div style={{background:"#0f0f0f",border:"1px solid #1e1e1e",borderRadius:12,padding:20}}>
-              <div style={{fontSize:13,fontWeight:900,color:"#FFD700",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>📋 Roster</div>
+              <div style={{fontSize:13,fontWeight:900,color:"#DDB34D",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>📋 Roster</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
                 {teamRoster.length===0&&<div style={{color:"#444",fontSize:13}}>No players yet.</div>}
                 {teamRoster.map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#080808",borderRadius:7,border:"1px solid #181818"}}>
@@ -333,20 +333,20 @@ function App(){
                 <input value={newTeamPlayer.name} onChange={e=>setNewTeamPlayer({...newTeamPlayer,name:e.target.value})} placeholder="Player name" style={inp({flex:2,minWidth:100})}/>
                 <select value={newTeamPlayer.pos} onChange={e=>setNewTeamPlayer({...newTeamPlayer,pos:e.target.value})} style={inp({})}>{["WR","RB","TE","QB"].map(p=><option key={p}>{p}</option>)}</select>
                 <input value={newTeamPlayer.age||""} onChange={e=>setNewTeamPlayer({...newTeamPlayer,age:e.target.value})} placeholder="Age" style={inp({width:48})}/>
-                <button onClick={()=>{if(!newTeamPlayer.name)return;setTeamRoster([...teamRoster,{...newTeamPlayer}]);setNewTeamPlayer({name:"",pos:"WR",age:"",tier:""}); }} style={{padding:"7px 13px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>+ Add</button>
+                <button onClick={()=>{if(!newTeamPlayer.name)return;setTeamRoster([...teamRoster,{...newTeamPlayer}]);setNewTeamPlayer({name:"",pos:"WR",age:"",tier:""}); }} style={{padding:"7px 13px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12}}>+ Add</button>
               </div>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div style={{background:"#0f0f0f",border:"1px solid #1e1e1e",borderRadius:12,padding:20}}>
-                <div style={{fontSize:13,fontWeight:900,color:"#FFD700",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>🎯 Draft Capital</div>
+                <div style={{fontSize:13,fontWeight:900,color:"#DDB34D",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>🎯 Draft Capital</div>
                 {picks.length===0&&<div style={{color:"#444",fontSize:13,marginBottom:12}}>No picks logged.</div>}
-                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>{picks.map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",background:"#080808",borderRadius:7,border:"1px solid #181818"}}><span style={{fontSize:13,fontWeight:700,color:"#FFD700"}}>{p.year}</span><span style={{fontSize:13,flex:1}}>{p.round} Round</span><span style={{fontSize:11,color:"#666"}}>{p.est}</span><button onClick={()=>setPicks(picks.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:"#333",cursor:"pointer"}}>✕</button></div>))}</div>
-                <button onClick={()=>setPicks([...picks,{year:2027,round:"1st",est:"Mid"}])} style={{padding:"7px 13px",background:"transparent",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontWeight:700,cursor:"pointer",fontSize:12}}>+ Add Pick</button>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>{picks.map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",background:"#080808",borderRadius:7,border:"1px solid #181818"}}><span style={{fontSize:13,fontWeight:700,color:"#DDB34D"}}>{p.year}</span><span style={{fontSize:13,flex:1}}>{p.round} Round</span><span style={{fontSize:11,color:"#666"}}>{p.est}</span><button onClick={()=>setPicks(picks.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:"#333",cursor:"pointer"}}>✕</button></div>))}</div>
+                <button onClick={()=>setPicks([...picks,{year:2027,round:"1st",est:"Mid"}])} style={{padding:"7px 13px",background:"transparent",border:"1px solid #DDB34D",borderRadius:7,color:"#DDB34D",fontWeight:700,cursor:"pointer",fontSize:12}}>+ Add Pick</button>
               </div>
               <div style={{background:"#0f0f0f",border:"1px solid #1e1e1e",borderRadius:12,padding:20}}>
-                <div style={{fontSize:13,fontWeight:900,color:"#FFD700",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>📊 Team Grades</div>
+                <div style={{fontSize:13,fontWeight:900,color:"#DDB34D",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>📊 Team Grades</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
-                  {[{l:"Grade",v:grade.g,c:grade.c,s:grade.l},{l:"Avg Age",v:avgAge,c:Number(avgAge)<=24?"#10b981":"#FFD700",s:"of roster"},{l:"Roster Size",v:teamRoster.length,c:"#FFD700",s:"players"},{l:"Draft Picks",v:picks.length,c:"#3b82f6",s:"banked"}].map(({l,v,c,s})=>(
+                  {[{l:"Grade",v:grade.g,c:grade.c,s:grade.l},{l:"Avg Age",v:avgAge,c:Number(avgAge)<=24?"#10b981":"#DDB34D",s:"of roster"},{l:"Roster Size",v:teamRoster.length,c:"#DDB34D",s:"players"},{l:"Draft Picks",v:picks.length,c:"#3b82f6",s:"banked"}].map(({l,v,c,s})=>(
                     <div key={l} style={{background:"#080808",borderRadius:8,padding:12,border:"1px solid #181818",textAlign:"center"}}>
                       <div style={{fontSize:26,fontWeight:900,color:c}}>{v}</div>
                       <div style={{fontSize:10,fontWeight:700,color:"#888",marginTop:2}}>{l}</div>
@@ -365,8 +365,8 @@ function App(){
               <div style={{fontSize:18,fontWeight:700,color:"#fff",marginTop:8}}>{grade.l}</div>
             </div>
             <div style={{background:"#0f0f0f",border:"1px solid #1e1e1e",borderRadius:12,padding:22}}>
-              <div style={{fontSize:12,fontWeight:900,color:"#FFD700",marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>📈 Position Breakdown</div>
-              {["WR","RB","TE","QB"].map(pos=>{const ps=teamRoster.filter(p=>p.pos===pos);const v=ps.length===0?{t:"⚠️ No players",c:"#ef4444"}:ps.length>=3?{t:"✅ Good depth",c:"#10b981"}:{t:"🟡 Needs depth",c:"#FFD700"};return(
+              <div style={{fontSize:12,fontWeight:900,color:"#DDB34D",marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>📈 Position Breakdown</div>
+              {["WR","RB","TE","QB"].map(pos=>{const ps=teamRoster.filter(p=>p.pos===pos);const v=ps.length===0?{t:"⚠️ No players",c:"#ef4444"}:ps.length>=3?{t:"✅ Good depth",c:"#10b981"}:{t:"🟡 Needs depth",c:"#DDB34D"};return(
                 <div key={pos} style={{display:"flex",alignItems:"center",gap:14,padding:"10px 0",borderBottom:"1px solid #181818"}}>
                   <span style={{width:34,height:34,borderRadius:7,background:POS_COLORS[pos]+"22",border:"1px solid "+POS_COLORS[pos],display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12,color:POS_COLORS[pos]}}>{pos}</span>
                   <span style={{width:60,fontSize:12,color:"#666"}}>{ps.length} player{ps.length!==1?"s":""}</span>
@@ -399,7 +399,7 @@ A web app built for **Play For Keeps Fantasy Football** — a dynasty fantasy fo
 
 ### Brand
 - **Name:** Play For Keeps Fantasy Football
-- **Colors:** Black (#080808 background) + Gold (#FFD700 primary accent)
+- **Colors:** Black (#080808 background) + Gold (#DDB34D primary accent)
 - **Logo:** https://i.imgur.com/ftHKrQX.png (hosted on Imgur — may need re-hosting)
 - **Vibe:** Sleek, dark, premium dynasty football tool
 
@@ -454,7 +454,7 @@ Default tier breaks (by player index):
 | 36 | Waivers |
 
 #### Tier Colors (in order of appearance)
-\`["#FFD700","#FFC107","#FFAA00","#E09000","#B8860B","#8B6914","#6B5010","#4a3a0a","#555","#444"]\`
+\`["#DDB34D","#FFC107","#FFAA00","#E09000","#B8860B","#8B6914","#6B5010","#4a3a0a","#555","#444"]\`
 
 ---
 

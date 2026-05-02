@@ -136,7 +136,7 @@ function SettingsToggleBar({value,onChange,compact}){
       <div style={{fontSize:11,color:'#777',letterSpacing:1,fontWeight:700,textAlign:'center'}}>{label}</div>
       <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}}>
         {choices.map(c=>(
-          <button key={c} onClick={()=>onChange({...value,[field]:c})} style={{padding:compact?'3px 8px':'5px 10px',background:current===c?'#FFD700':'transparent',color:current===c?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:13,fontWeight:700}}>{c}{suffix}</button>
+          <button key={c} onClick={()=>onChange({...value,[field]:c})} style={{padding:compact?'3px 8px':'5px 10px',background:current===c?'#DDB34D':'transparent',color:current===c?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:13,fontWeight:700}}>{c}{suffix}</button>
         ))}
       </div>
     </div>
@@ -150,7 +150,7 @@ function SettingsToggleBar({value,onChange,compact}){
   );
 }
 
-const TIER_COLORS = ["#FFD700","#FFC107","#FFAA00","#E09000","#d97706","#c2840a","#a37820","#8B6914","#a3a3a3","#7c8896"];
+const TIER_COLORS = ["#DDB34D","#FFC107","#FFAA00","#E09000","#d97706","#c2840a","#a37820","#8B6914","#a3a3a3","#7c8896"];
 const POS_COLORS = { WR:"#3b82f6", RB:"#10b981", TE:"#f59e0b", QB:"#ef4444" };
 const INITIAL_TIERS = ["Untouchable","X-Factor","Super-Star","Star","Starter","Good Depth","Bench Player","Roster Clogger","Taxi Squad","Waivers"];
 // Dynamic per-class auto-tier algorithm.
@@ -271,7 +271,7 @@ const loadStorage = (key, fallback) => {
 };
 
 const classifyTeam = (dPct, rPct) => {
-  if (dPct >= 67 && rPct >= 67)  return {label:'Dynasty',        emoji:'👑', color:'#FFD700', desc:'Dominant now and built to stay that way'};
+  if (dPct >= 67 && rPct >= 67)  return {label:'Dynasty',        emoji:'👑', color:'#DDB34D', desc:'Dominant now and built to stay that way'};
   if (rPct >= 67 && dPct < 40)   return {label:'Aging Contender', emoji:'⏰', color:'#ef4444', desc:'Championship window is closing fast'};
   if (dPct >= 67 && rPct < 40)   return {label:'Future Dynasty',  emoji:'🔮', color:'#3b82f6', desc:'Young and loaded — not competing yet'};
   if (dPct >= 50 && rPct >= 50)  return {label:'Contender',       emoji:'💪', color:'#FFC107', desc:'Real title threat with a solid future'};
@@ -285,7 +285,7 @@ const AGE_RISK_AGE = { RB: 29, WR: 29, TE: 27, QB: 31 };
 const AGE_TIERS = [
   {max:25.0, label:'Young',  desc:'Dynasty upside',   color:'#3b82f6'},
   {max:26.5, label:'Prime',  desc:'Prime window',     color:'#10b981'},
-  {max:27.5, label:'Mature', desc:'Contender window', color:'#FFD700'},
+  {max:27.5, label:'Mature', desc:'Contender window', color:'#DDB34D'},
   {max:28.5, label:'Aging',  desc:'Window closing',   color:'#f59e0b'},
   {max:999,  label:'Old',    desc:'Rebuild risk',     color:'#ef4444'},
 ];
@@ -781,7 +781,7 @@ const BAKED_FILM_ZIERLEIN = {
   michaeltrigg:6.00, tannerkoziol:5.95, johnmichaelgyllenborg:5.90, carsenryan:5.84,
 };
 const POS_TIER_BANDS = [
-  {max:5,   key:'Elite', color:'#FFD700'},
+  {max:5,   key:'Elite', color:'#DDB34D'},
   {max:12,  key:'T1',    color:'#c084fc'},
   {max:24,  key:'T2',    color:'#3b82f6'},
   {max:36,  key:'Flex',  color:'#10b981'},
@@ -816,10 +816,10 @@ const healthGrade = (pos, b) => {
   }
   return 'Critical';
 };
-const GRADE_COLOR = {Strong:'#10b981', Adequate:'#FFD700', Thin:'#f59e0b', Critical:'#ef4444'};
+const GRADE_COLOR = {Strong:'#10b981', Adequate:'#DDB34D', Thin:'#f59e0b', Critical:'#ef4444'};
 const pickTierFromStand = (standPos, n=12) => {
   const third = Math.max(1, Math.round(n/3));
-  if (standPos <= third)   return {key:'Early', color:'#FFD700'};
+  if (standPos <= third)   return {key:'Early', color:'#DDB34D'};
   if (standPos <= third*2) return {key:'Mid',   color:'#3b82f6'};
   return                        {key:'Late',  color:'#666'};
 };
@@ -1536,13 +1536,13 @@ function TeamTab() {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
           <span style={{fontSize:13,fontWeight:700,color:'#555',letterSpacing:1}}>ROSTER · {team.allPlayers.length} PLAYERS</span>
           {teamChamps>0&&(
-            <span style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',background:'#111',border:'1px solid #FFD700',borderRadius:20,fontSize:13,fontWeight:800,color:'#FFD700'}}>
+            <span style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',background:'#111',border:'1px solid #DDB34D',borderRadius:20,fontSize:13,fontWeight:800,color:'#DDB34D'}}>
               {'🏆'.repeat(Math.min(teamChamps,5))} {teamChamps} LEAGUE TITLE{teamChamps>1?'S':''}
             </span>
           )}
           {hasFc&&(
             <div style={{marginLeft:'auto',display:'flex',alignItems:'center',width:96,justifyContent:'flex-end'}}>
-              <span style={{fontSize:11,color:'#FFD700',fontWeight:700,width:44,textAlign:'right',letterSpacing:0.5}}>DYN</span>
+              <span style={{fontSize:11,color:'#DDB34D',fontWeight:700,width:44,textAlign:'right',letterSpacing:0.5}}>DYN</span>
               <span style={{fontSize:11,color:'#3b82f6',fontWeight:700,width:44,textAlign:'right',letterSpacing:0.5}}>RDFT</span>
             </div>
           )}
@@ -1565,7 +1565,7 @@ function TeamTab() {
                   if(!pr?.dRank) return null;
                   return (
                     <span style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                      <span style={{fontSize:13,color:'#FFD700',fontWeight:900,letterSpacing:0.5}}>DYN #{pr.dRank}/{n}</span>
+                      <span style={{fontSize:13,color:'#DDB34D',fontWeight:900,letterSpacing:0.5}}>DYN #{pr.dRank}/{n}</span>
                       <span style={{fontSize:13,color:'#3b82f6',fontWeight:900,letterSpacing:0.5}}>RDFT #{pr.rRank}/{n}</span>
                     </span>
                   );
@@ -1590,7 +1590,7 @@ function TeamTab() {
                   let bgCol = '#0a0a0a';
                   let tierBadge = null;
                   if (dyn===1) { borderCol = '#ff6a00'; bgCol = '#2a1400'; tierBadge = {icon:'🐐',label:'GOAT',color:'#ff6a00'}; }
-                  else if (elite) { borderCol = '#FFD700'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#FFD700'}; }
+                  else if (elite) { borderCol = '#DDB34D'; bgCol = '#1a1400'; tierBadge = {icon:'⭐',label:'ELITE',color:'#DDB34D'}; }
                   else if (dyn && dyn<=tierCfg.purple) { borderCol = '#c084fc'; tierBadge = {icon:'💎',label:'STUD',color:'#c084fc'}; }
                   else if (dyn && dyn<=tierCfg.blue)   { borderCol = '#3b82f6'; tierBadge = {icon:'💪',label:'STARTER',color:'#3b82f6'}; }
                   else if (dyn && dyn<=tierCfg.green)  { borderCol = '#10b981'; tierBadge = tierCfg.greenBadge; }
@@ -1611,13 +1611,13 @@ function TeamTab() {
                       {age && <span style={{fontSize:12,color:ageCliff?'#ef4444':agePrime?'#10b981':'#888',fontWeight:ageCliff||agePrime?900:600,flexShrink:0,whiteSpace:'nowrap'}}>{ageCliff?'🚩 ':''}Age: {age}</span>}
                       {hasFc&&(
                         <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
-                          <span style={{fontSize:12,color:'#FFD700',fontWeight:700}}>Dyn {pos}#{dyn||'NR'}</span>
+                          <span style={{fontSize:12,color:'#DDB34D',fontWeight:700}}>Dyn {pos}#{dyn||'NR'}</span>
                           <span style={{fontSize:12,color:'#3b82f6',fontWeight:700}}>Rdft {pos}#{rdft||'NR'}</span>
                         </div>
                       )}
                       {hasFc&&(
                         <div style={{marginLeft:'auto',display:'flex',flexShrink:0,alignItems:'center',width:96,justifyContent:'flex-end'}}>
-                          <span style={{fontSize:13,fontWeight:700,color:'#FFD700',width:44,textAlign:'right'}}>{dv>0?(dv/1000).toFixed(1)+'k':'—'}</span>
+                          <span style={{fontSize:13,fontWeight:700,color:'#DDB34D',width:44,textAlign:'right'}}>{dv>0?(dv/1000).toFixed(1)+'k':'—'}</span>
                           <span style={{fontSize:13,fontWeight:700,color:'#3b82f6',width:44,textAlign:'right'}}>{rv>0?(rv/1000).toFixed(1)+'k':'—'}</span>
                         </div>
                       )}
@@ -1632,9 +1632,9 @@ function TeamTab() {
         {/* Draft Capital */}
         {picks.length>0&&(
           <div style={{marginTop:4}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 10px',background:'#111',borderLeft:'3px solid #FFD700',borderRadius:'5px 5px 0 0',marginBottom:3}}>
-              <span style={{fontWeight:900,color:'#FFD700',fontSize:13,letterSpacing:1}}>DRAFT CAPITAL</span>
-              <span style={{fontSize:12,color:'#FFD700'}}>({picks.length} picks)</span>
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 10px',background:'#111',borderLeft:'3px solid #DDB34D',borderRadius:'5px 5px 0 0',marginBottom:3}}>
+              <span style={{fontWeight:900,color:'#DDB34D',fontSize:13,letterSpacing:1}}>DRAFT CAPITAL</span>
+              <span style={{fontSize:12,color:'#DDB34D'}}>({picks.length} picks)</span>
             </div>
             {Object.entries(
               picks.reduce((acc,p)=>{ if(!acc[p.year])acc[p.year]=[]; acc[p.year].push(p); return acc; },{})
@@ -1644,7 +1644,7 @@ function TeamTab() {
                 {picks.map((p,i)=>{
                   const fromTeam = !p.isOwn ? rosterNameMap[p.origRid] : null;
                   const ord = ORDINALS[p.round-1]||`${p.round}th`;
-                  const labelColor = p.round===1?'#FFD700':p.round===2?'#bbb':p.round===3?'#8B6914':'#555';
+                  const labelColor = p.round===1?'#DDB34D':p.round===2?'#bbb':p.round===3?'#8B6914':'#555';
                   const {slotValues={},futureValues={}}=fcPickMap;
                   let fcVal=0;
                   if(p.isCurrent){
@@ -1674,12 +1674,12 @@ function TeamTab() {
 
       {/* Connect Sleeper */}
       <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-        <div style={{fontSize:13,fontWeight:900,color:'#FFD700',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>🔗 Sleeper Account</div>
+        <div style={{fontSize:13,fontWeight:900,color:'#DDB34D',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>🔗 Sleeper Account</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&connectUser()}
             placeholder="Sleeper username" style={inp2({flex:1,minWidth:160})}/>
           <button onClick={connectUser} disabled={!!loading}
-            style={{padding:'7px 18px',background:'#FFD700',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13}}>
+            style={{padding:'7px 18px',background:'#DDB34D',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13}}>
             {loading==='user'||loading==='leagues'?'...':'Load Teams'}
           </button>
           {sleeperUser&&<span style={{fontSize:14,color:'#10b981',fontWeight:700}}>✓ {sleeperUser.display_name}</span>}
@@ -1690,18 +1690,18 @@ function TeamTab() {
       {/* League Picker */}
       {sleeperUser&&leagues.length>0&&(
         <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-          <div style={{fontSize:13,fontWeight:900,color:'#FFD700',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>🏈 Your Leagues · 2025</div>
+          <div style={{fontSize:13,fontWeight:900,color:'#DDB34D',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>🏈 Your Leagues · 2025</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {leagues.map(lg=>{
               const active=league?.league_id===lg.league_id;
               const arc=leagueArcs[lg.league_id];
               return (
                 <button key={lg.league_id} onClick={()=>selectLeague(lg)}
-                  style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:active?'#141414':'#080808',border:'1px solid '+(active?'#FFD700':'#222'),borderRadius:9,cursor:'pointer',textAlign:'left',width:'100%',flexWrap:'wrap'}}>
+                  style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:active?'#141414':'#080808',border:'1px solid '+(active?'#DDB34D':'#222'),borderRadius:9,cursor:'pointer',textAlign:'left',width:'100%',flexWrap:'wrap'}}>
                   {arc&&<span style={{padding:'2px 8px',borderRadius:4,fontSize:12,fontWeight:800,background:'#111',color:arc.color,border:'1px solid '+arc.color,flexShrink:0}}>{arc.emoji} {arc.label}</span>}
-                  <span style={{fontWeight:700,fontSize:13,color:active?'#FFD700':'#f0f0f0',flex:1,minWidth:120}}>{lg.name}</span>
+                  <span style={{fontWeight:700,fontSize:13,color:active?'#DDB34D':'#f0f0f0',flex:1,minWidth:120}}>{lg.name}</span>
                   <span style={{fontSize:13,color:'#555'}}>{lg.total_rosters} teams</span>
-                  {active&&<span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>●</span>}
+                  {active&&<span style={{fontSize:13,color:'#DDB34D',fontWeight:700}}>●</span>}
                 </button>
               );
             })}
@@ -1714,14 +1714,14 @@ function TeamTab() {
 
       {/* Loading */}
       {(loading==='data'||loading==='fc')&&(
-        <div style={{padding:'24px',textAlign:'center',color:'#FFD700',fontSize:13,fontWeight:700,letterSpacing:1}}>
+        <div style={{padding:'24px',textAlign:'center',color:'#DDB34D',fontSize:13,fontWeight:700,letterSpacing:1}}>
           {loading==='data'?'Loading roster data…':'Fetching player values…'}
         </div>
       )}
 
       {/* Pending-trade indicator */}
       {league && ranked.length>0 && pendingTrades>0 && (
-        <a href={`https://sleeper.com/leagues/${league.league_id}/trade`} target="_blank" rel="noopener" style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'#1a1400',border:'1px solid #FFD700',borderRadius:8,fontSize:14,fontWeight:800,color:'#FFD700',textDecoration:'none',letterSpacing:0.5,animation:'pfk-pulse 1.8s ease-in-out infinite'}}>
+        <a href={`https://sleeper.com/leagues/${league.league_id}/trade`} target="_blank" rel="noopener" style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'#1a1400',border:'1px solid #DDB34D',borderRadius:8,fontSize:14,fontWeight:800,color:'#DDB34D',textDecoration:'none',letterSpacing:0.5,animation:'pfk-pulse 1.8s ease-in-out infinite'}}>
           🔔 {pendingTrades} pending trade{pendingTrades>1?'s':''}
         </a>
       )}
@@ -1818,8 +1818,8 @@ function TeamTab() {
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:20}}>
                 {[
                   {l:'Dynasty Rank', v:`#${selTeam.dRank} / ${ranked.length}`, c:selTeam.arc.color},
-                  {l:'Redraft Rank',  v:`#${selTeam.rRank} / ${ranked.length}`, c:selTeam.rRank<=ranked.length/3?'#10b981':selTeam.rRank<=ranked.length*2/3?'#FFD700':'#ef4444'},
-                  {l:'Dynasty Value', v:(selTeam.dVal/1000).toFixed(1)+'k',     c:'#FFD700'},
+                  {l:'Redraft Rank',  v:`#${selTeam.rRank} / ${ranked.length}`, c:selTeam.rRank<=ranked.length/3?'#10b981':selTeam.rRank<=ranked.length*2/3?'#DDB34D':'#ef4444'},
+                  {l:'Dynasty Value', v:(selTeam.dVal/1000).toFixed(1)+'k',     c:'#DDB34D'},
                   {l:'Redraft Value', v:(selTeam.rVal/1000).toFixed(1)+'k',     c:'#3b82f6'},
                 ].map(({l,v,c})=>(
                   <div key={l} style={{background:'#0a0a0a',borderRadius:8,padding:'10px 12px',border:'1px solid #1e1e1e',textAlign:'center'}}>
@@ -1841,7 +1841,7 @@ function TeamTab() {
               return (
                 <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:20}}>
                   <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-                    <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age Cliff Red Flags</div>
+                    <div style={{fontSize:14,fontWeight:900,color:'#DDB34D',letterSpacing:1,marginBottom:14,textTransform:'uppercase'}}>Age Cliff Red Flags</div>
                     {flags.length===0 && <div style={{fontSize:13,color:'#10b981'}}>✓ No startable players past their cliff threshold.</div>}
                     {flags.length>0 && (
                       <div style={{display:'flex',flexDirection:'column',gap:5}}>
@@ -1858,16 +1858,16 @@ function TeamTab() {
                   </div>
                   <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-                      <span style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,textTransform:'uppercase'}}>Team-Building Suggestions</span>
+                      <span style={{fontSize:14,fontWeight:900,color:'#DDB34D',letterSpacing:1,textTransform:'uppercase'}}>Team-Building Suggestions</span>
                       <div style={{display:'flex',gap:4,marginLeft:'auto',background:'#0f0f0f',border:'1px solid #222',borderRadius:8,padding:3}}>
                         {[['contending','🥇 Contending'],['tanking','🏗️ Tanking']].map(([k,l])=>(
-                          <button key={k} onClick={()=>setSuggestionMode(k)} style={{padding:'6px 12px',background:mode===k?'#FFD700':'transparent',color:mode===k?'#000':'#888',border:'none',borderRadius:5,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:0.5}}>{l}</button>
+                          <button key={k} onClick={()=>setSuggestionMode(k)} style={{padding:'6px 12px',background:mode===k?'#DDB34D':'transparent',color:mode===k?'#000':'#888',border:'none',borderRadius:5,cursor:'pointer',fontSize:14,fontWeight:800,letterSpacing:0.5}}>{l}</button>
                         ))}
                       </div>
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:7}}>
                       {activeSugs.map((s,i)=>{
-                        const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : s.type==='tank' ? '#c084fc' : s.type==='build' ? '#10b981' : s.type==='rule' ? '#888' : '#FFD700';
+                        const col = s.type==='critical' ? '#ef4444' : s.type==='thin' ? '#f59e0b' : s.type==='age' ? '#d97706' : s.type==='window' ? '#3b82f6' : s.type==='tank' ? '#c084fc' : s.type==='build' ? '#10b981' : s.type==='rule' ? '#888' : '#DDB34D';
                         return (
                           <div key={i} style={{display:'flex',gap:12,padding:'11px 14px',background:'#0f0f0f',borderLeft:`3px solid ${col}`,borderRadius:'0 7px 7px 0'}}>
                             <span style={{fontSize:14,color:'#f0f0f0',lineHeight:1.45}}>{s.text}</span>
@@ -1889,7 +1889,7 @@ function TeamTab() {
       {ranked.length>0&&(
         <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-            <span style={{fontSize:13,fontWeight:900,color:'#FFD700',textTransform:'uppercase',letterSpacing:1}}>📊 League Standings</span>
+            <span style={{fontSize:13,fontWeight:900,color:'#DDB34D',textTransform:'uppercase',letterSpacing:1}}>📊 League Standings</span>
             <div style={{display:'flex',gap:6,marginLeft:'auto',alignItems:'center',flexWrap:'wrap'}}>
               <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}} title="Starter = only usable lineup slots count · Total = all roster players count">
                 {['starter','total'].map(m=>(
@@ -1898,7 +1898,7 @@ function TeamTab() {
               </div>
               <div style={{display:'flex',gap:2,background:'#0a0a0a',border:'1px solid #222',borderRadius:6,padding:2}}>
                 {['dynasty','redraft'].map(m=>(
-                  <button key={m} onClick={()=>setViewMode(m)} style={{padding:'4px 10px',background:viewMode===m?(m==='dynasty'?'#FFD700':'#3b82f6'):'transparent',color:viewMode===m?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:12,fontWeight:800,letterSpacing:1,textTransform:'uppercase'}}>{m}</button>
+                  <button key={m} onClick={()=>setViewMode(m)} style={{padding:'4px 10px',background:viewMode===m?(m==='dynasty'?'#DDB34D':'#3b82f6'):'transparent',color:viewMode===m?'#000':'#888',border:'none',borderRadius:4,cursor:'pointer',fontSize:12,fontWeight:800,letterSpacing:1,textTransform:'uppercase'}}>{m}</button>
                 ))}
               </div>
             </div>
@@ -1911,17 +1911,17 @@ function TeamTab() {
               const isSelected=selectedOtherRid===t.roster_id;
               const clickable=!isMe;
               return (
-                <div key={t.roster_id} className="pfk-standings-row" onClick={clickable?()=>setSelectedOtherRid(isSelected?null:t.roster_id):undefined} style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 14px',background:isSelected?'#1a1a0a':isMe?'#141414':'#0a0a0a',border:'1px solid '+(isSelected?'#FFD700':isMe?t.arc.color:'#1e1e1e'),borderRadius:9,cursor:clickable?'pointer':'default'}}>
+                <div key={t.roster_id} className="pfk-standings-row" onClick={clickable?()=>setSelectedOtherRid(isSelected?null:t.roster_id):undefined} style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 14px',background:isSelected?'#1a1a0a':isMe?'#141414':'#0a0a0a',border:'1px solid '+(isSelected?'#DDB34D':isMe?t.arc.color:'#1e1e1e'),borderRadius:9,cursor:clickable?'pointer':'default'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{fontSize:13,fontWeight:900,color:i<3?'#FFD700':'#555',width:28,flexShrink:0,textAlign:'center'}}>#{i+1}</span>
-                    <span style={{flex:1,fontSize:14,fontWeight:isMe?900:700,color:isMe?'#FFD700':'#f0f0f0',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.username}{isMe?' ★':''}</span>
+                    <span style={{fontSize:13,fontWeight:900,color:i<3?'#DDB34D':'#555',width:28,flexShrink:0,textAlign:'center'}}>#{i+1}</span>
+                    <span style={{flex:1,fontSize:14,fontWeight:isMe?900:700,color:isMe?'#DDB34D':'#f0f0f0',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.username}{isMe?' ★':''}</span>
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                     <span style={{padding:'2px 8px',fontSize:12,fontWeight:800,borderRadius:4,background:'#111',color:t.arc.color,border:'1px solid '+t.arc.color,flexShrink:0,whiteSpace:'nowrap'}}>{t.arc.emoji} {t.arc.label}</span>
                     {rings>0&&<span style={{fontSize:14,flexShrink:0,letterSpacing:1}} title={`${rings} league title${rings>1?'s':''}`}>{'🏆'.repeat(Math.min(rings,5))}</span>}
                     {fcValues.length>0&&(
                       <>
-                        <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>D {(t.dVal/1000).toFixed(1)}k</span>
+                        <span style={{fontSize:13,color:'#DDB34D',fontWeight:700}}>D {(t.dVal/1000).toFixed(1)}k</span>
                         <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>R {(t.rVal/1000).toFixed(1)}k</span>
                       </>
                     )}
@@ -1936,9 +1936,9 @@ function TeamTab() {
 
       {/* Championship History */}
       {championships.length>0&&(
-        <div style={{background:'#0f0f0f',border:'2px solid #FFD700',borderRadius:14,padding:20}}>
+        <div style={{background:'#0f0f0f',border:'2px solid #DDB34D',borderRadius:14,padding:20}}>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18,flexWrap:'wrap'}}>
-            <span style={{fontSize:13,fontWeight:900,color:'#FFD700',textTransform:'uppercase',letterSpacing:1}}>🏆 Championship History</span>
+            <span style={{fontSize:13,fontWeight:900,color:'#DDB34D',textTransform:'uppercase',letterSpacing:1}}>🏆 Championship History</span>
             <span style={{fontSize:13,color:'#555'}}>{championships.length} season{championships.length!==1?'s':''} of data</span>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -1947,11 +1947,11 @@ function TeamTab() {
               const rings=champCounts[c.ownerId]||1;
               const isDefending=i===0;
               return(
-                <div key={c.year+c.ownerId} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',background:isMe?'#141414':'#0a0a0a',border:'1px solid '+(isMe?'#FFD700':'#1e1e1e'),borderRadius:10}}>
-                  <span style={{fontSize:13,fontWeight:900,color:'#FFD700',width:40,flexShrink:0}}>{c.year}</span>
+                <div key={c.year+c.ownerId} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',background:isMe?'#141414':'#0a0a0a',border:'1px solid '+(isMe?'#DDB34D':'#1e1e1e'),borderRadius:10}}>
+                  <span style={{fontSize:13,fontWeight:900,color:'#DDB34D',width:40,flexShrink:0}}>{c.year}</span>
                   <span style={{fontSize:24,flexShrink:0}}>🏆</span>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:800,color:isMe?'#FFD700':'#f0f0f0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <div style={{fontSize:14,fontWeight:800,color:isMe?'#DDB34D':'#f0f0f0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       {c.teamName}{isMe?' ★':''}
                     </div>
                     {c.ownerName&&c.ownerName!==c.teamName&&(
@@ -1959,8 +1959,8 @@ function TeamTab() {
                     )}
                   </div>
                   <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
-                    {rings>1&&<span style={{padding:'2px 8px',background:'#111',border:'1px solid #FFD700',borderRadius:10,fontSize:12,fontWeight:800,color:'#FFD700'}}>{rings}× Champ</span>}
-                    {isDefending&&<span style={{padding:'2px 9px',background:'#FFD700',borderRadius:10,fontSize:12,fontWeight:900,color:'#000'}}>DEFENDING</span>}
+                    {rings>1&&<span style={{padding:'2px 8px',background:'#111',border:'1px solid #DDB34D',borderRadius:10,fontSize:12,fontWeight:800,color:'#DDB34D'}}>{rings}× Champ</span>}
+                    {isDefending&&<span style={{padding:'2px 9px',background:'#DDB34D',borderRadius:10,fontSize:12,fontWeight:900,color:'#000'}}>DEFENDING</span>}
                   </div>
                 </div>
               );
@@ -1982,7 +1982,7 @@ function TeamTab() {
                 <div style={{fontSize:13,color:'#666',fontWeight:700,letterSpacing:2,marginBottom:4}}>VIEWING</div>
                 <div style={{fontSize:20,fontWeight:900,color:'#f0f0f0'}}>{other.teamName}</div>
                 <div style={{display:'flex',gap:10,marginTop:4,flexWrap:'wrap'}}>
-                  <span style={{fontSize:13,color:'#FFD700',fontWeight:700}}>Dyn #{other.dRank} · {(other.dVal/1000).toFixed(1)}k</span>
+                  <span style={{fontSize:13,color:'#DDB34D',fontWeight:700}}>Dyn #{other.dRank} · {(other.dVal/1000).toFixed(1)}k</span>
                   <span style={{fontSize:13,color:'#3b82f6',fontWeight:700}}>Rdft #{other.rRank} · {(other.rVal/1000).toFixed(1)}k</span>
                 </div>
               </div>
@@ -2190,7 +2190,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
   },[onReorder]);
 
   const draggingItem=draggingId?src.find(x=>x.id===draggingId):null;
-  const DropLine=()=><div style={{height:3,background:"#FFD700",borderRadius:2,margin:"1px 2px",boxShadow:"0 0 10px #FFD700",flexShrink:0}}/>;
+  const DropLine=()=><div style={{height:3,background:"#DDB34D",borderRadius:2,margin:"1px 2px",boxShadow:"0 0 10px #DDB34D",flexShrink:0}}/>;
 
   const renderGhost=()=>{
     if(!draggingItem)return null;
@@ -2229,7 +2229,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                 {isRen?(
                   <><input value={tierNameDraft} onChange={e=>setTierNameDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onRenameSave()} autoFocus
                     style={{fontSize:16,fontWeight:900,background:"#0f0f0f",border:"1px solid "+col,borderRadius:6,color:col,padding:"4px 10px",width:180}}/>
-                  <button onPointerDown={e=>e.stopPropagation()} onClick={onRenameSave} style={{padding:"4px 12px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Save</button>
+                  <button onPointerDown={e=>e.stopPropagation()} onClick={onRenameSave} style={{padding:"4px 12px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Save</button>
                   <button onPointerDown={e=>e.stopPropagation()} onClick={onRenameCancel} style={{padding:"4px 8px",background:"transparent",border:"1px solid #333",borderRadius:6,color:"#777",cursor:"pointer",fontSize:14}}>✕</button></>
                 ):(
                   <><span style={{fontSize:20,fontWeight:900,color:col,textTransform:"uppercase",letterSpacing:2,flex:1}}>{item.name}</span>
@@ -2251,7 +2251,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
         if(isEd)return(
           <React.Fragment key={item.id}>
             {showLine&&<DropLine/>}
-            <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:10,padding:"14px 16px"}}>
+            <div style={{background:"#0f0f0f",border:"1px solid #DDB34D",borderRadius:10,padding:"14px 16px"}}>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end",marginBottom:10}}>
                 <div style={{display:"flex",flexDirection:"column",gap:3,flex:2,minWidth:120}}>
                   <label style={{fontSize:12,color:"#888"}}>NAME</label>
@@ -2271,7 +2271,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                 ))}
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button onClick={onSavePlayer} style={{padding:"7px 18px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Save</button>
+                <button onClick={onSavePlayer} style={{padding:"7px 18px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Save</button>
                 <button onClick={onCancelEdit} style={{padding:"7px 12px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:14}}>Cancel</button>
               </div>
             </div>
@@ -2291,7 +2291,7 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                 {(()=>{
                   const p=prospects&&prospects[normName(item.name)];
                   // Popover always triggerable now — every player has a position, which is enough for FF hit rate.
-                  const und={textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#FFD70088',cursor:'help'};
+                  const und={textDecorationLine:'underline',textDecorationStyle:'dotted',textUnderlineOffset:3,textDecorationColor:'#DDB34D88',cursor:'help'};
                   const handlers=hoverCapable?{
                     onMouseEnter:e=>showProspect(e,item,p),
                     onMouseLeave:hideProspect
@@ -2303,9 +2303,9 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                 })()}
                 <span className="pfk-rook-college" style={{fontSize:13,color:"#888",flexShrink:0,fontStyle:"italic"}}>{item.college}</span>
                 {draftInfo&&(
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:5,flexShrink:0}}>
+                  <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 7px',background:'#0a0a0a',border:'1px solid #DDB34D55',borderRadius:5,flexShrink:0}}>
                     <img src={`https://a.espncdn.com/i/teamlogos/nfl/500/${draftInfo.team.toLowerCase()}.png`} alt={draftInfo.team} style={{width:16,height:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display='none';}}/>
-                    <span style={{fontSize:12,fontWeight:800,color:'#FFD700',letterSpacing:0.5}}>{draftInfo.team} · {draftInfo.pick}</span>
+                    <span style={{fontSize:12,fontWeight:800,color:'#DDB34D',letterSpacing:0.5}}>{draftInfo.team} · {draftInfo.pick}</span>
                   </span>
                 )}
                 <span style={{flex:1}}/>
@@ -2333,9 +2333,9 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
                   );
                 })()}
                 {!hidePfk && (()=>{ const m=modelBreakdown(item); return (
-                  <span title={m?`PFK Score: ${m.pfk}`:'No PFK Score available'} style={{display:'inline-flex',alignItems:'baseline',gap:5,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#FFD70066':'#222'),flexShrink:0,marginRight:6}}>
+                  <span title={m?`PFK Score: ${m.pfk}`:'No PFK Score available'} style={{display:'inline-flex',alignItems:'baseline',gap:5,padding:'3px 9px',borderRadius:6,background:'#0a0a0a',border:'1px solid '+(m?'#DDB34D66':'#222'),flexShrink:0,marginRight:6}}>
                     <span style={{fontSize:10,fontWeight:800,color:'#888',letterSpacing:1}}>PFK SCORE</span>
-                    <span style={{color:m?'#FFD700':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
+                    <span style={{color:m?'#DDB34D':'#444',fontWeight:900,fontSize:14,letterSpacing:0.3,minWidth:30,textAlign:'right'}}>{m?m.pfk:'—'}</span>
                   </span>
                 ); })()}
                 {allowPlayerDrag&&<div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
@@ -2358,14 +2358,14 @@ function RenderList({src,allowEdit,autoTier,lockPlayers,lockReorder,onReorder,on
         const hr = it ? ffHitRate(it.pos, draft?.pick) : null;
         const draftLabel = draft?.pick ? (draft.pick==='UDFA' ? 'UDFA' : `${draft.team||'—'} · ${draft.pick}`) : 'Undrafted';
         const hrLabel = it?.pos && FF_HIT_RATE[it.pos] ? FF_HIT_RATE[it.pos].metric : 'Fantasy starter (first 3 yrs)';
-        const hrColor = hr==null ? '#444' : (hr>=40 ? '#10b981' : hr>=20 ? '#FFD700' : hr>=10 ? '#f59e0b' : '#ef4444');
+        const hrColor = hr==null ? '#444' : (hr>=40 ? '#10b981' : hr>=20 ? '#DDB34D' : hr>=10 ? '#f59e0b' : '#ef4444');
         return (
-          <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
+          <div style={{position:'fixed',left:popover.x,top:popover.y,zIndex:9998,background:'#0f0f0f',border:'1px solid #DDB34D',borderRadius:10,padding:12,width:240,boxShadow:'0 8px 32px rgba(0,0,0,0.85)',pointerEvents:hoverCapable?'none':'auto'}}
             onClick={e=>e.stopPropagation()}>
             {popover.prospect&&(<>
               <img src={popover.prospect.headshot} alt="" style={{width:'100%',height:180,objectFit:'cover',borderRadius:8,background:'#000'}} onError={e=>{e.currentTarget.style.display='none';}}/>
             </>)}
-            <div style={{fontWeight:900,fontSize:14,marginTop:popover.prospect?8:0,color:'#FFD700'}}>{it?.name||popover.prospect?.name||''}</div>
+            <div style={{fontWeight:900,fontSize:14,marginTop:popover.prospect?8:0,color:'#DDB34D'}}>{it?.name||popover.prospect?.name||''}</div>
             <div style={{fontSize:13,color:'#888',marginTop:2}}>{(it?.pos||popover.prospect?.position||'')} · {(it?.college||popover.prospect?.college||'')}</div>
             {popover.prospect&&(
               <div style={{display:'flex',gap:14,marginTop:8,fontSize:14,flexWrap:'wrap'}}>
@@ -2463,18 +2463,18 @@ function TradePollsTab({session,onRequestSignIn}){
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,gap:10,flexWrap:'wrap'}}>
         <div>
-          <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1}}>TRADE POLLS</div>
+          <div style={{fontSize:20,fontWeight:900,color:'#DDB34D',letterSpacing:1}}>TRADE POLLS</div>
           <div style={{fontSize:13,color:'#777',marginTop:2}}>Post a trade, vote anonymously. You can change your vote anytime.</div>
         </div>
         {session?(
-          <button onClick={()=>setShowCreate(s=>!s)} style={{padding:'10px 18px',background:'#FFD700',color:'#000',border:'none',borderRadius:8,fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>{showCreate?'✕ CANCEL':'+ NEW POLL'}</button>
+          <button onClick={()=>setShowCreate(s=>!s)} style={{padding:'10px 18px',background:'#DDB34D',color:'#000',border:'none',borderRadius:8,fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>{showCreate?'✕ CANCEL':'+ NEW POLL'}</button>
         ):(
-          <button onClick={onRequestSignIn} style={{padding:'10px 18px',background:'transparent',color:'#FFD700',border:'1px solid #FFD700',borderRadius:8,fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>SIGN IN TO POST</button>
+          <button onClick={onRequestSignIn} style={{padding:'10px 18px',background:'transparent',color:'#DDB34D',border:'1px solid #DDB34D',borderRadius:8,fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1}}>SIGN IN TO POST</button>
         )}
       </div>
 
       {showCreate&&(
-        <div style={{background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:10,padding:16,marginBottom:18}}>
+        <div style={{background:'#0f0f0f',border:'1px solid #DDB34D',borderRadius:10,padding:16,marginBottom:18}}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8,marginBottom:12}}>
             <div style={{display:'flex',flexDirection:'column',gap:3}}>
               <label style={{fontSize:12,color:'#888',letterSpacing:1}}>TEAMS</label>
@@ -2519,7 +2519,7 @@ function TradePollsTab({session,onRequestSignIn}){
           ))}
           <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
             {newOpts.length<10&&<button onClick={addOpt} style={{padding:'7px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#aaa',cursor:'pointer',fontSize:14}}>+ Option</button>}
-            <button onClick={createPoll} style={{padding:'7px 18px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,marginLeft:'auto'}}>POST POLL</button>
+            <button onClick={createPoll} style={{padding:'7px 18px',background:'#DDB34D',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,marginLeft:'auto'}}>POST POLL</button>
           </div>
           {err&&<div style={{color:'#ef4444',fontSize:14,marginTop:8}}>{err}</div>}
         </div>
@@ -2539,13 +2539,13 @@ function TradePollsTab({session,onRequestSignIn}){
                 {p.title&&<div style={{fontWeight:700,fontSize:14,marginBottom:8,color:'#eee'}}>{p.title}</div>}
                 {p.settings&&(
                   <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
-                    {p.settings.teams&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#FFD700',fontWeight:700}}>{p.settings.teams}-team</span>}
-                    {p.settings.format&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#FFD700',fontWeight:700}}>{p.settings.format}</span>}
-                    {(p.settings.ppr||p.settings.ppr===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#FFD700',fontWeight:700}}>{p.settings.ppr} PPR</span>}
-                    {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#FFD700',fontWeight:700}}>{p.settings.tep} TEP</span>}
-                    {p.settings.passTd&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#FFD700',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
-                    {p.settings.ppc>0&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#FFD700',fontWeight:700}}>{p.settings.ppc} PPC</span>}
-                    {p.settings.status&&<span style={{padding:'4px 10px',background:'#FFD700',border:'1px solid #FFD700',borderRadius:12,fontSize:13,color:'#000',fontWeight:800}}>{p.settings.status}</span>}
+                    {p.settings.teams&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#DDB34D',fontWeight:700}}>{p.settings.teams}-team</span>}
+                    {p.settings.format&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#DDB34D',fontWeight:700}}>{p.settings.format}</span>}
+                    {(p.settings.ppr||p.settings.ppr===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#DDB34D',fontWeight:700}}>{p.settings.ppr} PPR</span>}
+                    {(p.settings.tep||p.settings.tep===0)&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#DDB34D',fontWeight:700}}>{p.settings.tep} TEP</span>}
+                    {p.settings.passTd&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#DDB34D',fontWeight:700}}>{p.settings.passTd} pt pass TD</span>}
+                    {p.settings.ppc>0&&<span style={{padding:'4px 10px',background:'#1a1a1a',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#DDB34D',fontWeight:700}}>{p.settings.ppc} PPC</span>}
+                    {p.settings.status&&<span style={{padding:'4px 10px',background:'#DDB34D',border:'1px solid #DDB34D',borderRadius:12,fontSize:13,color:'#000',fontWeight:800}}>{p.settings.status}</span>}
                   </div>
                 )}
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -2553,8 +2553,8 @@ function TradePollsTab({session,onRequestSignIn}){
                     const pct=p.total>0?Math.round((p.counts[i]/p.total)*100):0;
                     const isMine=myIdx===i;
                     return (
-                      <button key={i} onClick={()=>castVote(p.id,i)} style={{position:'relative',textAlign:'left',padding:'10px 14px',background:'#0a0a0a',border:isMine?'2px solid #FFD700':'1px solid #2a2a2a',borderRadius:8,color:'#eee',cursor:'pointer',overflow:'hidden',fontSize:13,fontWeight:isMine?700:500}}>
-                        <div style={{position:'absolute',left:0,top:0,bottom:0,width:pct+'%',background:isMine?'rgba(255,215,0,0.18)':'rgba(255,255,255,0.06)',transition:'width 0.25s'}}/>
+                      <button key={i} onClick={()=>castVote(p.id,i)} style={{position:'relative',textAlign:'left',padding:'10px 14px',background:'#0a0a0a',border:isMine?'2px solid #DDB34D':'1px solid #2a2a2a',borderRadius:8,color:'#eee',cursor:'pointer',overflow:'hidden',fontSize:13,fontWeight:isMine?700:500}}>
+                        <div style={{position:'absolute',left:0,top:0,bottom:0,width:pct+'%',background:isMine?'rgba(221,179,77,0.18)':'rgba(255,255,255,0.06)',transition:'width 0.25s'}}/>
                         <div style={{position:'relative',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
                           <span>{isMine&&'✓ '}{opt}</span>
                           <span style={{fontSize:13,color:'#999',fontWeight:700,flexShrink:0}}>{p.counts[i]} · {pct}%</span>
@@ -2614,7 +2614,7 @@ function OutlookTab() {
       {dVal > 0 && (
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           {[
-            {label:'Dynasty Rank', rank:dRank, color:'#FFD700', barColor:'#FFD700'},
+            {label:'Dynasty Rank', rank:dRank, color:'#DDB34D', barColor:'#DDB34D'},
             {label:'Redraft Rank', rank:rRank, color:'#3b82f6', barColor:'#3b82f6'},
           ].map(({label,rank,color,barColor})=>(
             <div key={label} style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20,textAlign:'center'}}>
@@ -2632,7 +2632,7 @@ function OutlookTab() {
       {/* League bar chart */}
       {dVal > 0 && (
         <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-          <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:18,textTransform:'uppercase',letterSpacing:1}}>📊 Dynasty Value · Full League</div>
+          <div style={{fontSize:14,fontWeight:900,color:'#DDB34D',marginBottom:18,textTransform:'uppercase',letterSpacing:1}}>📊 Dynasty Value · Full League</div>
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {ranked.map(t => {
               const isMe = t.owner_id === sleeperUser?.user_id;
@@ -2657,7 +2657,7 @@ function OutlookTab() {
 
       {/* Archetype glossary */}
       <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:12,padding:20}}>
-        <div style={{fontSize:14,fontWeight:900,color:'#FFD700',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>📖 Archetype Guide</div>
+        <div style={{fontSize:14,fontWeight:900,color:'#DDB34D',marginBottom:14,textTransform:'uppercase',letterSpacing:1}}>📖 Archetype Guide</div>
         {[classifyTeam(80,80),classifyTeam(20,80),classifyTeam(80,20),classifyTeam(65,65),classifyTeam(55,35),classifyTeam(45,30),classifyTeam(20,20)]
           .filter((v,i,a)=>a.findIndex(x=>x.label===v.label)===i)
           .map(a=>(
@@ -2680,16 +2680,16 @@ function OutlookTab() {
 function DevAuthGate({mode, doAuth, authEmail, setAuthEmail, authPassword, setAuthPassword, authMsg, doLogout, signedInAs}){
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:20,background:'#080808',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <div style={{width:'100%',maxWidth:380,background:'#111',border:'1px solid #FFD700',borderRadius:12,padding:28}}>
+      <div style={{width:'100%',maxWidth:380,background:'#111',border:'1px solid #DDB34D',borderRadius:12,padding:28}}>
         <div style={{textAlign:'center',marginBottom:20}}>
-          <div style={{fontWeight:900,fontSize:22,letterSpacing:3,color:'#FFD700'}}>PFK DEV</div>
+          <div style={{fontWeight:900,fontSize:22,letterSpacing:3,color:'#DDB34D'}}>PFK DEV</div>
           <div style={{fontSize:13,color:'#888',marginTop:6}}>This is a private preview. Only the site owner can access it.</div>
         </div>
         {mode==='signin' && (
           <>
             <input placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} style={{width:'100%',padding:10,marginBottom:10,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
             <input type="password" placeholder="Password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doAuth()} style={{width:'100%',padding:10,marginBottom:14,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
-            <button onClick={doAuth} style={{width:'100%',padding:12,background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN IN</button>
+            <button onClick={doAuth} style={{width:'100%',padding:12,background:'#DDB34D',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN IN</button>
             {authMsg&&<div style={{color:'#ef4444',fontSize:14,marginTop:10,textAlign:'center'}}>{authMsg}</div>}
           </>
         )}
@@ -2698,7 +2698,7 @@ function DevAuthGate({mode, doAuth, authEmail, setAuthEmail, authPassword, setAu
             <div style={{padding:14,background:'#3a1010',border:'1px solid #ef4444',borderRadius:8,color:'#ef4444',fontSize:14,textAlign:'center',marginBottom:14}}>
               Access denied. Signed in as <strong>{signedInAs}</strong>.
             </div>
-            <button onClick={doLogout} style={{width:'100%',padding:12,background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN OUT</button>
+            <button onClick={doLogout} style={{width:'100%',padding:12,background:'#DDB34D',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN OUT</button>
           </>
         )}
       </div>
@@ -2770,12 +2770,12 @@ function SleeperLink(){
     const avatar = user.avatar ? `https://sleepercdn.com/avatars/thumbs/${user.avatar}` : null;
     return (
       <div data-tooltip="Your linked Sleeper account — click × to unlink"
-           style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 6px 3px 3px",background:"#0a0a0a",border:"1px solid #FFD70066",borderRadius:18}}>
+           style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 6px 3px 3px",background:"#0a0a0a",border:"1px solid #DDB34D66",borderRadius:18}}>
         {avatar
           ? <img src={avatar} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
-          : <div style={{width:22,height:22,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900,fontSize:11}}>{(user.username||'?')[0].toUpperCase()}</div>
+          : <div style={{width:22,height:22,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#DDB34D',fontWeight:900,fontSize:11}}>{(user.username||'?')[0].toUpperCase()}</div>
         }
-        <span style={{color:'#FFD700',fontWeight:800,fontSize:11,letterSpacing:0.3,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>@{user.username}</span>
+        <span style={{color:'#DDB34D',fontWeight:800,fontSize:11,letterSpacing:0.3,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>@{user.username}</span>
         <button onClick={()=>{ if(confirm('Unlink your Sleeper account?')) setUser(null); }}
                 title="Unlink Sleeper"
                 style={{background:'transparent',border:'none',color:'#666',fontSize:12,fontWeight:900,cursor:'pointer',padding:'0 4px',lineHeight:1}}>×</button>
@@ -2789,9 +2789,9 @@ function SleeperLink(){
                onKeyDown={e=>e.key==='Enter'&&submit()}
                placeholder="Sleeper username"
                disabled={busy}
-               style={{padding:'4px 8px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:11,fontFamily:'inherit',width:130}}/>
+               style={{padding:'4px 8px',background:'#0a0a0a',border:'1px solid #DDB34D66',borderRadius:6,color:'#fff',fontSize:11,fontFamily:'inherit',width:130}}/>
         <button onClick={submit} disabled={busy}
-                style={{padding:'4px 8px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:10,cursor:busy?'wait':'pointer',letterSpacing:0.5}}>{busy?'…':'GO'}</button>
+                style={{padding:'4px 8px',background:'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:10,cursor:busy?'wait':'pointer',letterSpacing:0.5}}>{busy?'…':'GO'}</button>
         <button onClick={()=>{setLinking(false); setVal(''); setErr('');}}
                 style={{background:'transparent',border:'none',color:'#888',fontSize:14,cursor:'pointer',padding:'0 4px'}}>×</button>
         {err && <span style={{color:'#ef4444',fontSize:10,marginLeft:4}}>{err}</span>}
@@ -2801,7 +2801,7 @@ function SleeperLink(){
   return (
     <button onClick={()=>{setLinking(true); setErr('');}}
             data-tooltip="Link your Sleeper account once — Trade Finder, Lookup, and other tools will use it automatically"
-            style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",fontWeight:700,fontSize:11,letterSpacing:0.3,cursor:'pointer'}}>
+            style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #DDB34D55",borderRadius:16,color:"#DDB34D",fontWeight:700,fontSize:11,letterSpacing:0.3,cursor:'pointer'}}>
       🔗 Link Sleeper
     </button>
   );
@@ -2864,10 +2864,10 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
   const twitterChip = (
     <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
        aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayforkeepsFF on X"
-       style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
-       onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
-       onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+       style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #DDB34D55",borderRadius:16,color:"#DDB34D",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
+       onMouseEnter={e=>{e.currentTarget.style.background='#DDB34D';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
+       onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#DDB34D';e.currentTarget.querySelector('svg').setAttribute('fill','#DDB34D');}}>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="#DDB34D" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
       <span>@PlayforkeepsFF</span>
     </a>
   );
@@ -2875,7 +2875,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
     <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
        aria-label="Email PFK support with feedback or bug reports"
        data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
-       style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
+       style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #DDB34D55",borderRadius:16,color:"#DDB34D",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
       📧 Email Support
     </a>
   );
@@ -2886,14 +2886,14 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
   // (other pages) keeps its left-aligned brand + nav tabs.
   if (compact) {
     return (
-      <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"6px 14px",position:"sticky",top:0,zIndex:100}}>
+      <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"6px 14px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
             <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:104,height:104,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
             <div style={{textAlign:"center"}}>
-              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700",lineHeight:1.05}}>PLAY FOR KEEPS</div>
+              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D",lineHeight:1.05}}>PLAY FOR KEEPS</div>
               {subtitle && (
-                <div style={{fontSize:11,color:"#FFD700CC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:4,textAlign:"center"}}>{subtitle}</div>
+                <div style={{fontSize:11,color:"#DDB34DCC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:4,textAlign:"center"}}>{subtitle}</div>
               )}
             </div>
           </a>
@@ -2907,14 +2907,14 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
   }
   // Default layout (non-compact pages): existing left-aligned brand + nav tabs.
   return (
-    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
+    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
       <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:10}}>
         {/* Top row: brand on left, account controls on right */}
         <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
           <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none"}}>
             <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
             <div>
-              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
+              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D"}}>PLAY FOR KEEPS</div>
               <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
             </div>
           </a>
@@ -2925,7 +2925,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
           {session ? (
             <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
           ) : (
-            <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
+            <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
           )}
         </div>
         {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line. */}
@@ -2934,7 +2934,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
             const active = isActiveTab(id);
             return (
               <a key={id} href={href} onClick={e=>handleTabClick(e,id,isInPage)} aria-label={desc} data-tooltip={desc}
-                 style={{padding:"5px 10px",borderRadius:6,border:active?"1.5px solid #FFD700":"1.5px solid #1e1e1e",background:active?"#FFD700":"transparent",color:active?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4,transition:"all .15s"}}>{label}</a>
+                 style={{padding:"5px 10px",borderRadius:6,border:active?"1.5px solid #DDB34D":"1.5px solid #1e1e1e",background:active?"#DDB34D":"transparent",color:active?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4,transition:"all .15s"}}>{label}</a>
             );
           })}
         </div>
@@ -3419,7 +3419,7 @@ function App(){
 
   const inp=ex=>({padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:14,...ex});
   const avgAge=teamRoster.length?(teamRoster.reduce((s,p)=>s+Number(p.age||25),0)/teamRoster.length).toFixed(1):"—";
-  const grade=(()=>{let s=Math.min(picks.length*5,20)+(Number(avgAge)<=24?15:Number(avgAge)<=26?8:0);if(s>=30)return{g:"A",l:"Championship Window",c:"#FFD700"};if(s>=20)return{g:"B+",l:"Contender",c:"#FFC107"};return{g:"B",l:"Building",c:"#e0a800"};})();
+  const grade=(()=>{let s=Math.min(picks.length*5,20)+(Number(avgAge)<=24?15:Number(avgAge)<=26?8:0);if(s>=30)return{g:"A",l:"Championship Window",c:"#DDB34D"};if(s>=20)return{g:"B+",l:"Contender",c:"#FFC107"};return{g:"B",l:"Building",c:"#e0a800"};})();
 
   const FilterBar=()=>(
     <div className="pfk-filter-bar" style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
@@ -3447,15 +3447,15 @@ function App(){
     <div style={{background:"#080808",minHeight:"100vh",color:"#f0f0f0",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       {authOpen&&(
         <div onClick={()=>setAuthOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:380,background:"#111",border:"1px solid #FFD700",borderRadius:12,padding:24}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:380,background:"#111",border:"1px solid #DDB34D",borderRadius:12,padding:24}}>
             <div style={{display:"flex",gap:4,marginBottom:18,background:"#0a0a0a",borderRadius:8,padding:4}}>
-              <button onClick={()=>setAuthMode('signin')} style={{flex:1,padding:"8px",background:authMode==='signin'?"#FFD700":"transparent",color:authMode==='signin'?"#000":"#888",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",fontSize:14,letterSpacing:1}}>SIGN IN</button>
-              <button onClick={()=>setAuthMode('signup')} style={{flex:1,padding:"8px",background:authMode==='signup'?"#FFD700":"transparent",color:authMode==='signup'?"#000":"#888",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",fontSize:14,letterSpacing:1}}>SIGN UP</button>
+              <button onClick={()=>setAuthMode('signin')} style={{flex:1,padding:"8px",background:authMode==='signin'?"#DDB34D":"transparent",color:authMode==='signin'?"#000":"#888",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",fontSize:14,letterSpacing:1}}>SIGN IN</button>
+              <button onClick={()=>setAuthMode('signup')} style={{flex:1,padding:"8px",background:authMode==='signup'?"#DDB34D":"transparent",color:authMode==='signup'?"#000":"#888",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",fontSize:14,letterSpacing:1}}>SIGN UP</button>
             </div>
             <input placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} style={{width:"100%",padding:10,marginBottom:10,background:"#000",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
             <input type="password" placeholder="Password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doAuth()} style={{width:"100%",padding:10,marginBottom:10,background:"#000",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
             {authMode==='signup'&&<input placeholder="Sleeper username (optional)" value={authSleeper} onChange={e=>setAuthSleeper(e.target.value)} style={{width:"100%",padding:10,marginBottom:10,background:"#000",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>}
-            <button onClick={doAuth} style={{width:"100%",padding:12,background:"#FFD700",color:"#000",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",letterSpacing:1,fontSize:14}}>{authMode==='signup'?'CREATE ACCOUNT':'SIGN IN'}</button>
+            <button onClick={doAuth} style={{width:"100%",padding:12,background:"#DDB34D",color:"#000",border:"none",borderRadius:6,fontWeight:900,cursor:"pointer",letterSpacing:1,fontSize:14}}>{authMode==='signup'?'CREATE ACCOUNT':'SIGN IN'}</button>
             {authMsg&&<div style={{color:authMsg.includes('created')?"#10b981":"#ef4444",fontSize:13,marginTop:10,textAlign:"center"}}>{authMsg}</div>}
             <div style={{textAlign:"center",marginTop:14}}><button onClick={()=>setAuthOpen(false)} style={{background:"none",border:"none",color:"#666",fontSize:13,cursor:"pointer"}}>Close</button></div>
           </div>
@@ -3467,20 +3467,20 @@ function App(){
         {/* Dispersal hero CTA — only on Rookie Ranks (the landing tab).
             Other tabs reach Dispersal via the master toolbar nav above the yellow line. */}
         {(tab==="pfk"||tab==="custom") && (
-          <a href="/dispersal" style={{display:"block",textDecoration:"none",marginBottom:18,background:"linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)",border:"2px solid #FFD700",borderRadius:14,padding:"18px 22px",boxShadow:"0 0 24px #FFD70022",transition:"all .15s"}}
-             onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,#251c00 0%,#1a1a1a 100%)";e.currentTarget.style.boxShadow="0 0 32px #FFD70044";}}
-             onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)";e.currentTarget.style.boxShadow="0 0 24px #FFD70022";}}>
+          <a href="/dispersal" style={{display:"block",textDecoration:"none",marginBottom:18,background:"linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)",border:"2px solid #DDB34D",borderRadius:14,padding:"18px 22px",boxShadow:"0 0 24px #DDB34D22",transition:"all .15s"}}
+             onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,#251c00 0%,#1a1a1a 100%)";e.currentTarget.style.boxShadow="0 0 32px #DDB34D44";}}
+             onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)";e.currentTarget.style.boxShadow="0 0 24px #DDB34D22";}}>
             <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"}}>
               <div style={{fontSize:38,flexShrink:0}}>🎲</div>
               <div style={{flex:1,minWidth:240}}>
-                <div style={{fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
+                <div style={{fontSize:18,fontWeight:900,color:"#DDB34D",letterSpacing:1.5,marginBottom:3}}>PFK DISPERSAL DRAFT</div>
                 <div style={{fontSize:13,color:"#bbb",lineHeight:1.5}}>Real-time picks, mobile-friendly, auto-pulls rosters from your Sleeper league.</div>
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-                <div style={{padding:"10px 18px",background:"#FFD700",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
+                <div style={{padding:"10px 18px",background:"#DDB34D",borderRadius:8,color:"#000",fontWeight:900,fontSize:13,letterSpacing:1.5,whiteSpace:"nowrap"}}>OPEN TOOL →</div>
                 {/* Dev-only: completed-drafts counter — live query, hidden on prod */}
                 {isDevHost() && completedDispersalCount !== null && (
-                  <div style={{fontSize:11,color:"#FFD700",fontWeight:800,letterSpacing:0.5,whiteSpace:"nowrap"}}>{completedDispersalCount.toLocaleString()} completed drafts</div>
+                  <div style={{fontSize:11,color:"#DDB34D",fontWeight:800,letterSpacing:0.5,whiteSpace:"nowrap"}}>{completedDispersalCount.toLocaleString()} completed drafts</div>
                 )}
               </div>
             </div>
@@ -3489,26 +3489,26 @@ function App(){
 
         {(tab==="pfk"||tab==="custom") && (
           <div style={{display:"inline-flex",gap:4,padding:4,background:"#0a0a0a",border:"1px solid #1e1e1e",borderRadius:8,marginBottom:14}}>
-            <button onClick={()=>setTab("pfk")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="pfk"?"#FFD700":"transparent",color:tab==="pfk"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>👑 View Official</button>
-            <button onClick={()=>setTab("custom")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="custom"?"#FFD700":"transparent",color:tab==="custom"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>✏️ Customize My Own</button>
+            <button onClick={()=>setTab("pfk")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="pfk"?"#DDB34D":"transparent",color:tab==="pfk"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>👑 View Official</button>
+            <button onClick={()=>setTab("custom")} style={{padding:"6px 14px",borderRadius:5,border:"none",background:tab==="custom"?"#DDB34D":"transparent",color:tab==="custom"?"#000":"#888",fontWeight:800,fontSize:12,cursor:"pointer",letterSpacing:0.5}}>✏️ Customize My Own</button>
           </div>
         )}
         {tab==="pfk"&&(
           <div>
-            <div style={{background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:240}}><div style={{fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL ROOKIE RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
+            <div style={{background:"#0f0f0f",border:"1px solid #DDB34D",borderRadius:12,padding:"14px 20px",marginBottom:18,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:240}}><div style={{fontSize:14,fontWeight:900,color:"#DDB34D",letterSpacing:1}}>PLAY FOR KEEPS OFFICIAL ROOKIE RANKINGS</div><div style={{fontSize:13,color:"#666",marginTop:2}}>2026 Dynasty Rookie Class{officialUpdated?" · Last updated by PFK Staff · "+new Date(officialUpdated).toLocaleString():" · PFK Staff Rankings"}</div></div>
               {isEvanOnDev && (
                 <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
                   {!editMode && <button onClick={()=>setEditMode(true)} style={{padding:'8px 14px',background:'transparent',border:'2px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>✏️ EDIT MODE</button>}
                   {editMode && <>
-                    <button onClick={officialAddTier} style={{padding:'7px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Tier</button>
+                    <button onClick={officialAddTier} style={{padding:'7px 12px',background:'transparent',border:'1px solid #DDB34D',borderRadius:6,color:'#DDB34D',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Tier</button>
                     {sameSettings(pfkSettings, DEFAULT_SETTINGS) ? (
                       <button onClick={seedOfficialFromModel} style={{padding:'7px 12px',background:'transparent',border:'1px solid #c084fc',borderRadius:6,color:'#c084fc',cursor:'pointer',fontSize:13,fontWeight:700}} title="Replace current list with the model's auto-tier output">🌱 Seed from Model</button>
                     ) : (
                       <button onClick={deriveFromMaster} style={{padding:'7px 12px',background:'transparent',border:'1px solid #06b6d4',borderRadius:6,color:'#06b6d4',cursor:'pointer',fontSize:13,fontWeight:700}} title="Rebuild this combo from the master list with position multipliers applied">🔄 Derive from Master</button>
                     )}
                     <button onClick={saveDraft} style={{padding:'7px 14px',background:'#10b981',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>💾 SAVE DRAFT</button>
-                    <button onClick={publishToProd} style={{padding:'7px 14px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🚀 PUBLISH TO PROD</button>
+                    <button onClick={publishToProd} style={{padding:'7px 14px',background:'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>🚀 PUBLISH TO PROD</button>
                     <button onClick={()=>setEditMode(false)} style={{padding:'7px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13}}>Exit</button>
                   </>}
                 </div>
@@ -3531,7 +3531,7 @@ function App(){
             <div style={{background:"#0a0a0a",border:"1px solid #1e1e1e",borderRadius:12,padding:"12px 14px",marginBottom:10}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                 <span style={{fontSize:13,fontWeight:700,color:"#555",letterSpacing:1,flexShrink:0}}>MY LISTS</span>
-                <button onClick={createList} disabled={savedLists.length>=10} style={{marginLeft:"auto",padding:"4px 12px",background:savedLists.length>=10?"#111":"#FFD700",border:"none",borderRadius:6,color:savedLists.length>=10?"#444":"#000",fontWeight:900,cursor:savedLists.length>=10?"default":"pointer",fontSize:13,flexShrink:0}}>+ New List</button>
+                <button onClick={createList} disabled={savedLists.length>=10} style={{marginLeft:"auto",padding:"4px 12px",background:savedLists.length>=10?"#111":"#DDB34D",border:"none",borderRadius:6,color:savedLists.length>=10?"#444":"#000",fontWeight:900,cursor:savedLists.length>=10?"default":"pointer",fontSize:13,flexShrink:0}}>+ New List</button>
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {savedLists.map(sl=>{
@@ -3543,10 +3543,10 @@ function App(){
                         <input autoFocus value={listNameDraft} onChange={e=>setListNameDraft(e.target.value)}
                           onKeyDown={e=>{if(e.key==="Enter"){renameList(sl.id,listNameDraft);setRenamingListId(null);}if(e.key==="Escape")setRenamingListId(null);}}
                           onBlur={()=>{renameList(sl.id,listNameDraft);setRenamingListId(null);}}
-                          style={{padding:"5px 10px",background:"#0d0d0d",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontSize:14,fontWeight:700,width:130}}/>
+                          style={{padding:"5px 10px",background:"#0d0d0d",border:"1px solid #DDB34D",borderRadius:7,color:"#DDB34D",fontSize:14,fontWeight:700,width:130}}/>
                       ):(
                         <button onClick={()=>switchList(sl.id)}
-                          style={{padding:"5px 12px",borderRadius:20,border:active?"2px solid #FFD700":"2px solid #2a2a2a",background:active?"#1a1400":"transparent",color:active?"#FFD700":"#666",fontWeight:700,fontSize:14,cursor:"pointer",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          style={{padding:"5px 12px",borderRadius:20,border:active?"2px solid #DDB34D":"2px solid #2a2a2a",background:active?"#1a1400":"transparent",color:active?"#DDB34D":"#666",fontWeight:700,fontSize:14,cursor:"pointer",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                           {sl.name}
                         </button>
                       )}
@@ -3564,12 +3564,12 @@ function App(){
               </div>
             </div>
             {/* Toolbar */}
-            <div style={{background:"#111",border:"1px solid #FFD700",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <span style={{fontSize:13,fontWeight:800,color:"#FFD700"}}>✏️ {savedLists.find(l=>l.id===activeListId)?.name||"My Rankings"}</span>
+            <div style={{background:"#111",border:"1px solid #DDB34D",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,fontWeight:800,color:"#DDB34D"}}>✏️ {savedLists.find(l=>l.id===activeListId)?.name||"My Rankings"}</span>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span style={{fontSize:11,fontWeight:800,color:"#888",letterSpacing:1}}>STARTING POINT</span>
                 <select value={sortBy} onChange={e=>applySort(e.target.value)} title="Pick a starting order — you can drag freely from there. Re-pick any time to start over."
-                  style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#FFD700",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  style={{padding:"5px 8px",background:"#0d0d0d",border:"1px solid #333",borderRadius:6,color:"#DDB34D",fontSize:13,fontWeight:700,cursor:"pointer"}}>
                   <option value="pfk">PFK Official Rankings</option>
                   <option value="draftcapital">NFL Draft Capital</option>
                   <option value="pfkmodel">PFK Rookie Model</option>
@@ -3581,22 +3581,22 @@ function App(){
                   ? <span style={{fontSize:12,color:"#10b981",fontWeight:800,letterSpacing:0.5}}>✓ Saved</span>
                   : <span style={{fontSize:12,color:"#555"}}>All changes saved</span>}
               <span style={{flex:1}}/>
-              <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#0f0f0f",border:"1px solid #FFD700",borderRadius:7,color:"#FFD700",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Tier</button>
+              <button onClick={()=>setShowAddTier(v=>!v)} style={{padding:"6px 12px",background:"#0f0f0f",border:"1px solid #DDB34D",borderRadius:7,color:"#DDB34D",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Tier</button>
               <button onClick={()=>setShowAdd(v=>!v)} style={{padding:"6px 12px",background:"#222",border:"1px solid #444",borderRadius:7,color:"#ccc",fontWeight:700,cursor:"pointer",fontSize:14}}>+ Player</button>
-              <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#FFD700":"#333"),borderRadius:7,color:history.length?"#FFD700":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:14}}>↩ Undo</button>
+              <button onClick={undo} disabled={!history.length} style={{padding:"6px 12px",background:"transparent",border:"1px solid "+(history.length?"#DDB34D":"#333"),borderRadius:7,color:history.length?"#DDB34D":"#444",fontWeight:700,cursor:history.length?"pointer":"default",fontSize:14}}>↩ Undo</button>
               <button onClick={()=>{if(!confirm('Reset to the latest published PFK rankings? Your edits to this list will be lost.')) return; setHistory([]);setList(officialList||buildInitialList()); setIsDirty(false);}} style={{padding:"6px 12px",background:"transparent",border:"1px solid #555",borderRadius:7,color:"#888",fontWeight:700,cursor:"pointer",fontSize:14}}>↺ Reset</button>
-              <button onClick={saveList} disabled={!isDirty} style={{padding:"6px 14px",background:isDirty?"#FFD700":"#1a1a1a",border:"none",borderRadius:7,color:isDirty?"#000":"#444",fontWeight:900,cursor:isDirty?"pointer":"default",fontSize:14,letterSpacing:0.5}}>💾 Save</button>
+              <button onClick={saveList} disabled={!isDirty} style={{padding:"6px 14px",background:isDirty?"#DDB34D":"#1a1a1a",border:"none",borderRadius:7,color:isDirty?"#000":"#444",fontWeight:900,cursor:isDirty?"pointer":"default",fontSize:14,letterSpacing:0.5}}>💾 Save</button>
             </div>
-            {showAddTier&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
+            {showAddTier&&(<div style={{background:"#111",border:"1px solid #DDB34D",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
               <input value={newTierName} onChange={e=>setNewTierName(e.target.value)} placeholder="Tier name" onKeyDown={e=>e.key==="Enter"&&addTier()} style={{flex:1,padding:"7px 10px",background:"#0d0d0d",border:"1px solid #333",borderRadius:7,color:"#fff",fontSize:13}}/>
-              <button onClick={addTier} style={{padding:"7px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Add</button>
+              <button onClick={addTier} style={{padding:"7px 16px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Add</button>
               <button onClick={()=>setShowAddTier(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:14}}>✕</button>
             </div>)}
-            {showAdd&&(<div style={{background:"#111",border:"1px solid #FFD700",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+            {showAdd&&(<div style={{background:"#111",border:"1px solid #DDB34D",borderRadius:10,padding:14,marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
               <div style={{display:"flex",flexDirection:"column",gap:3,flex:2,minWidth:110}}><label style={{fontSize:12,color:"#666"}}>NAME</label><input value={newPlayer.name} onChange={e=>setNewPlayer({...newPlayer,name:e.target.value})} placeholder="Player name" style={inp({width:"100%"})}/></div>
               <div style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:12,color:"#666"}}>POS</label><select value={newPlayer.pos} onChange={e=>setNewPlayer({...newPlayer,pos:e.target.value})} style={inp({})}>{["WR","RB","TE","QB"].map(o=><option key={o}>{o}</option>)}</select></div>
               {[["college","SCHOOL","School"]].map(([k,l,ph])=>(<div key={k} style={{display:"flex",flexDirection:"column",gap:3}}><label style={{fontSize:12,color:"#666"}}>{l}</label><input value={newPlayer[k]||""} onChange={e=>setNewPlayer({...newPlayer,[k]:e.target.value})} placeholder={ph} style={inp({width:120})}/></div>))}
-              <button onClick={addNew} style={{padding:"7px 16px",background:"#FFD700",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Add</button>
+              <button onClick={addNew} style={{padding:"7px 16px",background:"#DDB34D",border:"none",borderRadius:7,color:"#000",fontWeight:900,cursor:"pointer",fontSize:14}}>Add</button>
               <button onClick={()=>setShowAdd(false)} style={{padding:"7px 10px",background:"transparent",border:"1px solid #333",borderRadius:7,color:"#888",cursor:"pointer",fontSize:14}}>✕</button>
             </div>)}
             <FilterBar/>
@@ -3694,7 +3694,7 @@ function PFKvsZoltyTab({officialList:livOfficialList}){
   return (
     <div style={{padding:'16px 20px',color:'#eee'}}>
       <div style={{marginBottom:14,display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap'}}>
-        <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:1}}>PFK vs ZOLTY</div>
+        <div style={{fontSize:18,fontWeight:900,color:'#DDB34D',letterSpacing:1}}>PFK vs ZOLTY</div>
         <div style={{fontSize:12,color:'#888'}}>{rows.length} players in both lists · sorted by PFK rank · green = PFK higher · red = PFK lower</div>
       </div>
       <div className="pfk-wide-scroll" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10}}>
@@ -3713,7 +3713,7 @@ function PFKvsZoltyTab({officialList:livOfficialList}){
           <tbody>
             {rows.map((r,i)=>(
               <tr key={r.name} style={{background:i%2?'#0d0d0d':'#0f0f0f'}}>
-                <td style={{...td,textAlign:'right',fontWeight:900,color:'#FFD700'}}>{r.pfk}</td>
+                <td style={{...td,textAlign:'right',fontWeight:900,color:'#DDB34D'}}>{r.pfk}</td>
                 <td style={{...td,fontWeight:700}}>{r.name}</td>
                 <td style={td}><span style={{padding:'2px 7px',borderRadius:4,fontSize:11,fontWeight:800,background:'#111',color:POS_COLORS[r.pos]||'#888',border:'1px solid '+(POS_COLORS[r.pos]||'#333')}}>{r.pos}</span></td>
                 <td style={{...td,textAlign:'right',color:'#aaa'}}>{r.zolty}</td>
@@ -3730,7 +3730,7 @@ function PFKvsZoltyTab({officialList:livOfficialList}){
           <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 14px'}}>
             <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:'#888',marginBottom:6}}>ONLY ON PFK ({onlyPfk.length})</div>
             <div style={{fontSize:12,color:'#aaa',lineHeight:1.7}}>
-              {onlyPfk.map(p=><div key={p.name}><span style={{color:'#FFD700',fontWeight:700,display:'inline-block',width:30}}>{p.pfk}</span> {p.name} <span style={{color:'#666'}}>({p.pos})</span></div>)}
+              {onlyPfk.map(p=><div key={p.name}><span style={{color:'#DDB34D',fontWeight:700,display:'inline-block',width:30}}>{p.pfk}</span> {p.name} <span style={{color:'#666'}}>({p.pos})</span></div>)}
             </div>
           </div>
           <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 14px'}}>
@@ -3945,12 +3945,12 @@ function RookieModelTab(){
     });
   };
 
-  if(items===null) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading model...</div>;
+  if(items===null) return <div style={{padding:40,color:'#DDB34D',textAlign:'center'}}>Loading model...</div>;
 
   const cellStyle = {padding:'8px 10px', borderBottom:'1px solid #1a1a1a', fontSize:13, color:'#ddd'};
-  const headStyle = {padding:'10px 10px', background:'#0c0c0c', borderBottom:'2px solid #FFD700', fontSize:11, color:'#FFD700', fontWeight:800, letterSpacing:1, textAlign:'left', position:'sticky', top:0};
+  const headStyle = {padding:'10px 10px', background:'#0c0c0c', borderBottom:'2px solid #DDB34D', fontSize:11, color:'#DDB34D', fontWeight:800, letterSpacing:1, textAlign:'left', position:'sticky', top:0};
   const numCellStyle = {...cellStyle, textAlign:'right', cursor:'pointer'};
-  const editInputStyle = {width:60, padding:'4px 6px', background:'#000', border:'1px solid #FFD700', borderRadius:4, color:'#fff', fontSize:13, textAlign:'right'};
+  const editInputStyle = {width:60, padding:'4px 6px', background:'#000', border:'1px solid #DDB34D', borderRadius:4, color:'#fff', fontSize:13, textAlign:'right'};
   const POS_COLOR = {QB:'#ef4444', RB:'#10b981', WR:'#3b82f6', TE:'#f59e0b'};
 
   // Returns true if a field's current value differs from its baked/default state.
@@ -3994,15 +3994,15 @@ function RookieModelTab(){
     <div style={{padding:'12px 16px'}}>
       <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1a1a1a',borderRadius:10,marginBottom:12,display:'flex',alignItems:'flex-start',gap:14,flexWrap:'wrap'}}>
         <div style={{flex:1,minWidth:280}}>
-          <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>VIEWING COMBO — settings drive PFK column & per-combo override edits</div>
+          <div style={{fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:2,marginBottom:8}}>VIEWING COMBO — settings drive PFK column & per-combo override edits</div>
           <SettingsToggleBar value={modelSettings} onChange={setModelSettings}/>
           <div style={{fontSize:11,color:'#555',marginTop:6}}>Stats / DC / Film / Landing are baseline inputs and stay the same across combos. PFK column and Override apply only to the selected combo.</div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:6,minWidth:180}}>
-          <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:2}}>PUBLISH MODEL</div>
+          <div style={{fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:2}}>PUBLISH MODEL</div>
           <button onClick={onPublishModel} disabled={publishingModel || !draftDiffersFromPub} style={{
             padding:'10px 14px',
-            background: (publishingModel || !draftDiffersFromPub) ? '#222' : '#FFD700',
+            background: (publishingModel || !draftDiffersFromPub) ? '#222' : '#DDB34D',
             color: (publishingModel || !draftDiffersFromPub) ? '#666' : '#000',
             border:'none', borderRadius:8, fontWeight:900, letterSpacing:1, fontSize:13,
             cursor: (publishingModel || !draftDiffersFromPub) ? 'not-allowed' : 'pointer'
@@ -4015,13 +4015,13 @@ function RookieModelTab(){
         {['ALL','QB','RB','WR','TE'].map(p=>(
           <button key={p} onClick={()=>setPosFilter(p)} style={{
             padding:'5px 12px', borderRadius:14, fontSize:12, fontWeight:800, cursor:'pointer',
-            background: posFilter===p ? '#FFD700' : 'transparent',
+            background: posFilter===p ? '#DDB34D' : 'transparent',
             color: posFilter===p ? '#000' : '#888',
-            border: '1px solid '+(posFilter===p ? '#FFD700' : '#333'),
+            border: '1px solid '+(posFilter===p ? '#DDB34D' : '#333'),
           }}>{p}</button>
         ))}
         <span style={{flex:1}}/>
-        <button onClick={()=>setShowAdd(s=>!s)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Player</button>
+        <button onClick={()=>setShowAdd(s=>!s)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #DDB34D',borderRadius:6,color:'#DDB34D',cursor:'pointer',fontSize:13,fontWeight:700}}>+ Player</button>
         <button onClick={reseed} style={{padding:'6px 12px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#888',cursor:'pointer',fontSize:13,fontWeight:700}} title="Pull any new rookies from the roster into the model">↻ Sync roster</button>
         {msg && <span style={{fontSize:12,color: msg.startsWith('Save error')?'#ef4444':'#10b981',marginLeft:8}}>{msg}</span>}
       </div>
@@ -4039,7 +4039,7 @@ function RookieModelTab(){
             <label style={{fontSize:11,color:'#888'}}>PICK (optional, e.g. 3.05)</label>
             <input value={newP.pick} onChange={e=>setNewP({...newP,pick:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addRow()} placeholder="leave blank for UDFA" style={{padding:'7px 9px',background:'#000',border:'1px solid #333',borderRadius:5,color:'#fff',fontSize:13,width:160}}/>
           </div>
-          <button onClick={addRow} style={{padding:'8px 14px',background:'#FFD700',color:'#000',border:'none',borderRadius:5,fontWeight:900,cursor:'pointer',fontSize:13}}>Add</button>
+          <button onClick={addRow} style={{padding:'8px 14px',background:'#DDB34D',color:'#000',border:'none',borderRadius:5,fontWeight:900,cursor:'pointer',fontSize:13}}>Add</button>
           <button onClick={()=>setShowAdd(false)} style={{padding:'8px 10px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:13}}>Cancel</button>
         </div>
       )}
@@ -4059,7 +4059,7 @@ function RookieModelTab(){
               <th style={{...headStyle,width:75,textAlign:'right',color:'#aaa'}} title="Average of all populated film sources, normalized to 0-100">Film%</th>
               <th style={{...headStyle,width:75,textAlign:'center'}} title="Landing spot multiplier — 5=best (×1.08), 4 (×1.04), 3=neutral (×1.00), 2 (×0.96), 1=worst (×0.92). Default — = ×1.00 (no impact).">Landing</th>
               <th style={{...headStyle,width:75,textAlign:'right'}} title="Per-combo manual override of PFK score. Empty = use formula. Only applies to the currently-selected combo.">Override</th>
-              <th style={{...headStyle,width:75,textAlign:'right',color:'#FFD700'}} title="PFK = baseline × FORMAT × TEP × PTD multiplier (or override if set)">PFK</th>
+              <th style={{...headStyle,width:75,textAlign:'right',color:'#DDB34D'}} title="PFK = baseline × FORMAT × TEP × PTD multiplier (or override if set)">PFK</th>
               <th style={{...headStyle,width:40}}></th>
             </tr>
           </thead>
@@ -4152,7 +4152,7 @@ function RookieModelTab(){
                   {(() => {
                     const sig = settingsSig(modelSettings);
                     const isOv = it.comboOverrides?.[sig]!=null;
-                    return <td style={{...cellStyle,textAlign:'right',fontWeight:900,color: isOv?'#c084fc':'#FFD700',fontSize:14}} title={isOv?'Override active for this combo':`Auto: baseline × ${comboMultiplier(it.pos,modelSettings).toFixed(2)} combo multiplier`}>{pfk}</td>;
+                    return <td style={{...cellStyle,textAlign:'right',fontWeight:900,color: isOv?'#c084fc':'#DDB34D',fontSize:14}} title={isOv?'Override active for this combo':`Auto: baseline × ${comboMultiplier(it.pos,modelSettings).toFixed(2)} combo multiplier`}>{pfk}</td>;
                   })()}
                   <td style={{...cellStyle,textAlign:'center'}}><button onClick={()=>removeRow(it.id)} style={{background:'transparent',border:'none',color:'#444',cursor:'pointer',fontSize:16}} title="Remove from model">×</button></td>
                 </tr>
@@ -4364,19 +4364,19 @@ function AdminApp(){
     setTimeout(()=>setPublishMsg(''),4000);
   };
 
-  if(loading) return <div style={{padding:40,color:'#FFD700',textAlign:'center'}}>Loading...</div>;
+  if(loading) return <div style={{padding:40,color:'#DDB34D',textAlign:'center'}}>Loading...</div>;
 
   if(!session){
     return (
       <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
         <div style={{width:'100%',maxWidth:380,background:'#111',border:'1px solid #333',borderRadius:12,padding:28}}>
           <div style={{textAlign:'center',marginBottom:20}}>
-            <div style={{fontWeight:900,fontSize:22,letterSpacing:3,color:'#FFD700'}}>PFK ADMIN</div>
+            <div style={{fontWeight:900,fontSize:22,letterSpacing:3,color:'#DDB34D'}}>PFK ADMIN</div>
             <div style={{fontSize:13,color:'#888',marginTop:4}}>Staff login</div>
           </div>
           <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={{width:'100%',padding:10,marginBottom:10,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
           <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()} style={{width:'100%',padding:10,marginBottom:14,background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff'}}/>
-          <button onClick={login} style={{width:'100%',padding:12,background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN IN</button>
+          <button onClick={login} style={{width:'100%',padding:12,background:'#DDB34D',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',letterSpacing:1}}>SIGN IN</button>
           {loginErr&&<div style={{color:'#ef4444',fontSize:14,marginTop:10,textAlign:'center'}}>{loginErr}</div>}
           <div style={{textAlign:'center',marginTop:16}}><a href="/" style={{fontSize:13,color:'#666',textDecoration:'none'}}>← Back to site</a></div>
         </div>
@@ -4388,9 +4388,9 @@ function AdminApp(){
 
   return (
     <div style={{minHeight:'100vh',paddingBottom:40}}>
-      <div className="pfk-admin-topbar" style={{position:'sticky',top:0,zIndex:100,background:'#080808',borderBottom:'2px solid #FFD700',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+      <div className="pfk-admin-topbar" style={{position:'sticky',top:0,zIndex:100,background:'#080808',borderBottom:'2px solid #DDB34D',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
         <div>
-          <div style={{fontWeight:900,fontSize:16,letterSpacing:2,color:'#FFD700'}}>PFK ADMIN</div>
+          <div style={{fontWeight:900,fontSize:16,letterSpacing:2,color:'#DDB34D'}}>PFK ADMIN</div>
           <div style={{fontSize:12,color:'#888'}}>{session.user.email}{lastUpdated&&' · last published '+new Date(lastUpdated).toLocaleString()}</div>
         </div>
         <div className="pfk-admin-actions" style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4403,14 +4403,14 @@ function AdminApp(){
         {[['rankings','RANKINGS'],['model','ROOKIE MODEL'],['compare','PFK vs ZOLTY'],['power','POWER RANKINGS']].map(([k,label])=>(
           <button key={k} onClick={()=>setAdminTab(k)} style={{
             padding:'10px 18px', background:'transparent', border:'none',
-            borderBottom: adminTab===k ? '2px solid #FFD700' : '2px solid transparent',
-            color: adminTab===k ? '#FFD700' : '#666', fontWeight:800, fontSize:13, letterSpacing:1.5, cursor:'pointer',
+            borderBottom: adminTab===k ? '2px solid #DDB34D' : '2px solid transparent',
+            color: adminTab===k ? '#DDB34D' : '#666', fontWeight:800, fontSize:13, letterSpacing:1.5, cursor:'pointer',
           }}>{label}</button>
         ))}
       </div>
       {adminTab==='model' ? <RookieModelTab/> : adminTab==='compare' ? <PFKvsZoltyTab officialList={list}/> : adminTab==='power' ? <div style={{padding:'16px'}}><TeamTab/></div> : (<>
       <div style={{padding:'12px 16px',background:'#0a0a0a',borderBottom:'1px solid #222'}}>
-        <div style={{fontSize:12,color:'#FFD700',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
+        <div style={{fontSize:12,color:'#DDB34D',fontWeight:800,letterSpacing:2,marginBottom:8}}>RANKING SET — PICK SETTINGS, EDIT, PUBLISH</div>
         <SettingsToggleBar value={adminSettings} onChange={setAdminSettings}/>
         {adminMissing&&<div style={{fontSize:13,color:'#d97706',marginTop:8}}>⚠ No ranking published for this combo yet. Editing will start from the most recent ranking — hit PUBLISH to create a new set for these settings.</div>}
       </div>
@@ -4428,19 +4428,19 @@ function AdminApp(){
             <label style={{fontSize:12,color:'#888'}}>SCHOOL</label>
             <input value={newP.college} onChange={e=>setNewP({...newP,college:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addPlayer()} placeholder="School" style={{padding:'8px 10px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
           </div>
-          <button onClick={addPlayer} style={{padding:'9px 16px',background:'#FFD700',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:14}}>Add</button>
+          <button onClick={addPlayer} style={{padding:'9px 16px',background:'#DDB34D',color:'#000',border:'none',borderRadius:6,fontWeight:900,cursor:'pointer',fontSize:14}}>Add</button>
           <button onClick={()=>setShowAddPlayer(false)} style={{padding:'9px 12px',background:'transparent',border:'1px solid #333',borderRadius:6,color:'#888',cursor:'pointer',fontSize:14}}>Cancel</button>
         </div>
       )}
       <div className="pfk-admin-list pfk-rookie-list" style={{padding:'16px'}}>
-        <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.6}}>
-          <span style={{color:'#FFD700',fontWeight:800,letterSpacing:1,marginRight:6}}>READ-ONLY PREVIEW</span>
+        <div style={{padding:'10px 12px',background:'#0f0a00',border:'1px solid #DDB34D33',borderRadius:8,marginBottom:12,fontSize:12,color:'#888',lineHeight:1.6}}>
+          <span style={{color:'#DDB34D',fontWeight:800,letterSpacing:1,marginRight:6}}>READ-ONLY PREVIEW</span>
           This shows the model's auto-tier output for the selected combo — what the dev URL displays before any of your edits.
           <div style={{marginTop:6}}>
             <span style={{color:'#aaa',fontWeight:700}}>To edit & publish:</span> click <span style={{color:'#10b981',fontWeight:800}}>✏️ EDIT ON DEV</span> above. You'll go to the dev URL where you can drag/move/edit and then push to prod.
           </div>
           <div style={{marginTop:4}}>
-            <span style={{color:'#aaa',fontWeight:700}}>To change a player's PFK score:</span> use the <span style={{color:'#FFD700',fontWeight:800}}>ROOKIE MODEL</span> tab.
+            <span style={{color:'#aaa',fontWeight:700}}>To change a player's PFK score:</span> use the <span style={{color:'#DDB34D',fontWeight:800}}>ROOKIE MODEL</span> tab.
           </div>
         </div>
         <RenderList src={list} allowEdit={false} autoTier={true} {...commonProps}/>
@@ -5011,7 +5011,7 @@ function DispersalSetup(){
 
   const inputStyle = {width:'100%',padding:'10px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'};
   const labelStyle = {fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:6,display:'block'};
-  const selectStyle = {flex:'1 1 110px',padding:'8px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'};
+  const selectStyle = {flex:'1 1 110px',padding:'8px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#DDB34D',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'};
 
   // Shared "league info on share image" block — shown in both Sleeper and Custom modes.
   // Defined as a JSX value (NOT a child component) so React reconciles it instead of
@@ -5019,7 +5019,7 @@ function DispersalSetup(){
   // mid-keystroke and stealing focus after every character.
   const leagueInfoInputs = (
     <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:1.5}}>📸 SHOWN ON THE "SHARE DISPERSAL" IMAGE</div>
+      <div style={{fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:1.5}}>📸 SHOWN ON THE "SHARE DISPERSAL" IMAGE</div>
       <div>
         <label style={{...labelStyle,marginBottom:5}}>LEAGUE BUY-IN</label>
         <input value={buyIn} onChange={e=>setBuyIn(e.target.value)} placeholder="e.g. 250  /  FREE  /  $50 + entry trade" style={inputStyle}/>
@@ -5186,7 +5186,7 @@ function DispersalSetup(){
     <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
       {PICK_YEARS.map(y => (
         <select key={y} value="" onChange={e=>{ if(e.target.value){ addPickFromDropdown(e.target.value); e.target.value=''; } }}
-          style={{flex:'1 1 130px',padding:'7px 9px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+          style={{flex:'1 1 130px',padding:'7px 9px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#DDB34D',fontSize:12,fontWeight:700,cursor:'pointer'}}>
           <option value="">+ Add {y} pick</option>
           {setupMode==='sleeper'
             ? PICK_ROUNDS.flatMap(([rk,rl]) => [
@@ -5266,7 +5266,7 @@ function DispersalSetup(){
           year-by-year dropdowns AND the clean-slate "all teams have own picks"
           bulk button so the primary action stays uncluttered. */}
       <button type="button" onClick={()=>setShowCustomizePicks(v=>!v)}
-        style={{padding:'8px 12px',background:'transparent',border:'1px dashed #FFD70066',borderRadius:6,color:'#FFD700',fontWeight:700,cursor:'pointer',fontSize:12,letterSpacing:0.5,textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+        style={{padding:'8px 12px',background:'transparent',border:'1px dashed #DDB34D66',borderRadius:6,color:'#DDB34D',fontWeight:700,cursor:'pointer',fontSize:12,letterSpacing:0.5,textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
         <span>⚙️ Customize / add more picks</span>
         <span style={{fontSize:14}}>{showCustomizePicks ? '▲' : '▼'}</span>
       </button>
@@ -5280,7 +5280,7 @@ function DispersalSetup(){
               {PICK_YEARS.map(y => {
                 const sel = bulkPicksYears.has(y);
                 return (
-                  <button key={y} type="button" onClick={()=>toggleBulkYear(y)} style={{padding:'6px 14px',background:sel?'#FFD700':'#0a0a0a',color:sel?'#000':'#888',border:'1px solid '+(sel?'#FFD700':'#333'),borderRadius:14,fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:0.5}}>{sel?'✓ ':''}{y}</button>
+                  <button key={y} type="button" onClick={()=>toggleBulkYear(y)} style={{padding:'6px 14px',background:sel?'#DDB34D':'#0a0a0a',color:sel?'#000':'#888',border:'1px solid '+(sel?'#DDB34D':'#333'),borderRadius:14,fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:0.5}}>{sel?'✓ ':''}{y}</button>
                 );
               })}
             </div>
@@ -5297,13 +5297,13 @@ function DispersalSetup(){
               no big green slab. */}
           <div>
             <label style={{display:'flex',alignItems:'center',gap:9,cursor:'pointer',fontSize:13,color:'#ddd',fontWeight:700}}>
-              <input type="checkbox" checked={allHavePicks} onChange={e=>setAllHavePicks(e.target.checked)} style={{width:16,height:16,accentColor:'#FFD700',cursor:'pointer'}}/>
+              <input type="checkbox" checked={allHavePicks} onChange={e=>setAllHavePicks(e.target.checked)} style={{width:16,height:16,accentColor:'#DDB34D',cursor:'pointer'}}/>
               All managers have all future picks
             </label>
             {allHavePicks && (
               <div style={{marginTop:8,paddingLeft:25,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                 <button type="button" onClick={applyBulkPicks} disabled={managerCountForBulk===0 || bulkPicksYears.size===0}
-                  style={{padding:'5px 11px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'transparent':'#0a0a0a',border:'1px solid '+((managerCountForBulk===0||bulkPicksYears.size===0)?'#333':'#FFD70066'),borderRadius:5,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#555':'#FFD700',fontWeight:700,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:12,letterSpacing:0.4}}>
+                  style={{padding:'5px 11px',background:(managerCountForBulk===0||bulkPicksYears.size===0)?'transparent':'#0a0a0a',border:'1px solid '+((managerCountForBulk===0||bulkPicksYears.size===0)?'#333':'#DDB34D66'),borderRadius:5,color:(managerCountForBulk===0||bulkPicksYears.size===0)?'#555':'#DDB34D',fontWeight:700,cursor:(managerCountForBulk===0||bulkPicksYears.size===0)?'default':'pointer',fontSize:12,letterSpacing:0.4}}>
                   {managerCountForBulk===0
                     ? (isSleeperMode ? 'select managers first' : 'type managers first')
                     : bulkPicksYears.size===0
@@ -5321,15 +5321,15 @@ function DispersalSetup(){
   return (
     <div style={{maxWidth:760,margin:'24px auto',padding:'20px',color:'#eee'}}>
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18,flexWrap:'wrap'}}>
-        <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:2}}>🎲 DISPERSAL DRAFT</div>
+        <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',letterSpacing:2}}>🎲 DISPERSAL DRAFT</div>
         <button type="button" onClick={()=>setShowWhatIsDispersal(v=>!v)}
-          style={{padding:'4px 10px',background:'transparent',border:'1px solid #FFD70066',borderRadius:14,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.3}}>
+          style={{padding:'4px 10px',background:'transparent',border:'1px solid #DDB34D66',borderRadius:14,color:'#DDB34D',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.3}}>
           ⓘ {showWhatIsDispersal ? 'hide' : 'what is a dispersal draft?'}
         </button>
       </div>
       {showWhatIsDispersal && (
-        <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'14px 16px',marginBottom:14,fontSize:13,color:'#ddd',lineHeight:1.65}}>
-          <div style={{fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:8}}>WHAT IS A DISPERSAL DRAFT?</div>
+        <div style={{background:'#0f0a00',border:'1px solid #DDB34D55',borderRadius:8,padding:'14px 16px',marginBottom:14,fontSize:13,color:'#ddd',lineHeight:1.65}}>
+          <div style={{fontWeight:900,color:'#DDB34D',letterSpacing:1,marginBottom:8}}>WHAT IS A DISPERSAL DRAFT?</div>
           <div style={{marginBottom:8}}>A dispersal draft is how a fantasy league re-stocks one or more teams that have been abandoned by their previous managers. The orphaned team's players (and often their draft picks) go into a shared pool, and the new managers draft from it to build their team.</div>
           <div style={{marginBottom:8}}>What goes in the pool is up to each league. Most commissioners disperse the orphan teams' <strong style={{color:'#fff'}}>current-year rookie picks</strong> only — the new manager keeps their own future picks since they're in for the long haul. Some leagues include <strong style={{color:'#fff'}}>all future picks</strong> too. PFK's setup form lets you do either with a single tap.</div>
           <div style={{color:'#888',fontSize:12}}>Once the pool is built, you share a link, each new manager claims their team, and the snake draft runs from your phone or browser.</div>
@@ -5341,17 +5341,17 @@ function DispersalSetup(){
       <div style={{marginBottom:18}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,gap:8,flexWrap:'wrap'}}>
           <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5}}>HOW DO YOU WANT TO BUILD THE POOL?</div>
-          <button type="button" onClick={()=>setShowModeHelp(v=>!v)} style={{padding:'2px 8px',background:'transparent',border:'1px solid #FFD70055',borderRadius:12,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showModeHelp?'hide':'which mode should I pick?'}</button>
+          <button type="button" onClick={()=>setShowModeHelp(v=>!v)} style={{padding:'2px 8px',background:'transparent',border:'1px solid #DDB34D55',borderRadius:12,color:'#DDB34D',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showModeHelp?'hide':'which mode should I pick?'}</button>
         </div>
         {showModeHelp && (
-          <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:10,fontSize:12,color:'#ddd',lineHeight:1.6}}>
-            <div style={{marginBottom:6}}><strong style={{color:'#FFD700'}}>📥 SLEEPER LEAGUE ID</strong> — Fastest. Paste your Sleeper league ID and we'll auto-pull every team's roster + manager name. Pick the new managers to disperse and you're done. Best for active Sleeper leagues.</div>
-            <div><strong style={{color:'#FFD700'}}>✏️ CUSTOM</strong> — For non-Sleeper leagues (ESPN, Yahoo, MFL, etc.) or custom scenarios. Paste your player pool and manager usernames yourself. More work but works for any league.</div>
+          <div style={{background:'#0f0a00',border:'1px solid #DDB34D55',borderRadius:8,padding:'12px 14px',marginBottom:10,fontSize:12,color:'#ddd',lineHeight:1.6}}>
+            <div style={{marginBottom:6}}><strong style={{color:'#DDB34D'}}>📥 SLEEPER LEAGUE ID</strong> — Fastest. Paste your Sleeper league ID and we'll auto-pull every team's roster + manager name. Pick the new managers to disperse and you're done. Best for active Sleeper leagues.</div>
+            <div><strong style={{color:'#DDB34D'}}>✏️ CUSTOM</strong> — For non-Sleeper leagues (ESPN, Yahoo, MFL, etc.) or custom scenarios. Paste your player pool and manager usernames yourself. More work but works for any league.</div>
           </div>
         )}
         <div style={{display:'flex',gap:8,padding:6,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10}}>
-          <button onClick={()=>setSetupMode('sleeper')} style={{flex:1,padding:'10px 14px',background:setupMode==='sleeper'?'#FFD700':'transparent',border:'none',borderRadius:7,color:setupMode==='sleeper'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>📥 SLEEPER LEAGUE ID</button>
-          <button onClick={()=>setSetupMode('custom')} style={{flex:1,padding:'10px 14px',background:setupMode==='custom'?'#FFD700':'transparent',border:'none',borderRadius:7,color:setupMode==='custom'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>✏️ CUSTOM</button>
+          <button onClick={()=>setSetupMode('sleeper')} style={{flex:1,padding:'10px 14px',background:setupMode==='sleeper'?'#DDB34D':'transparent',border:'none',borderRadius:7,color:setupMode==='sleeper'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>📥 SLEEPER LEAGUE ID</button>
+          <button onClick={()=>setSetupMode('custom')} style={{flex:1,padding:'10px 14px',background:setupMode==='custom'?'#DDB34D':'transparent',border:'none',borderRadius:7,color:setupMode==='custom'?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>✏️ CUSTOM</button>
         </div>
       </div>
 
@@ -5367,8 +5367,8 @@ function DispersalSetup(){
             <label style={labelStyle}>YOUR LEAGUES <span style={{color:'#10b981',fontWeight:700,fontSize:10,letterSpacing:1.5,marginLeft:6}}>· FASTEST</span></label>
             {!sleeperLinkedUser && (
               <>
-                <div style={{padding:'10px 12px',background:'#1a1400',border:'1px dashed #FFD70066',borderRadius:8}}>
-                  <div style={{fontSize:12,color:'#FFD700CC',marginBottom:8,lineHeight:1.5}}>
+                <div style={{padding:'10px 12px',background:'#1a1400',border:'1px dashed #DDB34D66',borderRadius:8}}>
+                  <div style={{fontSize:12,color:'#DDB34DCC',marginBottom:8,lineHeight:1.5}}>
                     💡 Link your Sleeper username for easy league select.
                   </div>
                   <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -5389,9 +5389,9 @@ function DispersalSetup(){
                               page past the top of the dispersal form. The full autofill-off
                               combo (autoComplete off + neutral name + 1p/lp ignore hints)
                               tells iOS, 1Password, and LastPass to leave this field alone. */
-                           style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
+                           style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #DDB34D66',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
                     <button onClick={inlineLinkSubmit} disabled={inlineLinkBusy}
-                            style={{padding:'10px 18px',background:inlineLinkBusy?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:inlineLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>
+                            style={{padding:'10px 18px',background:inlineLinkBusy?'#444':'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:inlineLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>
                       {inlineLinkBusy ? '…' : '🔗 LINK'}
                     </button>
                   </div>
@@ -5432,9 +5432,9 @@ function DispersalSetup(){
             <label style={labelStyle}>SLEEPER LEAGUE ID</label>
             <div style={{display:'flex',gap:8}}>
               <input value={sleeperId} onChange={e=>setSleeperId(e.target.value)} onKeyDown={e=>e.key==='Enter'&&fetchSleeperLeague()} placeholder="e.g. 1042739852394871234" style={{...inputStyle,fontFamily:'monospace'}}/>
-              <button type="button" onClick={fetchSleeperLeague} disabled={sleeperLoading} style={{padding:'10px 18px',background:sleeperLoading?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:sleeperLoading?'default':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>{sleeperLoading?'…':'FETCH'}</button>
+              <button type="button" onClick={fetchSleeperLeague} disabled={sleeperLoading} style={{padding:'10px 18px',background:sleeperLoading?'#444':'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:sleeperLoading?'default':'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap'}}>{sleeperLoading?'…':'FETCH'}</button>
             </div>
-            <div style={{fontSize:11,color:'#666',marginTop:5}}>Long number from <code style={{color:'#FFD700'}}>sleeper.com/leagues/&lt;id&gt;</code>{!sleeperLinkedUser && <> · or <strong style={{color:'#FFD700'}}>link Sleeper in the toolbar above</strong> to pick from a dropdown</>}</div>
+            <div style={{fontSize:11,color:'#666',marginTop:5}}>Long number from <code style={{color:'#DDB34D'}}>sleeper.com/leagues/&lt;id&gt;</code>{!sleeperLinkedUser && <> · or <strong style={{color:'#DDB34D'}}>link Sleeper in the toolbar above</strong> to pick from a dropdown</>}</div>
           </div>
           {leagueInfoInputs}
           <div>
@@ -5448,10 +5448,10 @@ function DispersalSetup(){
               <div>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
                   <label style={{...labelStyle,marginBottom:0}}>CHOOSE TEAMS & ROSTERS TO INCLUDE · {sleeperSelected.size} of {(sleeperData.rosters||[]).length} selected</label>
-                  <button type="button" onClick={()=>setShowTeamsHelp(v=>!v)} title="What does this do?" style={{padding:'2px 8px',background:'transparent',border:'1px solid #FFD70055',borderRadius:12,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showTeamsHelp?'hide':'what is this?'}</button>
+                  <button type="button" onClick={()=>setShowTeamsHelp(v=>!v)} title="What does this do?" style={{padding:'2px 8px',background:'transparent',border:'1px solid #DDB34D55',borderRadius:12,color:'#DDB34D',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showTeamsHelp?'hide':'what is this?'}</button>
                 </div>
                 {showTeamsHelp && (
-                  <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
+                  <div style={{background:'#0f0a00',border:'1px solid #DDB34D55',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
                     Every team you check below will be part of the dispersal. Their entire current roster goes into the draft pool. After you create the draft, share the link with the league and each manager clicks CLAIM next to their team.
                   </div>
                 )}
@@ -5469,7 +5469,7 @@ function DispersalSetup(){
                           setSleeperSelected(next);
                         }} style={{color:sel?'#10b981':'#666',fontSize:18,cursor:'pointer',userSelect:'none'}}>{sel?'☑':'☐'}</span>
                         <div style={{flex:'1 1 130px',minWidth:120}}>
-                          <input value={sleeperUsernames[r.roster_id]||''} onChange={e=>setSleeperUsernames({...sleeperUsernames,[r.roster_id]:e.target.value})} disabled={!sel} placeholder="manager username" style={{width:'100%',padding:'5px 8px',background:'#000',border:'1px solid '+(sel?'#FFD700':'#222'),borderRadius:5,color:sel?'#FFD700':'#666',fontSize:13,fontWeight:700}}/>
+                          <input value={sleeperUsernames[r.roster_id]||''} onChange={e=>setSleeperUsernames({...sleeperUsernames,[r.roster_id]:e.target.value})} disabled={!sel} placeholder="manager username" style={{width:'100%',padding:'5px 8px',background:'#000',border:'1px solid '+(sel?'#DDB34D':'#222'),borderRadius:5,color:sel?'#DDB34D':'#666',fontSize:13,fontWeight:700}}/>
                           <div style={{fontSize:10,color:'#666',marginTop:3}}>{playerCount} players · roster #{r.roster_id} {orphan && <span style={{color:'#f59e0b',fontWeight:800,marginLeft:4}}>· ORPHAN</span>} {owner && <span>· originally {owner.display_name||owner.username}</span>}</div>
                         </div>
                       </div>
@@ -5483,10 +5483,10 @@ function DispersalSetup(){
           <div>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,gap:8,flexWrap:'wrap'}}>
               <label style={{...labelStyle,marginBottom:0}}>FUTURE PICKS (optional)</label>
-              <button type="button" onClick={()=>setShowPicksHelp(v=>!v)} style={{padding:'2px 8px',background:'transparent',border:'1px solid #FFD70055',borderRadius:12,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showPicksHelp?'hide':'what goes here?'}</button>
+              <button type="button" onClick={()=>setShowPicksHelp(v=>!v)} style={{padding:'2px 8px',background:'transparent',border:'1px solid #DDB34D55',borderRadius:12,color:'#DDB34D',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showPicksHelp?'hide':'what goes here?'}</button>
             </div>
             {showPicksHelp && (
-              <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
+              <div style={{background:'#0f0a00',border:'1px solid #DDB34D55',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
                 Sleeper doesn't track future picks reliably, so add them here manually. These get pooled alongside the players and can be drafted just like any other asset.
                 <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add draft picks fast.</div>
               </div>
@@ -5498,13 +5498,13 @@ function DispersalSetup(){
             <div>
               <label style={labelStyle}>FORMAT</label>
               <div style={{display:'flex',gap:6}}>
-                <button onClick={()=>setSnake(true)} style={{padding:'8px 14px',background:snake?'#FFD700':'#0a0a0a',color:snake?'#000':'#888',border:'1px solid '+(snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>🐍 Snake</button>
-                <button onClick={()=>setSnake(false)} style={{padding:'8px 14px',background:!snake?'#FFD700':'#0a0a0a',color:!snake?'#000':'#888',border:'1px solid '+(!snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>↓ Linear</button>
+                <button onClick={()=>setSnake(true)} style={{padding:'8px 14px',background:snake?'#DDB34D':'#0a0a0a',color:snake?'#000':'#888',border:'1px solid '+(snake?'#DDB34D':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>🐍 Snake</button>
+                <button onClick={()=>setSnake(false)} style={{padding:'8px 14px',background:!snake?'#DDB34D':'#0a0a0a',color:!snake?'#000':'#888',border:'1px solid '+(!snake?'#DDB34D':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>↓ Linear</button>
               </div>
             </div>
             <div>
               <label style={labelStyle}>TIMER PER PICK</label>
-              <select value={timer} onChange={e=>setTimer(e.target.value)} style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#FFD700',fontSize:13,fontWeight:800,cursor:'pointer',minWidth:160}}>
+              <select value={timer} onChange={e=>setTimer(e.target.value)} style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#DDB34D',fontSize:13,fontWeight:800,cursor:'pointer',minWidth:160}}>
                 <option value="off">None (no clock)</option>
                 <option value="30m">30 minutes</option>
                 <option value="1h">1 hour</option>
@@ -5525,7 +5525,7 @@ function DispersalSetup(){
             <div>
               <label style={labelStyle}>SHARE</label>
               <button onClick={sharePoolImage} disabled={poolShareBusy||!sleeperData||sleeperSelected.size===0} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft"
-                style={{padding:'8px 14px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#FFD700'),borderRadius:6,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#FFD700',fontWeight:800,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13}}>{poolShareBusy?'BUILDING…':'📸 SHARE DISPERSAL'}</button>
+                style={{padding:'8px 14px',background:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#222':'transparent',border:'1px solid '+((poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#444':'#DDB34D'),borderRadius:6,color:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'#666':'#DDB34D',fontWeight:800,cursor:(poolShareBusy||!sleeperData||sleeperSelected.size===0)?'default':'pointer',fontSize:13}}>{poolShareBusy?'BUILDING…':'📸 SHARE DISPERSAL'}</button>
             </div>
           </div>
           {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
@@ -5543,17 +5543,17 @@ function DispersalSetup(){
         <div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:8}}>
             <label style={{...labelStyle,marginBottom:0}}>PLAYER POOL (one player per line)</label>
-            <button onClick={()=>setSleeperOpen(true)} type="button" style={{padding:'5px 11px',background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>📥 IMPORT FROM SLEEPER</button>
+            <button onClick={()=>setSleeperOpen(true)} type="button" style={{padding:'5px 11px',background:'#0f0f0f',border:'1px solid #DDB34D',borderRadius:6,color:'#DDB34D',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>📥 IMPORT FROM SLEEPER</button>
           </div>
           <textarea value={poolText} onChange={e=>setPoolText(e.target.value)} placeholder={`Justin Jefferson\nBijan Robinson\n...`} rows={8} style={{...inputStyle,fontFamily:'monospace',resize:'vertical'}}/>
         </div>
         <div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,gap:8,flexWrap:'wrap'}}>
             <label style={{...labelStyle,marginBottom:0}}>FUTURE PICKS (optional)</label>
-            <button type="button" onClick={()=>setShowPicksHelp(v=>!v)} style={{padding:'2px 8px',background:'transparent',border:'1px solid #FFD70055',borderRadius:12,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showPicksHelp?'hide':'what goes here?'}</button>
+            <button type="button" onClick={()=>setShowPicksHelp(v=>!v)} style={{padding:'2px 8px',background:'transparent',border:'1px solid #DDB34D55',borderRadius:12,color:'#DDB34D',cursor:'pointer',fontSize:11,fontWeight:800}}>ⓘ {showPicksHelp?'hide':'what goes here?'}</button>
           </div>
           {showPicksHelp && (
-            <div style={{background:'#0f0a00',border:'1px solid #FFD70055',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
+            <div style={{background:'#0f0a00',border:'1px solid #DDB34D55',borderRadius:8,padding:'12px 14px',marginBottom:8,fontSize:12,color:'#ddd',lineHeight:1.6}}>
               Sleeper doesn't track future picks reliably, so add them here manually. These get pooled alongside the players and can be drafted just like any other asset.
               <div style={{marginTop:6,color:'#aaa'}}>Use the year dropdowns to add draft picks fast.</div>
             </div>
@@ -5570,15 +5570,15 @@ function DispersalSetup(){
           <div>
             <label style={labelStyle}>FORMAT</label>
             <div style={{display:'flex',gap:6}}>
-              <button onClick={()=>setSnake(true)} style={{padding:'8px 14px',background:snake?'#FFD700':'#0a0a0a',color:snake?'#000':'#888',border:'1px solid '+(snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>🐍 Snake</button>
-              <button onClick={()=>setSnake(false)} style={{padding:'8px 14px',background:!snake?'#FFD700':'#0a0a0a',color:!snake?'#000':'#888',border:'1px solid '+(!snake?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>↓ Linear</button>
+              <button onClick={()=>setSnake(true)} style={{padding:'8px 14px',background:snake?'#DDB34D':'#0a0a0a',color:snake?'#000':'#888',border:'1px solid '+(snake?'#DDB34D':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>🐍 Snake</button>
+              <button onClick={()=>setSnake(false)} style={{padding:'8px 14px',background:!snake?'#DDB34D':'#0a0a0a',color:!snake?'#000':'#888',border:'1px solid '+(!snake?'#DDB34D':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>↓ Linear</button>
             </div>
           </div>
           <div>
             <label style={labelStyle}>TIMER PER PICK</label>
             <div style={{display:'flex',gap:6}}>
               {[['off','None'],['4h','4 hrs'],['8h','8 hrs']].map(([k,l])=>(
-                <button key={k} onClick={()=>setTimer(k)} style={{padding:'8px 14px',background:timer===k?'#FFD700':'#0a0a0a',color:timer===k?'#000':'#888',border:'1px solid '+(timer===k?'#FFD700':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>{l}</button>
+                <button key={k} onClick={()=>setTimer(k)} style={{padding:'8px 14px',background:timer===k?'#DDB34D':'#0a0a0a',color:timer===k?'#000':'#888',border:'1px solid '+(timer===k?'#DDB34D':'#333'),borderRadius:6,fontWeight:800,cursor:'pointer',fontSize:13}}>{l}</button>
               ))}
             </div>
             <div style={{fontSize:11,color:'#666',marginTop:5}}>When a pick clock expires, the draft pauses for the commish to advance.</div>
@@ -5588,7 +5588,7 @@ function DispersalSetup(){
           <div>
             <label style={labelStyle}>SHARE</label>
             <button onClick={sharePoolImage} disabled={poolShareBusy||(!poolText.trim()&&!picksText.trim())} title="Save a PFK-branded image of the pool to advertise the league on Twitter/Discord BEFORE creating the draft"
-              style={{padding:'8px 14px',background:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#222':'transparent',border:'1px solid '+((poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#444':'#FFD700'),borderRadius:6,color:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#666':'#FFD700',fontWeight:800,cursor:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'default':'pointer',fontSize:13}}>{poolShareBusy?'BUILDING…':'📸 SHARE DISPERSAL'}</button>
+              style={{padding:'8px 14px',background:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#222':'transparent',border:'1px solid '+((poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#444':'#DDB34D'),borderRadius:6,color:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'#666':'#DDB34D',fontWeight:800,cursor:(poolShareBusy||(!poolText.trim()&&!picksText.trim()))?'default':'pointer',fontSize:13}}>{poolShareBusy?'BUILDING…':'📸 SHARE DISPERSAL'}</button>
           </div>
         </div>
         {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13}}>{err}</div>}
@@ -5601,15 +5601,15 @@ function DispersalSetup(){
         const usersById = {}; (sleeperData?.users||[]).forEach(u=>{ usersById[u.user_id]=u; });
         return (
           <div onClick={()=>setSleeperOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:540,maxHeight:'90vh',overflowY:'auto',background:'#0f0f0f',border:'1px solid #FFD700',borderRadius:12,padding:'18px 22px'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:540,maxHeight:'90vh',overflowY:'auto',background:'#0f0f0f',border:'1px solid #DDB34D',borderRadius:12,padding:'18px 22px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                <div style={{fontWeight:900,fontSize:16,letterSpacing:1.5,color:'#FFD700'}}>📥 IMPORT FROM SLEEPER</div>
+                <div style={{fontWeight:900,fontSize:16,letterSpacing:1.5,color:'#DDB34D'}}>📥 IMPORT FROM SLEEPER</div>
                 <button onClick={()=>setSleeperOpen(false)} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
               </div>
-              <div style={{fontSize:12,color:'#888',marginBottom:10,lineHeight:1.5}}>Paste your Sleeper league ID (the long number from <code style={{color:'#FFD700'}}>sleeper.com/leagues/&lt;id&gt;</code>). We'll pull the team list. Pick the orphaned teams to import their rosters into the pool.</div>
+              <div style={{fontSize:12,color:'#888',marginBottom:10,lineHeight:1.5}}>Paste your Sleeper league ID (the long number from <code style={{color:'#DDB34D'}}>sleeper.com/leagues/&lt;id&gt;</code>). We'll pull the team list. Pick the orphaned teams to import their rosters into the pool.</div>
               <div style={{display:'flex',gap:8,marginBottom:14}}>
                 <input value={sleeperId} onChange={e=>setSleeperId(e.target.value)} onKeyDown={e=>e.key==='Enter'&&fetchSleeperLeague()} placeholder="Sleeper league ID" style={{flex:1,padding:'10px 12px',background:'#000',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'monospace'}}/>
-                <button onClick={fetchSleeperLeague} disabled={sleeperLoading} style={{padding:'10px 16px',background:sleeperLoading?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:sleeperLoading?'default':'pointer',fontSize:13,letterSpacing:1}}>{sleeperLoading?'…':'FETCH'}</button>
+                <button onClick={fetchSleeperLeague} disabled={sleeperLoading} style={{padding:'10px 16px',background:sleeperLoading?'#444':'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:sleeperLoading?'default':'pointer',fontSize:13,letterSpacing:1}}>{sleeperLoading?'…':'FETCH'}</button>
               </div>
               {sleeperErr && <div style={{padding:'8px 12px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:12,marginBottom:12}}>{sleeperErr}</div>}
               {sleeperData && (
@@ -5697,15 +5697,15 @@ function DispersalSetup(){
         };
         return (
           <div onClick={closeModal} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:99999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:440,background:'#0f0f0f',border:'2px solid #FFD700',borderRadius:12,padding:'22px 24px'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:440,background:'#0f0f0f',border:'2px solid #DDB34D',borderRadius:12,padding:'22px 24px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                <div style={{fontWeight:900,fontSize:15,letterSpacing:1.5,color:'#FFD700'}}>📸 SHARE DISPERSAL</div>
+                <div style={{fontWeight:900,fontSize:15,letterSpacing:1.5,color:'#DDB34D'}}>📸 SHARE DISPERSAL</div>
                 <button onClick={closeModal} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
               </div>
               <div style={{fontSize:13,color:'#aaa',marginBottom:14,lineHeight:1.5}}>Image is ready. Pick what to do with it:</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 <button onClick={doDownload} style={{padding:'12px 16px',background:'#0a1f10',border:'1.5px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📥 &nbsp;DOWNLOAD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· save .png to your computer</span></button>
-                <button onClick={doCopy} style={{padding:'12px 16px',background:'transparent',border:'1.5px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📋 &nbsp;COPY TO CLIPBOARD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· paste into iMessage, Slack, etc.</span></button>
+                <button onClick={doCopy} style={{padding:'12px 16px',background:'transparent',border:'1.5px solid #DDB34D',borderRadius:7,color:'#DDB34D',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📋 &nbsp;COPY TO CLIPBOARD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· paste into iMessage, Slack, etc.</span></button>
                 <button onClick={doShareToX} style={{padding:'12px 16px',background:'#000',border:'1.5px solid #fff',borderRadius:7,color:'#fff',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left',display:'flex',alignItems:'center',gap:8}}>
                   <svg viewBox="0 0 24 24" style={{width:16,height:16}}>
                     <path fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -5723,24 +5723,24 @@ function DispersalSetup(){
           Painted at -99999px so the card renders correctly without ever being visible. */}
       {previewData && (
         <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
-          <div ref={poolCardRef} style={{width:900,background:'#080808',padding:'32px 36px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
-            <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #FFD70044'}}>
+          <div ref={poolCardRef} style={{width:900,background:'#080808',padding:'32px 36px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #DDB34D',borderRadius:14,boxSizing:'border-box'}}>
+            <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:18,paddingBottom:18,borderBottom:'2px solid #DDB34D44'}}>
               {/* Local logo (1500x500 actual) — display at fixed height respecting aspect ratio.
                   Hosted on the same origin so html2canvas captures it cleanly (no CORS). */}
               <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:60,width:'auto',objectFit:'contain',flexShrink:0}}/>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:2.5,marginBottom:4}}>🎲 DISPERSAL DRAFT POOL</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#DDB34D',letterSpacing:2.5,marginBottom:4}}>🎲 DISPERSAL DRAFT POOL</div>
                 <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:0.5,lineHeight:1.15,wordBreak:'break-word'}}>{previewData.draftName}</div>
               </div>
             </div>
             {/* Stats row — 3 cards: TOTAL ASSETS (players+picks), NEW MANAGERS, BUY-IN. */}
             <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.players.length + previewData.picks.length}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{previewData.players.length + previewData.picks.length}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TOTAL ASSETS</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{previewData.managersNeeded||0}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{previewData.managersNeeded||0}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>NEW MANAGERS NEEDED</div>
               </div>
               <div style={{flex:'1 1 0',padding:'10px 14px',background:'#0a1f10',border:'1px solid #10b981',borderRadius:8,textAlign:'center'}}>
@@ -5756,13 +5756,13 @@ function DispersalSetup(){
             </div>
             {/* Settings strip — auto-detected from Sleeper or commish-entered for Custom mode. */}
             {previewData.settingsLine && (
-              <div style={{padding:'10px 14px',background:'#0f0a00',border:'1px solid #FFD70033',borderRadius:8,marginBottom:18,textAlign:'center',fontSize:13,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>
+              <div style={{padding:'10px 14px',background:'#0f0a00',border:'1px solid #DDB34D33',borderRadius:8,marginBottom:18,textAlign:'center',fontSize:13,fontWeight:800,color:'#DDB34D',letterSpacing:1.5}}>
                 {previewData.settingsLine}
               </div>
             )}
             <div style={{display:'grid',gridTemplateColumns: previewData.picks.length ? '1.6fr 1fr' : '1fr',gap:20}}>
               <div>
-                <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>📋 PLAYER POOL</div>
+                <div style={{fontSize:12,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #DDB34D33'}}>📋 PLAYER POOL</div>
                 {[...previewData.posOrder, 'OTHER'].filter(p => previewData.playersByPos[p]?.length).map(pos => (
                   <div key={pos} style={{marginBottom:14}}>
                     <div style={{fontSize:11,fontWeight:900,color:'#a78bfa',letterSpacing:1.5,marginBottom:6}}>{pos === 'OTHER' ? 'OTHER' : pos} <span style={{color:'#666',fontWeight:700}}>· {previewData.playersByPos[pos].length}</span></div>
@@ -5778,7 +5778,7 @@ function DispersalSetup(){
               </div>
               {previewData.picks.length > 0 && (
                 <div>
-                  <div style={{fontSize:12,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #FFD70033'}}>🎟 ROOKIE PICKS</div>
+                  <div style={{fontSize:12,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:10,paddingBottom:6,borderBottom:'1px solid #DDB34D33'}}>🎟 ROOKIE PICKS</div>
                   {(() => {
                     const byYear = {};
                     previewData.picks.forEach(p => {
@@ -5803,17 +5803,17 @@ function DispersalSetup(){
                 </div>
               )}
             </div>
-            <div style={{marginTop:22,paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{marginTop:22,paddingTop:16,borderTop:'2px solid #DDB34D44',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:11,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>CREATE YOUR OWN DISPERSAL DRAFT AT</div>
-                <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>playforkeepsdynasty.com</div>
+                <div style={{fontSize:18,fontWeight:900,color:'#DDB34D',letterSpacing:0.5}}>playforkeepsdynasty.com</div>
               </div>
               {/* X (Twitter) icon + handle. Inline SVG so html2canvas captures it cleanly. */}
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <svg viewBox="0 0 24 24" style={{width:22,height:22,flexShrink:0}}>
-                  <path fill="#FFD700" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  <path fill="#DDB34D" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
-                <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>@PlayforkeepsFF</div>
+                <div style={{fontSize:18,fontWeight:900,color:'#DDB34D',letterSpacing:0.5}}>@PlayforkeepsFF</div>
               </div>
             </div>
           </div>
@@ -6382,23 +6382,23 @@ function DispersalDraft({draftId}){
     <div style={{padding:'8px 14px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:sheetPadding}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
-        <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:1.2}}>🎲 {draft.name}</div>
-        <div style={{padding:'4px 10px',background:status==='live'?'#0a2a1a':status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'}}>{status.toUpperCase()}</div>
+        <div style={{fontSize:18,fontWeight:900,color:'#DDB34D',letterSpacing:1.2}}>🎲 {draft.name}</div>
+        <div style={{padding:'4px 10px',background:status==='live'?'#0a2a1a':status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(status==='live'?'#10b981':status==='complete'?'#a78bfa':'#DDB34D'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:status==='live'?'#10b981':status==='complete'?'#a78bfa':'#DDB34D'}}>{status.toUpperCase()}</div>
         <button onClick={()=>{
           try{ navigator.clipboard.writeText(window.location.origin + '/dispersal/' + draftId); }catch(e){}
           setLinkCopied(true);
           setTimeout(()=>setLinkCopied(false), 2000);
-        }} style={{padding:'5px 11px',background:linkCopied?'#10b981':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>{linkCopied?'✓ COPIED!':'🔗 COPY LINK'}</button>
+        }} style={{padding:'5px 11px',background:linkCopied?'#10b981':'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:1}}>{linkCopied?'✓ COPIED!':'🔗 COPY LINK'}</button>
         <div style={{flex:1}}/>
         {isSpectator && <div style={{padding:'4px 10px',background:'#1a1a3a',border:'1px solid #a78bfa',borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:'#a78bfa'}}>👀 SPECTATING</div>}
-        {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#FFD700',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
+        {!isSpectator && me && <div style={{fontSize:13,color:'#888'}}>You: <span style={{color:'#DDB34D',fontWeight:800}}>{me.username}</span> <button onClick={signOut} style={{marginLeft:8,padding:'3px 9px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11}}>switch</button></div>}
       </div>
 
       {/* Quick how-it-works strip — only during lobby phase. Tells the commish
           what to do: copy the link to leaguemates, have them claim teams. */}
       {status === 'lobby' && (
-        <div style={{background:'#0f0a00',border:'1px dashed #FFD70066',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'#ddd',lineHeight:1.55}}>
-          💡 <strong style={{color:'#FFD700'}}>How this works:</strong> Tap <span style={{color:'#000',background:'#FFD700',padding:'1px 6px',borderRadius:3,fontWeight:800,fontSize:11}}>🔗 COPY LINK</span> above and send it to your league. Each manager opens the link and claims their team below — once everyone's joined, the commish hits <span style={{color:'#10b981',fontWeight:800}}>▶ GO TO DRAFT</span>. Claimed the wrong team by mistake? Tap <span style={{color:'#888',fontWeight:800}}>✕ UNCLAIM</span> on your card to release it and pick a different one.
+        <div style={{background:'#0f0a00',border:'1px dashed #DDB34D66',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'#ddd',lineHeight:1.55}}>
+          💡 <strong style={{color:'#DDB34D'}}>How this works:</strong> Tap <span style={{color:'#000',background:'#DDB34D',padding:'1px 6px',borderRadius:3,fontWeight:800,fontSize:11}}>🔗 COPY LINK</span> above and send it to your league. Each manager opens the link and claims their team below — once everyone's joined, the commish hits <span style={{color:'#10b981',fontWeight:800}}>▶ GO TO DRAFT</span>. Claimed the wrong team by mistake? Tap <span style={{color:'#888',fontWeight:800}}>✕ UNCLAIM</span> on your card to release it and pick a different one.
         </div>
       )}
 
@@ -6408,7 +6408,7 @@ function DispersalDraft({draftId}){
       {status === 'lobby' && !isSpectator && !sleeperLinkedUser && !unlinkBannerDismissed && (
         <div style={{background:'#0a1a14',border:'1px dashed #10b98166',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'#ddd',lineHeight:1.55,display:'flex',alignItems:'flex-start',gap:10}}>
           <div style={{flex:1}}>
-            🔗 <strong style={{color:'#10b981'}}>Pro tip:</strong> Tap <strong style={{color:'#FFD700'}}>🔗 Link Sleeper</strong> in the toolbar above before you claim. Linking your Sleeper account means your team claim follows you across browsers and devices — no risk of getting locked out if your phone clears its cache mid-draft. One-time setup, no password, takes 5 seconds.
+            🔗 <strong style={{color:'#10b981'}}>Pro tip:</strong> Tap <strong style={{color:'#DDB34D'}}>🔗 Link Sleeper</strong> in the toolbar above before you claim. Linking your Sleeper account means your team claim follows you across browsers and devices — no risk of getting locked out if your phone clears its cache mid-draft. One-time setup, no password, takes 5 seconds.
           </div>
           <button onClick={dismissUnlinkBanner} title="Dismiss"
             style={{flexShrink:0,background:'transparent',border:'1px solid #444',borderRadius:5,color:'#888',padding:'2px 8px',fontSize:13,fontWeight:700,cursor:'pointer'}}>×</button>
@@ -6423,27 +6423,27 @@ function DispersalDraft({draftId}){
         <div className="pfk-disp-lobby-controls" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           <div style={{flex:'1 1 200px',minWidth:0}}>
             <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:2}}>WAITING FOR MANAGERS</div>
-            <div style={{fontSize:14,fontWeight:900,color:'#FFD700'}}>{teams.filter(t=>t.joined).length} <span style={{color:'#666',fontWeight:700}}>of</span> {teams.length} <span style={{color:'#888',fontWeight:700,fontSize:12}}>joined</span></div>
+            <div style={{fontSize:14,fontWeight:900,color:'#DDB34D'}}>{teams.filter(t=>t.joined).length} <span style={{color:'#666',fontWeight:700}}>of</span> {teams.length} <span style={{color:'#888',fontWeight:700,fontSize:12}}>joined</span></div>
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {isCommish && <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>🎲 RANDOMIZE DRAFT ORDER</button>}
+            {isCommish && <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #DDB34D',borderRadius:7,color:'#DDB34D',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>🎲 RANDOMIZE DRAFT ORDER</button>}
             <button onClick={goToDraft} style={{padding:'10px 18px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1.2,whiteSpace:'nowrap'}}>▶ GO TO DRAFT</button>
           </div>
           {claimErr && <div style={{flex:'1 1 100%',color:'#ef4444',fontSize:12,marginTop:4}}>{claimErr}</div>}
         </div>
       )}
       {status === 'lobby' && !me && !isSpectator && !isCommish && (
-        <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'14px 18px',marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <div style={{background:'#0f0a00',border:'2px solid #DDB34D',borderRadius:10,padding:'14px 18px',marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
           <div style={{flex:1,minWidth:200}}>
-            <div style={{fontSize:13,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:2}}>👑 RUNNING THIS DRAFT?</div>
+            <div style={{fontSize:13,fontWeight:900,color:'#DDB34D',letterSpacing:1,marginBottom:2}}>👑 RUNNING THIS DRAFT?</div>
             <div style={{fontSize:12,color:'#aaa'}}>Click in as commissioner — start/randomize/undo controls. No passcode needed.</div>
           </div>
-          <button onClick={declareCommish} style={{padding:'10px 16px',background:'#FFD700',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>I AM THE COMMISSIONER</button>
+          <button onClick={declareCommish} style={{padding:'10px 16px',background:'#DDB34D',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>I AM THE COMMISSIONER</button>
         </div>
       )}
       {status === 'lobby' && !me && isCommish && (
-        <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'10px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          <span style={{fontSize:13,fontWeight:900,color:'#FFD700',letterSpacing:1}}>👑 COMMISSIONER MODE</span>
+        <div style={{background:'#0f0a00',border:'1px solid #DDB34D',borderRadius:10,padding:'10px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <span style={{fontSize:13,fontWeight:900,color:'#DDB34D',letterSpacing:1}}>👑 COMMISSIONER MODE</span>
           <span style={{fontSize:12,color:'#888'}}>You're not drafting — you run the lobby + start the draft. Claim a team below if you do want to draft.</span>
         </div>
       )}
@@ -6455,18 +6455,18 @@ function DispersalDraft({draftId}){
         <>
           {status === 'ready' && (
             <div style={{marginBottom:14}}>
-              <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:'10px 10px 0 0',padding:'14px 16px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',borderBottom:'none'}}>
+              <div style={{background:'#0f0a00',border:'2px solid #DDB34D',borderRadius:'10px 10px 0 0',padding:'14px 16px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',borderBottom:'none'}}>
                 <div style={{flex:'1 1 220px',minWidth:0}}>
-                  <div style={{fontSize:11,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>READY TO DRAFT</div>
+                  <div style={{fontSize:11,fontWeight:800,color:'#DDB34D',letterSpacing:1.5}}>READY TO DRAFT</div>
                   <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order. Hit START DRAFT when everyone's ready.</div>
                 </div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',flex:'0 1 auto'}}>
-                  <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:160}}>🎲 RANDOMIZE DRAFT ORDER</button>
+                  <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #DDB34D',borderRadius:7,color:'#DDB34D',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:160}}>🎲 RANDOMIZE DRAFT ORDER</button>
                   <button onClick={startDraft} style={{padding:'10px 18px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:140}}>▶ START DRAFT</button>
                 </div>
               </div>
               {/* Pick order strip — visible right under the READY banner so RANDOMIZE shows the reorder live */}
-              <div style={{background:'#0a0a0a',border:'2px solid #FFD700',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'8px 12px',display:'flex',gap:6,overflowX:'auto'}}>
+              <div style={{background:'#0a0a0a',border:'2px solid #DDB34D',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'8px 12px',display:'flex',gap:6,overflowX:'auto'}}>
                 {pickOrder.map((slotIdx,i)=>{
                   const team = teams.find(t=>t.slot===slotIdx);
                   const isMine = me && slotIdx === me.slot;
@@ -6486,12 +6486,12 @@ function DispersalDraft({draftId}){
             const secs = remaining!=null ? Math.floor((remaining%60000)/1000) : null;
             const expired = remaining===0;
             const lowTime = remaining!=null && remaining < 60000 && !expired;
-            const timerColor = expired ? '#ef4444' : lowTime ? '#f59e0b' : myTurn ? '#10b981' : '#FFD700';
-            const borderColor = expired ? '#ef4444' : myTurn ? '#10b981' : '#FFD700';
+            const timerColor = expired ? '#ef4444' : lowTime ? '#f59e0b' : myTurn ? '#10b981' : '#DDB34D';
+            const borderColor = expired ? '#ef4444' : myTurn ? '#10b981' : '#DDB34D';
             return (
               <div style={{marginBottom:14}}>
                 <div style={{background:myTurn?'#0a2a1a':'#0a0a0a',border:'2px solid '+borderColor,borderRadius:'10px 10px 0 0',padding:'14px 18px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',borderBottom:'none'}}>
-                  <div style={{fontSize:11,fontWeight:800,color:expired?'#ef4444':myTurn?'#10b981':'#FFD700',letterSpacing:1.5}}>{expired?'TIME EXPIRED':myTurn?'🚨 YOU ARE OTC!':'ON THE CLOCK'}</div>
+                  <div style={{fontSize:11,fontWeight:800,color:expired?'#ef4444':myTurn?'#10b981':'#DDB34D',letterSpacing:1.5}}>{expired?'TIME EXPIRED':myTurn?'🚨 YOU ARE OTC!':'ON THE CLOCK'}</div>
                   <div style={{fontSize:18,fontWeight:900}}>{onClockTeam.username}</div>
                   <div style={{fontSize:13,color:'#888'}}>Round {round} · Pick {posInRound} (overall #{draft.current_pick_idx+1})</div>
                   {remaining!=null && (
@@ -6507,7 +6507,7 @@ function DispersalDraft({draftId}){
                     const isCurrent = slotIdx === onClockSlot;
                     const isMe = me && slotIdx === me.slot;
                     return (
-                      <div key={i} style={{flexShrink:0,padding:'4px 10px',borderRadius:14,fontSize:11,fontWeight:800,letterSpacing:0.5,background:isCurrent?'#FFD700':isMe?'#0a2a1a':'#111',color:isCurrent?'#000':isMe?'#10b981':'#888',border:'1px solid '+(isCurrent?'#FFD700':isMe?'#10b981':'#222')}}>
+                      <div key={i} style={{flexShrink:0,padding:'4px 10px',borderRadius:14,fontSize:11,fontWeight:800,letterSpacing:0.5,background:isCurrent?'#DDB34D':isMe?'#0a2a1a':'#111',color:isCurrent?'#000':isMe?'#10b981':'#888',border:'1px solid '+(isCurrent?'#DDB34D':isMe?'#10b981':'#222')}}>
                         <span style={{opacity:0.65,marginRight:5}}>{i+1}.</span>{team?.username||'?'}
                       </div>
                     );
@@ -6517,17 +6517,17 @@ function DispersalDraft({draftId}){
             );
           })()}
           {status === 'complete' && (
-            <div style={{background:'linear-gradient(135deg,#1a1a3a 0%, #0f0a00 100%)',border:'2px solid #FFD700',borderRadius:10,padding:'18px 22px',marginBottom:14,textAlign:'center'}}>
-              <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:6}}>🏆 DRAFT COMPLETE</div>
+            <div style={{background:'linear-gradient(135deg,#1a1a3a 0%, #0f0a00 100%)',border:'2px solid #DDB34D',borderRadius:10,padding:'18px 22px',marginBottom:14,textAlign:'center'}}>
+              <div style={{fontSize:16,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:6}}>🏆 DRAFT COMPLETE</div>
               <div style={{fontSize:13,color:'#a78bfa',marginBottom:14,letterSpacing:1}}>{picks.length} picks made · 📸 download each roster from the bar below</div>
               <div style={{fontSize:14,color:'#eee',marginBottom:6,fontWeight:700}}>Thanks for drafting with Play For Keeps!</div>
               <div style={{fontSize:12,color:'#aaa',marginBottom:14,maxWidth:460,marginLeft:'auto',marginRight:'auto',lineHeight:1.5}}>If this saved you time please follow @PlayForKeepsFF on twitter. Check out playforkeepsdynasty.com for more free dynasty tools and content.</div>
               <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
-                <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'#FFD700',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1}}>
+                <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'#DDB34D',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1}}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="#000" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
                   FOLLOW @PlayForKeepsFF
                 </a>
-                <a href="https://playforkeepsdynasty.com/" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'transparent',color:'#FFD700',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1,border:'2px solid #FFD700'}}>
+                <a href="https://playforkeepsdynasty.com/" target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'12px 22px',background:'transparent',color:'#DDB34D',textDecoration:'none',borderRadius:8,fontWeight:900,fontSize:14,letterSpacing:1,border:'2px solid #DDB34D'}}>
                   <span style={{fontSize:16}}>👑</span>
                   PLAYFORKEEPSDYNASTY.COM
                 </a>
@@ -6539,7 +6539,7 @@ function DispersalDraft({draftId}){
           {isCommish && (
             <div style={{background:'#0a0a0a',border:'1px solid #222',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
               <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginRight:6}}>COMMISH:</div>
-              <button onClick={undoLastPick} disabled={!picks.length} style={{padding:'6px 12px',background:'transparent',border:'1px solid '+(picks.length?'#FFD700':'#333'),borderRadius:6,color:picks.length?'#FFD700':'#444',fontSize:12,fontWeight:800,cursor:picks.length?'pointer':'default'}}>↩ Undo last pick</button>
+              <button onClick={undoLastPick} disabled={!picks.length} style={{padding:'6px 12px',background:'transparent',border:'1px solid '+(picks.length?'#DDB34D':'#333'),borderRadius:6,color:picks.length?'#DDB34D':'#444',fontSize:12,fontWeight:800,cursor:picks.length?'pointer':'default'}}>↩ Undo last pick</button>
               {status==='live' && <button onClick={pauseDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #a78bfa',borderRadius:6,color:'#a78bfa',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏸ Pause draft</button>}
               {status==='live' && <button onClick={forceSkip} style={{padding:'6px 12px',background:'transparent',border:'1px solid #f59e0b',borderRadius:6,color:'#f59e0b',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏭ Force skip</button>}
               {status==='live' && <button onClick={endDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:12,fontWeight:800,cursor:'pointer'}}>⏹ End draft</button>}
@@ -6575,7 +6575,7 @@ function DispersalDraft({draftId}){
             const POS_COLORS = { QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', K:'#9ca3af' };
             const cellColorOf = (it) => {
               if(!it) return null;
-              if(it.type === 'pick') return '#FFD700';
+              if(it.type === 'pick') return '#DDB34D';
               return POS_COLORS[posOf(it)] || '#9ca3af';
             };
             // Snake mapping: even rounds flow left→right, odd rounds reverse.
@@ -6584,7 +6584,7 @@ function DispersalDraft({draftId}){
               if(draft.snake && r % 2 === 1) return r * N + (N - 1 - c);
               return r * N + c;
             };
-            const SLOT_COLORS = ['#FFD700','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
+            const SLOT_COLORS = ['#DDB34D','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
             const initialOf = (s) => (s||'?').trim().charAt(0).toUpperCase();
             const currentIdx = draft.current_pick_idx || 0;
             // Min cell width keeps player names legible while letting 12-team
@@ -6634,7 +6634,7 @@ function DispersalDraft({draftId}){
                             <div style={{
                               width:40,height:40,borderRadius:'50%',
                               background:slotColor+'33',
-                              border:'2px solid '+(isOnClock?'#10b981':isMe?'#FFD700':t.joined?slotColor+'aa':'#444'),
+                              border:'2px solid '+(isOnClock?'#10b981':isMe?'#DDB34D':t.joined?slotColor+'aa':'#444'),
                               color:slotColor,
                               overflow:'hidden',
                               display:'flex',alignItems:'center',justifyContent:'center',
@@ -6648,7 +6648,7 @@ function DispersalDraft({draftId}){
                             </div>
                             <div style={{
                               fontSize:10,fontWeight:800,letterSpacing:0.3,
-                              color:isOnClock?'#10b981':isMe?'#FFD700':'#ddd',
+                              color:isOnClock?'#10b981':isMe?'#DDB34D':'#ddd',
                               maxWidth:MIN_CELL-8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
                             }}>{t.username}{isMe && <span style={{color:'#10b981',marginLeft:3}}>•you</span>}</div>
                             <div style={{fontSize:9,color:'#666',fontWeight:700,letterSpacing:0.3}}>Pick #{idx+1}{!t.joined && <span style={{color:'#666',marginLeft:4}}>· open</span>}</div>
@@ -6656,12 +6656,12 @@ function DispersalDraft({draftId}){
                           {/* Action chip row — only one at a time renders */}
                           {canClaim && (
                             <button onClick={(e)=>{e.stopPropagation(); handleClaimClick(slotIdx);}}
-                              style={{padding:'5px 10px',background:'#FFD700',border:'none',borderRadius:4,color:'#000',fontWeight:900,fontSize:10,letterSpacing:0.8,cursor:'pointer',width:'calc(100% - 6px)'}}>CLAIM</button>
+                              style={{padding:'5px 10px',background:'#DDB34D',border:'none',borderRadius:4,color:'#000',fontWeight:900,fontSize:10,letterSpacing:0.8,cursor:'pointer',width:'calc(100% - 6px)'}}>CLAIM</button>
                           )}
                           {!canClaim && canRecover && (
                             <button onClick={(e)=>{e.stopPropagation(); recoverSlot(slotIdx);}}
                               title="Take over this team — only if you're the original claimer and lost your session"
-                              style={{padding:'5px 8px',background:'transparent',border:'1px solid #FFD70077',borderRadius:4,color:'#FFD700',fontWeight:800,fontSize:9,letterSpacing:0.5,cursor:'pointer',width:'calc(100% - 6px)',whiteSpace:'nowrap'}}>↻ RECOVER</button>
+                              style={{padding:'5px 8px',background:'transparent',border:'1px solid #DDB34D77',borderRadius:4,color:'#DDB34D',fontWeight:800,fontSize:9,letterSpacing:0.5,cursor:'pointer',width:'calc(100% - 6px)',whiteSpace:'nowrap'}}>↻ RECOVER</button>
                           )}
                           {canUnclaim && (
                             <button onClick={(e)=>{e.stopPropagation(); releaseSlot(slotIdx);}}
@@ -6756,9 +6756,9 @@ function DispersalDraft({draftId}){
                     name="sleeper-handle"
                     autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false}
                     data-1p-ignore="true" data-lpignore="true"
-                    style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
+                    style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #DDB34D66',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
                   <button onClick={claimLinkSubmit} disabled={claimLinkBusy}
-                    style={{padding:'10px 16px',background:claimLinkBusy?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:claimLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:0.5,whiteSpace:'nowrap'}}>
+                    style={{padding:'10px 16px',background:claimLinkBusy?'#444':'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:claimLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:0.5,whiteSpace:'nowrap'}}>
                     {claimLinkBusy ? '…' : '🔗 LINK & CLAIM'}
                   </button>
                 </div>
@@ -6778,7 +6778,7 @@ function DispersalDraft({draftId}){
               <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:380,background:'#0f0f0f',border:'2px solid '+(pickConfirm._commishOverride ? '#a78bfa' : '#10b981'),borderRadius:12,padding:'22px 24px',textAlign:'center'}}>
                 <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:8}}>{pickConfirm._commishOverride ? 'COMMISH OVERRIDE PICK' : 'CONFIRM PICK'}</div>
                 <div style={{fontSize:14,color:'#aaa',marginBottom:6}}>Draft</div>
-                <div style={{fontSize:22,fontWeight:900,color:'#FFD700',marginBottom:6,wordBreak:'break-word'}}>{pickConfirm.name}</div>
+                <div style={{fontSize:22,fontWeight:900,color:'#DDB34D',marginBottom:6,wordBreak:'break-word'}}>{pickConfirm.name}</div>
                 {pickConfirm._commishOverride && pickConfirm._onClockUsername && (
                   <div style={{fontSize:13,fontWeight:700,color:'#a78bfa',marginBottom:8}}>on behalf of @{pickConfirm._onClockUsername}</div>
                 )}
@@ -6831,12 +6831,12 @@ function DispersalDraft({draftId}){
             const activeTeamPicks = picks.filter(p => p.slot === activeTeamSlot)
               .map(p => ({...p, item: pool.find(it => it.id === p.poolItemId)}))
               .sort((a,b) => a.pickIdx - b.pickIdx);
-            const SLOT_COLORS = ['#FFD700','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
+            const SLOT_COLORS = ['#DDB34D','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
             const initialOf = (s) => (s||'?').trim().charAt(0).toUpperCase();
             return (
               <div className={"pfk-disp-bottom-sheet"+(isSheetCollapsed?' collapsed':'')} style={{
                 position:'fixed',left:0,right:0,bottom:0,
-                background:'#080808',borderTop:'2px solid #FFD700',
+                background:'#080808',borderTop:'2px solid #DDB34D',
                 paddingBottom:'env(safe-area-inset-bottom)',
                 // Drag-controlled height (px). Mobile CSS no longer overrides
                 // this — the user is in charge. SHEET_COLLAPSED_PX is the
@@ -6858,7 +6858,7 @@ function DispersalDraft({draftId}){
                     onTouchStart={onSheetDragStart} onTouchMove={onSheetDragMove} onTouchEnd={onSheetDragEnd} onTouchCancel={onSheetDragEnd}
                     onMouseDown={(e)=>{ onSheetDragStart(e); const move=(ev)=>onSheetDragMove(ev); const up=()=>{ onSheetDragEnd(); window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); }; window.addEventListener('mousemove',move); window.addEventListener('mouseup',up); }}
                     style={{padding:'14px 0 14px',display:'flex',justifyContent:'center',cursor:'ns-resize',touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}>
-                    <div style={{width:80,height:8,borderRadius:4,background:'#FFD700',boxShadow:'0 0 8px rgba(255,215,0,0.45)'}}/>
+                    <div style={{width:80,height:8,borderRadius:4,background:'#DDB34D',boxShadow:'0 0 8px rgba(221,179,77,0.45)'}}/>
                   </div>
                   {/* Tab strip — PLAYERS · TEAM · COLLAPSE · VIEW (snap buttons) */}
                   <div style={{display:'flex',alignItems:'stretch',borderBottom:'1px solid #1e1e1e'}}>
@@ -6873,8 +6873,8 @@ function DispersalDraft({draftId}){
                           onClick={() => { setSheetTab(tab.id); ensureSheetOpen(); }}
                           style={{
                             flex:1,padding:'14px 6px',background:sel?'#0f0f0f':'transparent',border:'none',cursor:'pointer',
-                            color:sel?'#FFD700':'#888',fontWeight:900,fontSize:12,letterSpacing:1.2,
-                            borderBottom:'2px solid '+(sel?'#FFD700':'transparent')
+                            color:sel?'#DDB34D':'#888',fontWeight:900,fontSize:12,letterSpacing:1.2,
+                            borderBottom:'2px solid '+(sel?'#DDB34D':'transparent')
                           }}>
                           {tab.label}{tab.count!=null && <span style={{opacity:0.7,marginLeft:5,fontWeight:700}}>({tab.count})</span>}
                         </button>
@@ -6887,7 +6887,7 @@ function DispersalDraft({draftId}){
                     {/* VIEW — snap to ceiling (full open) */}
                     <button onClick={()=>setSheetHeight(sheetMaxPx())} title="Expand to full view"
                       className="pfk-disp-sheet-snap"
-                      style={{padding:'14px 14px',background:'transparent',border:'none',cursor:'pointer',color:'#FFD700',fontSize:14,fontWeight:900,letterSpacing:0.5,minWidth:54,minHeight:48}}>▲</button>
+                      style={{padding:'14px 14px',background:'transparent',border:'none',cursor:'pointer',color:'#DDB34D',fontSize:14,fontWeight:900,letterSpacing:0.5,minWidth:54,minHeight:48}}>▲</button>
                   </div>
 
                   {/* Tab content — only renders when sheet is expanded enough
@@ -6901,12 +6901,12 @@ function DispersalDraft({draftId}){
                           {/* Position filter chips with counts */}
                           <div style={{display:'flex',gap:6,marginBottom:10,padding:4,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
                             {[
-                              { id:'all',   label:'ALL',     active:'#FFD700' },
+                              { id:'all',   label:'ALL',     active:'#DDB34D' },
                               { id:'QB',    label:'QB',      active:'#a78bfa' },
                               { id:'RB',    label:'RB',      active:'#34d399' },
                               { id:'WR',    label:'WR',      active:'#60a5fa' },
                               { id:'TE',    label:'TE',      active:'#fb923c' },
-                              { id:'picks', label:'PICKS',   active:'#FFD700' },
+                              { id:'picks', label:'PICKS',   active:'#DDB34D' },
                             ].map(t => {
                               const sel = poolTab === t.id;
                               return (
@@ -6948,7 +6948,7 @@ function DispersalDraft({draftId}){
                               const clickable = (myTurn || commishOverride) && status==='live';
                               const inferredPos = item.pos || (item.name||'').match(/\(([A-Za-z]+)\)\s*$/)?.[1]?.toUpperCase() || '';
                               const badgeLabel = item.type === 'pick' ? 'PICK' : (inferredPos || 'PLAYER');
-                              const badgeColor = item.type === 'pick' ? '#FFD700' : (POS_COLORS[badgeLabel] || '#9ca3af');
+                              const badgeColor = item.type === 'pick' ? '#DDB34D' : (POS_COLORS[badgeLabel] || '#9ca3af');
                               const cleanName = (item.name || '').replace(/\s*\([A-Za-z]+\)\s*$/, '');
                               return (
                                 <div key={item.id} className="pfk-disp-pool-item"
@@ -6993,8 +6993,8 @@ function DispersalDraft({draftId}){
                                     flexShrink:0,display:'flex',alignItems:'center',gap:8,
                                     padding:'6px 12px 6px 6px',borderRadius:24,
                                     background:sel?'#0f0f0f':'transparent',
-                                    border:'1px solid '+(sel?'#FFD700':'#222'),
-                                    cursor:'pointer',color:sel?'#FFD700':'#aaa',
+                                    border:'1px solid '+(sel?'#DDB34D':'#222'),
+                                    cursor:'pointer',color:sel?'#DDB34D':'#aaa',
                                     fontSize:12,fontWeight:800,letterSpacing:0.3
                                   }}>
                                   <span style={{
@@ -7084,7 +7084,7 @@ function DispersalDraft({draftId}){
                                 // filled, otherwise grey.
                                 const lineupSlotColor = (slotKey, pick) => {
                                   if(pick && pick.item) {
-                                    if(pick.item.type === 'pick') return '#FFD700';
+                                    if(pick.item.type === 'pick') return '#DDB34D';
                                     return POS_COLORS[posOf(pick.item)] || '#9ca3af';
                                   }
                                   // Empty — slot accent based on slot type
@@ -7141,7 +7141,7 @@ function DispersalDraft({draftId}){
                                             const it = p.item;
                                             const isFuturePick = it?.type === 'pick';
                                             const pos = isFuturePick ? 'PICK' : posOf(it);
-                                            const color = isFuturePick ? '#FFD700' : (POS_COLORS[pos] || '#9ca3af');
+                                            const color = isFuturePick ? '#DDB34D' : (POS_COLORS[pos] || '#9ca3af');
                                             return <div key={p.pickIdx}>{renderRow(p, pos || 'BN', color, true)}</div>;
                                           })}
                                         </div>
@@ -7199,7 +7199,7 @@ function DispersalApp({draftId}){
           the counter is still visible while creating new drafts. */}
       {isDevHost() && !draftId && (
         <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 14px 0',maxWidth:1240,margin:'0 auto'}}>
-          <div style={{display:'inline-block',padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,whiteSpace:'nowrap'}}>
+          <div style={{display:'inline-block',padding:'6px 12px',background:'#0a0a0a',border:'1px solid #DDB34D66',borderRadius:20,fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:0.5,whiteSpace:'nowrap'}}>
             {completedDispersalCount !== null
               ? <>🎲 {completedDispersalCount.toLocaleString()} completed drafts</>
               : counterErr
@@ -7685,14 +7685,14 @@ function LookupSearch(){
   };
   return (
     <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',color:'#eee',textAlign:'center'}}>
-      <div style={{fontSize:32,fontWeight:900,color:'#FFD700',letterSpacing:3,marginBottom:10}}>🔍 SLEEPER SNAPSHOT</div>
+      <div style={{fontSize:32,fontWeight:900,color:'#DDB34D',letterSpacing:3,marginBottom:10}}>🔍 SLEEPER SNAPSHOT</div>
       <div style={{fontSize:14,color:'#bbb',marginBottom:30,letterSpacing:0.3,lineHeight:1.6,maxWidth:540,margin:'0 auto 30px'}}>Type any Sleeper username to instantly see their account age, total dynasty leagues, trade activity, orphan history, and roster average dynasty value. Vet new leaguemates in seconds.</div>
       <form onSubmit={submit} style={{display:'flex',gap:8,marginBottom:14}}>
         <input
           value={query} onChange={e=>{setQuery(e.target.value); setErr('');}}
           placeholder="Sleeper username (e.g. ej97)"
-          style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
-        <button type="submit" style={{padding:'14px 24px',background:'#FFD700',border:'none',borderRadius:8,color:'#000',fontWeight:900,fontSize:14,letterSpacing:1.5,cursor:'pointer',whiteSpace:'nowrap'}}>LOOKUP →</button>
+          style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #DDB34D66',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
+        <button type="submit" style={{padding:'14px 24px',background:'#DDB34D',border:'none',borderRadius:8,color:'#000',fontWeight:900,fontSize:14,letterSpacing:1.5,cursor:'pointer',whiteSpace:'nowrap'}}>LOOKUP →</button>
       </form>
       {err && <div style={{padding:'10px 14px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:6,color:'#ef4444',fontSize:13,marginBottom:14}}>{err}</div>}
     </div>
@@ -7832,13 +7832,13 @@ function LookupProfile({ identifier }){
   };
 
   if(loading){
-    return <div style={{maxWidth:680,margin:'80px auto',textAlign:'center',color:'#aaa',fontSize:14}}>Looking up <span style={{color:'#FFD700',fontFamily:'monospace'}}>{identifier}</span>…</div>;
+    return <div style={{maxWidth:680,margin:'80px auto',textAlign:'center',color:'#aaa',fontSize:14}}>Looking up <span style={{color:'#DDB34D',fontFamily:'monospace'}}>{identifier}</span>…</div>;
   }
   if(err){
     return (
       <div style={{maxWidth:680,margin:'80px auto',padding:'0 20px',textAlign:'center',color:'#eee'}}>
         <div style={{padding:'20px 24px',background:'#3a1010',border:'1px solid #ef4444',borderRadius:8,color:'#ef4444',fontSize:14,marginBottom:18}}>{err}</div>
-        <a href="/lookup" style={{color:'#FFD700',textDecoration:'none',fontWeight:800}}>← Try another lookup</a>
+        <a href="/lookup" style={{color:'#DDB34D',textDecoration:'none',fontWeight:800}}>← Try another lookup</a>
       </div>
     );
   }
@@ -7865,7 +7865,7 @@ function LookupProfile({ identifier }){
   const createdMs = user.metadata?.created || user.created;
   const createdDate = createdMs ? new Date(Number(createdMs)) : null;
 
-  const sectionHdr = {fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:1.5,marginBottom:10};
+  const sectionHdr = {fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:1.5,marginBottom:10};
   const card = {background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'18px 22px',marginBottom:14};
 
   return (
@@ -7874,18 +7874,18 @@ function LookupProfile({ identifier }){
       <div style={{...card,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
         {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} onError={e=>e.target.style.display='none'}/>}
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
+          <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
           <div style={{fontSize:12,color:'#666',marginTop:2}}>{user.username && user.username !== user.display_name ? `@${user.username} · ` : ''}user_id <code style={{color:'#888'}}>{user.user_id}</code></div>
           {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
         </div>
-        <button onClick={shareProfileImage} disabled={profileShareBusy} title="Share a PFK-branded snapshot of this profile" style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#FFD700'),borderRadius:7,color:profileShareBusy?'#888':'#FFD700',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{profileShareBusy?'BUILDING…':'📸 SHARE'}</button>
+        <button onClick={shareProfileImage} disabled={profileShareBusy} title="Share a PFK-branded snapshot of this profile" style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#DDB34D'),borderRadius:7,color:profileShareBusy?'#888':'#DDB34D',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{profileShareBusy?'BUILDING…':'📸 SHARE'}</button>
       </div>
 
       {/* Activity snapshot — dynasty-focused */}
       <div style={card}>
         <div style={sectionHdr}>📊 ACTIVITY SNAPSHOT</div>
         <div style={{padding:'14px 16px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-          <div style={{fontSize:32,fontWeight:900,color:'#FFD700'}}>{dynastyActive.length}</div>
+          <div style={{fontSize:32,fontWeight:900,color:'#DDB34D'}}>{dynastyActive.length}</div>
           <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
         </div>
       </div>
@@ -7916,16 +7916,16 @@ function LookupProfile({ identifier }){
                 <div style={{fontSize:11,color:'#a78bfa',fontWeight:800,letterSpacing:1.5,marginBottom:6}}>{label}</div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8}}>
                   <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                    <div style={{fontSize:22,fontWeight:900,color:'#FFD700'}}>{data.totalTrades}</div>
+                    <div style={{fontSize:22,fontWeight:900,color:'#DDB34D'}}>{data.totalTrades}</div>
                     <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>TOTAL TRADES</div>
                   </div>
                   <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                    <div style={{fontSize:22,fontWeight:900,color:'#FFD700'}}>{data.avgPerLeague.toFixed(1)}</div>
+                    <div style={{fontSize:22,fontWeight:900,color:'#DDB34D'}}>{data.avgPerLeague.toFixed(1)}</div>
                     <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>AVG PER LEAGUE</div>
                   </div>
                   {showLastTrade && (
                     <div style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                      <div style={{fontSize:16,fontWeight:900,color:'#FFD700',lineHeight:1.2}}>{data.lastTradeDate ? lookupTimeAgo(data.lastTradeDate) : 'none'}</div>
+                      <div style={{fontSize:16,fontWeight:900,color:'#DDB34D',lineHeight:1.2}}>{data.lastTradeDate ? lookupTimeAgo(data.lastTradeDate) : 'none'}</div>
                       <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
                     </div>
                   )}
@@ -7947,7 +7947,7 @@ function LookupProfile({ identifier }){
             collusion scouting (facts only — they draw their own conclusions). */}
         {user && (
           <button onClick={() => setTradesModalOpen(true)}
-                  style={{marginTop:8,width:'100%',padding:'12px 14px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#FFD700',fontWeight:800,fontSize:13,letterSpacing:0.5,cursor:'pointer'}}>
+                  style={{marginTop:8,width:'100%',padding:'12px 14px',background:'#0a0a0a',border:'1.5px solid #DDB34D66',borderRadius:8,color:'#DDB34D',fontWeight:800,fontSize:13,letterSpacing:0.5,cursor:'pointer'}}>
             🔍 View Recent Trades →
           </button>
         )}
@@ -7968,15 +7968,15 @@ function LookupProfile({ identifier }){
           <>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.avgRank.toFixed(1)}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D'}}>{teamStrength.avgRank.toFixed(1)}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG RANK</div>
               </div>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.avgTeams.toFixed(0)}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D'}}>{teamStrength.avgTeams.toFixed(0)}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
               </div>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700'}}>{teamStrength.leaguesCount}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D'}}>{teamStrength.leaguesCount}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES</div>
               </div>
             </div>
@@ -7990,10 +7990,10 @@ function LookupProfile({ identifier }){
         <div style={sectionHdr}>🪦 DYNASTY ORPHAN HISTORY</div>
         <div style={{fontSize:13,color:'#aaa',lineHeight:1.7}}>Past <strong style={{color:'#fff'}}>dynasty</strong> leagues this user appears to have left between seasons. Redraft / keeper leagues that ended naturally are not counted.</div>
         <div style={{display:'flex',gap:14,marginTop:10,flexWrap:'wrap'}}>
-          <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 12 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last12mo ?? 0}</strong></div>
-          <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 24 months: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan?.last24mo ?? 0}</strong></div>
+          <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 12 months: <strong style={{color:'#DDB34D',fontSize:16,marginLeft:6}}>{orphan?.last12mo ?? 0}</strong></div>
+          <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Last 24 months: <strong style={{color:'#DDB34D',fontSize:16,marginLeft:6}}>{orphan?.last24mo ?? 0}</strong></div>
           {orphan && orphan.uniqueLeagues > 0 && (
-            <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Orphan rate: <strong style={{color:'#FFD700',fontSize:16,marginLeft:6}}>{orphan.orphanRatePct.toFixed(1)}%</strong> <span style={{color:'#666',marginLeft:4,fontSize:11}}>({orphan.all} of {orphan.uniqueLeagues})</span></div>
+            <div style={{padding:'8px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,fontSize:13}}>Orphan rate: <strong style={{color:'#DDB34D',fontSize:16,marginLeft:6}}>{orphan.orphanRatePct.toFixed(1)}%</strong> <span style={{color:'#666',marginLeft:4,fontSize:11}}>({orphan.all} of {orphan.uniqueLeagues})</span></div>
           )}
         </div>
         {orphan?.details && orphan.details.length > 0 && (
@@ -8010,15 +8010,15 @@ function LookupProfile({ identifier }){
       <div style={card}>
         <div style={sectionHdr}>🔗 PROFILE LINK</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <code style={{flex:1,minWidth:200,padding:'8px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,color:'#FFD700',fontSize:12,wordBreak:'break-all'}}>{window.location.href}</code>
-          <button onClick={copyLink} style={{padding:'8px 14px',background:linkCopied?'#10b981':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:12,letterSpacing:1,cursor:'pointer',whiteSpace:'nowrap'}}>{linkCopied?'✓ COPIED':'📋 COPY'}</button>
+          <code style={{flex:1,minWidth:200,padding:'8px 12px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:6,color:'#DDB34D',fontSize:12,wordBreak:'break-all'}}>{window.location.href}</code>
+          <button onClick={copyLink} style={{padding:'8px 14px',background:linkCopied?'#10b981':'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:12,letterSpacing:1,cursor:'pointer',whiteSpace:'nowrap'}}>{linkCopied?'✓ COPIED':'📋 COPY'}</button>
         </div>
       </div>
 
       <div style={{textAlign:'center',marginTop:24,marginBottom:40,fontSize:12,color:'#666'}}>
         <div style={{marginBottom:8}}>Is this you and you'd rather not be searchable?</div>
         <a href={`mailto:ej@playforkeepsdynasty.com?subject=PFK%20Lookup%20opt-out%20request&body=Please%20remove%20my%20PFK%20Lookup%20profile.%0A%0ASleeper%20username%3A%20${encodeURIComponent(user.username||'')}%0ASleeper%20user_id%3A%20${encodeURIComponent(user.user_id||'')}`}
-           style={{color:'#FFD700',textDecoration:'underline'}}>Email us to opt out →</a>
+           style={{color:'#DDB34D',textDecoration:'underline'}}>Email us to opt out →</a>
         <div style={{marginTop:18}}>
           <a href="/lookup" style={{color:'#888',textDecoration:'none',fontWeight:700}}>← Search another user</a>
         </div>
@@ -8060,15 +8060,15 @@ function LookupProfile({ identifier }){
         };
         return (
           <div onClick={closeModal} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:99999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:440,background:'#0f0f0f',border:'2px solid #FFD700',borderRadius:12,padding:'22px 24px'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:440,background:'#0f0f0f',border:'2px solid #DDB34D',borderRadius:12,padding:'22px 24px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                <div style={{fontWeight:900,fontSize:15,letterSpacing:1.5,color:'#FFD700'}}>📸 SHARE PROFILE</div>
+                <div style={{fontWeight:900,fontSize:15,letterSpacing:1.5,color:'#DDB34D'}}>📸 SHARE PROFILE</div>
                 <button onClick={closeModal} style={{background:'none',border:'none',color:'#888',fontSize:20,cursor:'pointer'}}>✕</button>
               </div>
               <div style={{fontSize:13,color:'#aaa',marginBottom:14,lineHeight:1.5}}>Image is ready. Pick what to do with it:</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 <button onClick={doDownload} style={{padding:'12px 16px',background:'#0a1f10',border:'1.5px solid #10b981',borderRadius:7,color:'#10b981',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📥 &nbsp;DOWNLOAD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· save .png to your computer</span></button>
-                <button onClick={doCopy} style={{padding:'12px 16px',background:'transparent',border:'1.5px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📋 &nbsp;COPY TO CLIPBOARD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· paste into iMessage, Slack, etc.</span></button>
+                <button onClick={doCopy} style={{padding:'12px 16px',background:'transparent',border:'1.5px solid #DDB34D',borderRadius:7,color:'#DDB34D',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left'}}>📋 &nbsp;COPY TO CLIPBOARD &nbsp;<span style={{fontWeight:600,color:'#888',fontSize:12,letterSpacing:0.3}}>· paste into iMessage, Slack, etc.</span></button>
                 <button onClick={doShareToX} style={{padding:'12px 16px',background:'#000',border:'1.5px solid #fff',borderRadius:7,color:'#fff',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1,textAlign:'left',display:'flex',alignItems:'center',gap:8}}>
                   <svg viewBox="0 0 24 24" style={{width:16,height:16}}>
                     <path fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -8085,11 +8085,11 @@ function LookupProfile({ identifier }){
       {/* Off-screen share card — captured via html2canvas. Painted at -99999px so
           the layout is correct without ever being visible to the user. */}
       <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
-        <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'30px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #FFD700',borderRadius:14,boxSizing:'border-box'}}>
+        <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'30px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #DDB34D',borderRadius:14,boxSizing:'border-box'}}>
           {/* Card header — PFK brand + logo centered on top, user info below */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:14,paddingBottom:14,borderBottom:'2px solid #FFD70044'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:14,paddingBottom:14,borderBottom:'2px solid #DDB34D44'}}>
             <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:48,width:'auto',objectFit:'contain',flexShrink:0}}/>
-            <div style={{fontSize:22,fontWeight:900,color:'#FFD700',letterSpacing:2.5}}>PLAY FOR KEEPS</div>
+            <div style={{fontSize:22,fontWeight:900,color:'#DDB34D',letterSpacing:2.5}}>PLAY FOR KEEPS</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
             {/* Real Sleeper avatar — proxied through /api/avatar/{id} so it's
@@ -8099,7 +8099,7 @@ function LookupProfile({ identifier }){
             {user.avatar
               ? <img src={`/api/avatar/${user.avatar}`} alt="" style={{width:54,height:54,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e',flexShrink:0}} onError={e=>{e.target.style.display='none'; const fb = e.target.nextElementSibling; if(fb) fb.style.display='flex';}}/>
               : null}
-            <div style={{width:54,height:54,borderRadius:'50%',background:'#FFD700',display: user.avatar ? 'none' : 'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:24,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+            <div style={{width:54,height:54,borderRadius:'50%',background:'#DDB34D',display: user.avatar ? 'none' : 'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:24,fontWeight:900,color:'#000',letterSpacing:0,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
               {((user.display_name || user.username || '?')[0] || '?').toUpperCase()}
             </div>
             <div style={{flex:1,minWidth:0}}>
@@ -8111,18 +8111,18 @@ function LookupProfile({ identifier }){
           {/* Avg dynasty value standings */}
           {teamStrength && teamStrength.leaguesCount > 0 && (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>💪 AVG DYNASTY VALUE STANDINGS</div>
+              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>💪 AVG DYNASTY VALUE STANDINGS</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teamStrength.avgRank.toFixed(1)}</div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgRank.toFixed(1)}</div>
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG RANK</div>
                 </div>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teamStrength.avgTeams.toFixed(0)}</div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgTeams.toFixed(0)}</div>
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
                 </div>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{teamStrength.leaguesCount}</div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.leaguesCount}</div>
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES</div>
                 </div>
               </div>
@@ -8132,7 +8132,7 @@ function LookupProfile({ identifier }){
           {/* Trade activity — current shows LAST TRADE; prior years drop it (always stale) */}
           {tradeActivity && (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>🤝 TRADE ACTIVITY</div>
+              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>🤝 TRADE ACTIVITY</div>
               {[
                 { label: `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`, data: tradeActivity.current, showLast: true },
                 { label: `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`, data: tradeActivity.prior, showLast: false },
@@ -8142,16 +8142,16 @@ function LookupProfile({ identifier }){
                   <div style={{fontSize:10,color:'#a78bfa',fontWeight:800,letterSpacing:1.5,marginBottom:5}}>{s.label}</div>
                   <div style={{display:'grid',gridTemplateColumns: s.showLast ? '1fr 1fr 1fr' : '1fr 1fr',gap:8}}>
                     <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                      <div style={{fontSize:20,fontWeight:900,color:'#FFD700'}}>{s.data.totalTrades}</div>
+                      <div style={{fontSize:20,fontWeight:900,color:'#DDB34D'}}>{s.data.totalTrades}</div>
                       <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>TOTAL TRADES</div>
                     </div>
                     <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                      <div style={{fontSize:20,fontWeight:900,color:'#FFD700'}}>{s.data.avgPerLeague.toFixed(1)}</div>
+                      <div style={{fontSize:20,fontWeight:900,color:'#DDB34D'}}>{s.data.avgPerLeague.toFixed(1)}</div>
                       <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>AVG / LEAGUE</div>
                     </div>
                     {s.showLast && (
                       <div style={{padding:'10px 12px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                        <div style={{fontSize:14,fontWeight:900,color:'#FFD700',lineHeight:1.3}}>{s.data.lastTradeDate ? lookupTimeAgo(s.data.lastTradeDate) : 'none'}</div>
+                        <div style={{fontSize:14,fontWeight:900,color:'#DDB34D',lineHeight:1.3}}>{s.data.lastTradeDate ? lookupTimeAgo(s.data.lastTradeDate) : 'none'}</div>
                         <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:3}}>LAST TRADE</div>
                       </div>
                     )}
@@ -8163,19 +8163,19 @@ function LookupProfile({ identifier }){
 
           {/* Orphan history — last 12mo / 24mo + overall orphan rate % */}
           <div style={{marginBottom:18}}>
-            <div style={{fontSize:11,fontWeight:900,color:'#FFD700',letterSpacing:2,marginBottom:8}}>🪦 DYNASTY ORPHAN HISTORY</div>
+            <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>🪦 DYNASTY ORPHAN HISTORY</div>
             <div style={{display:'flex',gap:10}}>
               <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan?.last12mo ?? 0}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{orphan?.last12mo ?? 0}</div>
                 <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST 12 MONTHS</div>
               </div>
               <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan?.last24mo ?? 0}</div>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{orphan?.last24mo ?? 0}</div>
                 <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LAST 24 MONTHS</div>
               </div>
               {orphan && orphan.uniqueLeagues > 0 && (
                 <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',lineHeight:1}}>{orphan.orphanRatePct.toFixed(1)}%</div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{orphan.orphanRatePct.toFixed(1)}%</div>
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>ORPHAN RATE</div>
                   <div style={{fontSize:9,color:'#666',fontWeight:700,marginTop:2}}>{orphan.all} of {orphan.uniqueLeagues}</div>
                 </div>
@@ -8184,16 +8184,16 @@ function LookupProfile({ identifier }){
           </div>
 
           {/* Footer */}
-          <div style={{paddingTop:16,borderTop:'2px solid #FFD70044',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{paddingTop:16,borderTop:'2px solid #DDB34D44',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginBottom:3}}>LOOK UP ANY SLEEPER USER AT</div>
-              <div style={{fontSize:16,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>playforkeepsdynasty.com/lookup</div>
+              <div style={{fontSize:16,fontWeight:900,color:'#DDB34D',letterSpacing:0.5}}>playforkeepsdynasty.com/lookup</div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <svg viewBox="0 0 24 24" style={{width:18,height:18,flexShrink:0}}>
-                <path fill="#FFD700" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                <path fill="#DDB34D" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
-              <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:0.5}}>@PlayforkeepsFF</div>
+              <div style={{fontSize:14,fontWeight:900,color:'#DDB34D',letterSpacing:0.5}}>@PlayforkeepsFF</div>
             </div>
           </div>
         </div>
@@ -8231,8 +8231,8 @@ function LookupHeaderSearch(){
   return (
     <form onSubmit={submit} style={{display:'flex',gap:6,alignItems:'center'}}>
       <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 New lookup…"
-        style={{padding:'6px 10px',background:'#0a0a0a',border:'1px solid #FFD70055',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',width:160}}/>
-      <button type="submit" style={{padding:'6px 11px',background:'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:11,letterSpacing:1,cursor:'pointer'}}>GO</button>
+        style={{padding:'6px 10px',background:'#0a0a0a',border:'1px solid #DDB34D55',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',width:160}}/>
+      <button type="submit" style={{padding:'6px 11px',background:'#DDB34D',border:'none',borderRadius:6,color:'#000',fontWeight:900,fontSize:11,letterSpacing:1,cursor:'pointer'}}>GO</button>
     </form>
   );
 }
@@ -8572,11 +8572,11 @@ function RecentTradesModal({ userInfo, onClose, resolvePlayerName, relevantConte
     <div onClick={onClose}
          style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
       <div onClick={e=>e.stopPropagation()}
-           style={{background:'#0a0a0a',border:'2px solid #FFD700',borderRadius:14,padding:20,maxWidth:560,width:'100%',maxHeight:'80vh',overflowY:'auto'}}>
+           style={{background:'#0a0a0a',border:'2px solid #DDB34D',borderRadius:14,padding:20,maxWidth:560,width:'100%',maxHeight:'80vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,paddingBottom:12,borderBottom:'1px solid #1e1e1e'}}>
           {avatarUrl
             ? <img src={avatarUrl} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',background:'#1a1a1a'}} onError={e=>e.currentTarget.style.display='none'}/>
-            : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFD700',fontWeight:900}}>{(userInfo?.display_name||'?')[0].toUpperCase()}</div>}
+            : <div style={{width:36,height:36,borderRadius:'50%',background:'#1a1a1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#DDB34D',fontWeight:900}}>{(userInfo?.display_name||'?')[0].toUpperCase()}</div>}
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:900,color:'#fff'}}>@{userInfo?.username || userInfo?.display_name}</div>
             <div style={{fontSize:11,color:'#888'}}>{status === 'ready' ? `${trades.length} most recent trade${trades.length===1?'':'s'}` : 'Recent trades'}{leagueCount ? ` · scanned ${leagueCount} dynasty league${leagueCount===1?'':'s'}` : ''}</div>
@@ -8596,8 +8596,8 @@ function RecentTradesModal({ userInfo, onClose, resolvePlayerName, relevantConte
           const tabBtn = (key, label, count, disabled) => (
             <button onClick={()=>!disabled && setFilterMode(key)} disabled={disabled}
                     style={{flex:1,padding:'8px 10px',borderRadius:6,
-                            border: filterMode===key ? '1.5px solid #FFD700' : '1.5px solid #1e1e1e',
-                            background: filterMode===key ? '#FFD700' : 'transparent',
+                            border: filterMode===key ? '1.5px solid #DDB34D' : '1.5px solid #1e1e1e',
+                            background: filterMode===key ? '#DDB34D' : 'transparent',
                             color: filterMode===key ? '#000' : (disabled?'#444':'#aaa'),
                             fontWeight:800,fontSize:12,letterSpacing:0.4,cursor:disabled?'not-allowed':'pointer'}}>
               {label} <span style={{opacity:0.7,fontWeight:700}}>({count})</span>
@@ -8632,7 +8632,7 @@ function RecentTradesModal({ userInfo, onClose, resolvePlayerName, relevantConte
                   return items.map((it, idx) => (
                     <React.Fragment key={it.key}>
                       {idx > 0 && <span style={{color:'#444'}}> · </span>}
-                      <span style={it.relevant ? {color:'#FFD700',fontWeight:800} : null}>
+                      <span style={it.relevant ? {color:'#DDB34D',fontWeight:800} : null}>
                         {it.relevant && '★ '}{it.label}
                       </span>
                     </React.Fragment>
@@ -8642,10 +8642,10 @@ function RecentTradesModal({ userInfo, onClose, resolvePlayerName, relevantConte
                   <div key={tx.transaction_id || i}
                        style={{padding:'12px 14px',
                                background: txRelevant ? '#1a1400' : '#0f0f0f',
-                               border: txRelevant ? '1px solid #FFD70066' : '1px solid #1e1e1e',
+                               border: txRelevant ? '1px solid #DDB34D66' : '1px solid #1e1e1e',
                                borderRadius:8,marginBottom:10,fontSize:13}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
-                      <div style={{fontSize:11,color:'#FFD700',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
+                      <div style={{fontSize:11,color:'#DDB34D',fontWeight:700,letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'70%'}}>{tx._leagueName}</div>
                       <div style={{fontSize:11,color:'#666',fontWeight:700,letterSpacing:0.5}}>{dateStr}</div>
                     </div>
                     <div style={{marginBottom:6}}>
@@ -8964,7 +8964,7 @@ function TradeFinderApp(){
   };
 
   const posColor = (pos) => ({
-    QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#FFD700', OTHER:'#9ca3af'
+    QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#DDB34D', OTHER:'#9ca3af'
   }[pos] || '#9ca3af');
 
   return (
@@ -8977,7 +8977,7 @@ function TradeFinderApp(){
             in Trade Finder, even if the user's in many). */}
         <div style={{marginBottom:20,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
           {!sleeperUser && (
-            <div style={{padding:'10px 14px',background:'#0a0a0a',border:'1px dashed #FFD70044',borderRadius:8,color:'#aaa',fontSize:12,maxWidth:480}}>
+            <div style={{padding:'10px 14px',background:'#0a0a0a',border:'1px dashed #DDB34D44',borderRadius:8,color:'#aaa',fontSize:12,maxWidth:480}}>
               💡 Link your Sleeper account in the toolbar above — Trade Finder will then auto-adjust values to your specific league's scoring settings.
             </div>
           )}
@@ -8987,7 +8987,7 @@ function TradeFinderApp(){
               {leagues && leagues.length === 0 && <div style={{fontSize:12,color:'#888'}}>No dynasty leagues found for {new Date().getFullYear()}.</div>}
               {leagues && leagues.length > 0 && (
                 <select value={leagueId} onChange={e=>pickLeague(e.target.value)}
-                        style={{padding:'8px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',minWidth:240,maxWidth:'100%',cursor:'pointer'}}>
+                        style={{padding:'8px 12px',background:'#0a0a0a',border:'1.5px solid #DDB34D66',borderRadius:6,color:'#fff',fontSize:13,fontFamily:'inherit',minWidth:240,maxWidth:'100%',cursor:'pointer'}}>
                   <option value="">— Pick a league —</option>
                   {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
                 </select>
@@ -8997,9 +8997,9 @@ function TradeFinderApp(){
         </div>
 
         <div style={{textAlign:'center',marginBottom:18}}>
-          <div style={{fontSize:28,fontWeight:900,color:'#FFD700',letterSpacing:2.5,marginBottom:6}}>⚖️ TRADE FINDER</div>
+          <div style={{fontSize:28,fontWeight:900,color:'#DDB34D',letterSpacing:2.5,marginBottom:6}}>⚖️ TRADE FINDER</div>
           <div style={{fontSize:13,color:'#bbb',maxWidth:600,margin:'0 auto',lineHeight:1.5}}>
-            Type a rookie pick (e.g. <code style={{color:'#FFD700',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. <strong style={{color:'#eee'}}>Link your Sleeper account in the toolbar</strong> and pick a league — values auto-adjust to that league's exact scoring settings.
+            Type a rookie pick (e.g. <code style={{color:'#DDB34D',background:'#1a1400',padding:'1px 6px',borderRadius:4}}>1.03</code>) or any player name to see every equivalent-value asset grouped by position. <strong style={{color:'#eee'}}>Link your Sleeper account in the toolbar</strong> and pick a league — values auto-adjust to that league's exact scoring settings.
           </div>
           {/* Format chip — tells the user exactly which value table is in use right now. */}
           <div style={{marginTop:10,display:'inline-flex',alignItems:'center',gap:8,padding:'5px 12px',background:'#0a0a0a',border:'1px solid '+(selectedLeague?'#10b98166':'#1e1e1e'),borderRadius:16,fontSize:11,fontWeight:700,letterSpacing:0.5,color:selectedLeague?'#10b981':'#888'}}>
@@ -9022,11 +9022,11 @@ function TradeFinderApp(){
               onKeyDown={e=>{ if(e.key==='Enter' && suggestions.length>0){ e.preventDefault(); selectAsset(suggestions[0]); } }}
               placeholder={assets===null ? 'Loading values…' : 'Try "1.03" or "Ja\'Marr Chase"'}
               disabled={assets===null}
-              style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
+              style={{flex:1,padding:'14px 18px',background:'#0a0a0a',border:'1.5px solid #DDB34D66',borderRadius:8,color:'#fff',fontSize:16,fontFamily:'inherit'}}/>
             {anchor && <button onClick={reset} style={{padding:'14px 18px',background:'transparent',border:'1px solid #555',borderRadius:8,color:'#888',fontWeight:700,fontSize:13,cursor:'pointer',letterSpacing:0.5}}>CLEAR</button>}
           </div>
           {showSuggestions && suggestions.length > 0 && (
-            <div style={{position:'absolute',top:'100%',left:0,right:anchor?72:0,marginTop:4,background:'#0f0f0f',border:'1px solid #FFD70044',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,0.6)',zIndex:50,maxHeight:320,overflowY:'auto'}}>
+            <div style={{position:'absolute',top:'100%',left:0,right:anchor?72:0,marginTop:4,background:'#0f0f0f',border:'1px solid #DDB34D44',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,0.6)',zIndex:50,maxHeight:320,overflowY:'auto'}}>
               {suggestions.map(s => (
                 <div key={s.name} onMouseDown={()=>selectAsset(s)}
                      style={{padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid #1a1a1a',display:'flex',alignItems:'center',gap:10,fontSize:14}}
@@ -9034,7 +9034,7 @@ function TradeFinderApp(){
                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                   <span style={{padding:'2px 7px',background:posColor(s.pos)+'22',color:posColor(s.pos),borderRadius:4,fontSize:10,fontWeight:900,letterSpacing:0.5,minWidth:38,textAlign:'center'}}>{s.pos}</span>
                   <span style={{flex:1,color:'#fff'}}>{s.name}</span>
-                  <span style={{color:'#FFD700',fontWeight:800,fontSize:13}}>{s.value.toLocaleString()}</span>
+                  <span style={{color:'#DDB34D',fontWeight:800,fontSize:13}}>{s.value.toLocaleString()}</span>
                 </div>
               ))}
             </div>
@@ -9053,13 +9053,13 @@ function TradeFinderApp(){
               ) : null;
               const anchorOwner = anchorRosterId ? ownership.byRosterId[anchorRosterId] : null;
               return (
-                <div style={{background:'linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)',border:'2px solid #FFD700',borderRadius:12,padding:'16px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+                <div style={{background:'linear-gradient(135deg,#1a1400 0%,#0f0f0f 100%)',border:'2px solid #DDB34D',borderRadius:12,padding:'16px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
                   <span style={{padding:'4px 10px',background:posColor(liveAnchor.pos),color:'#000',borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:0.5}}>{liveAnchor.pos}</span>
                   <div style={{flex:1,minWidth:160}}>
                     <div style={{fontSize:18,fontWeight:900,color:'#fff'}}>{liveAnchor.name}</div>
                     <div style={{fontSize:12,color:'#888',marginTop:2}}>Anchor value</div>
                   </div>
-                  <div style={{fontSize:24,fontWeight:900,color:'#FFD700',letterSpacing:1}}>{liveAnchor.value.toLocaleString()}</div>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',letterSpacing:1}}>{liveAnchor.value.toLocaleString()}</div>
                   {anchorOwner && (
                     <button onClick={()=>openTradeHistory(anchorOwner)}
                             data-tooltip={`Click to see ${anchorOwner.display_name}'s recent trades`}
@@ -9078,17 +9078,17 @@ function TradeFinderApp(){
               <div style={{flex:'1 1 280px',display:'flex',flexDirection:'column',gap:6}}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#888',fontWeight:700,letterSpacing:0.5}}>
                   <span>VALUE TOLERANCE</span>
-                  <span style={{color:'#FFD700'}}>±{tolerance}%</span>
+                  <span style={{color:'#DDB34D'}}>±{tolerance}%</span>
                 </div>
                 <input type="range" min="3" max="25" step="1" value={tolerance} onChange={e=>setTolerance(Number(e.target.value))}
-                       style={{width:'100%',accentColor:'#FFD700'}}/>
+                       style={{width:'100%',accentColor:'#DDB34D'}}/>
                 <div style={{fontSize:11,color:'#666'}}>Range: {Math.round(liveAnchor.value*(1-tolerance/100)).toLocaleString()} – {Math.round(liveAnchor.value*(1+tolerance/100)).toLocaleString()}</div>
                 <div style={{fontSize:11,color:'#aaa',marginTop:2}}>💾 Your tolerance preference saves automatically for future visits.</div>
               </div>
               {!liveAnchor.isPick && (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   {[['all','All'],['players','Players'],['picks','Picks']].map(([k,label])=>(
-                    <button key={k} onClick={()=>setFilter(k)} style={{padding:'7px 14px',borderRadius:6,border:filter===k?'1.5px solid #FFD700':'1.5px solid #1e1e1e',background:filter===k?'#FFD700':'transparent',color:filter===k?'#000':'#aaa',fontWeight:800,fontSize:12,cursor:'pointer',letterSpacing:0.5}}>{label}</button>
+                    <button key={k} onClick={()=>setFilter(k)} style={{padding:'7px 14px',borderRadius:6,border:filter===k?'1.5px solid #DDB34D':'1.5px solid #1e1e1e',background:filter===k?'#DDB34D':'transparent',color:filter===k?'#000':'#aaa',fontWeight:800,fontSize:12,cursor:'pointer',letterSpacing:0.5}}>{label}</button>
                   ))}
                 </div>
               )}
@@ -9104,18 +9104,18 @@ function TradeFinderApp(){
                 data is actually populated so we don't dangle a tip pointing
                 at nothing. Mobile-first sizing (compact). */}
             {equivalents && equivalents.total > 0 && ownership && (
-              <div style={{padding:'10px 14px',marginBottom:10,background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:6,fontSize:12,color:'#aaa',lineHeight:1.55}}>
+              <div style={{padding:'10px 14px',marginBottom:10,background:'#0a0a0a',border:'1px solid #DDB34D33',borderRadius:6,fontSize:12,color:'#aaa',lineHeight:1.55}}>
                 <div style={{marginBottom:6}}>
-                  💡 <strong style={{color:'#FFD700'}}>How leaguemate trade history works:</strong>
+                  💡 <strong style={{color:'#DDB34D'}}>How leaguemate trade history works:</strong>
                 </div>
                 <div style={{marginBottom:5}}>
                   • The <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> button under each result shows which person in <strong style={{color:'#fff'}}>{selectedLeague?.name || 'your league'}</strong> currently rosters that asset (pulled live from Sleeper rosters + traded picks).
                 </div>
                 <div style={{marginBottom:5}}>
-                  • Tap a username to open their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong> — scanned across <em>every</em> dynasty league they're in (current + prior season), not just this one. Each trade card shows the league name, what they sent, and what they received, with current-year picks resolved to slot (e.g. <code style={{color:'#FFD700'}}>2026 Pick 1.03</code>).
+                  • Tap a username to open their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong> — scanned across <em>every</em> dynasty league they're in (current + prior season), not just this one. Each trade card shows the league name, what they sent, and what they received, with current-year picks resolved to slot (e.g. <code style={{color:'#DDB34D'}}>2026 Pick 1.03</code>).
                 </div>
                 <div>
-                  • The <span style={{color:'#FFD700',fontWeight:800}}>★ Relevant</span> tab inside the modal filters to trades that involved any player or pick from your current Trade Finder results — the most useful "what has this person paid for assets like the one I'm working with?" context.
+                  • The <span style={{color:'#DDB34D',fontWeight:800}}>★ Relevant</span> tab inside the modal filters to trades that involved any player or pick from your current Trade Finder results — the most useful "what has this person paid for assets like the one I'm working with?" context.
                 </div>
               </div>
             )}
@@ -9150,7 +9150,7 @@ function TradeFinderApp(){
                         return (
                           <div key={a.name} style={{padding:'9px 14px',borderBottom:'1px solid #131313',display:'flex',alignItems:'center',gap:8,fontSize:13,flexWrap:'wrap'}}>
                             <span style={{flex:1,minWidth:120,color:'#eee',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.name}</span>
-                            <span style={{color:'#FFD700',fontWeight:800,minWidth:48,textAlign:'right'}}>{a.value.toLocaleString()}</span>
+                            <span style={{color:'#DDB34D',fontWeight:800,minWidth:48,textAlign:'right'}}>{a.value.toLocaleString()}</span>
                             <span style={{color:deltaColor,fontSize:11,fontWeight:700,minWidth:48,textAlign:'right'}}>{deltaStr}</span>
                             {ownerInfo && (
                               <button onClick={()=>openTradeHistory(ownerInfo)}
@@ -9175,13 +9175,13 @@ function TradeFinderApp(){
             <div style={{fontSize:34,marginBottom:8}}>💡</div>
             Pick anything to anchor on — we'll show every player and pick within ±10% of its value by default.<br/>
             <span style={{fontSize:12,color:'#555'}}>Use the slider to tighten the range down to ±3% or widen up to ±25%.</span>
-            <div style={{maxWidth:560,margin:'24px auto 0',padding:'14px 16px',background:'#0a0a0a',border:'1px solid #FFD70033',borderRadius:8,textAlign:'left',color:'#aaa',fontSize:12,lineHeight:1.6}}>
-              <div style={{color:'#FFD700',fontWeight:800,letterSpacing:0.5,fontSize:11,marginBottom:8}}>👥 ABOUT LEAGUEMATE OWNERSHIP &amp; TRADE HISTORY</div>
+            <div style={{maxWidth:560,margin:'24px auto 0',padding:'14px 16px',background:'#0a0a0a',border:'1px solid #DDB34D33',borderRadius:8,textAlign:'left',color:'#aaa',fontSize:12,lineHeight:1.6}}>
+              <div style={{color:'#DDB34D',fontWeight:800,letterSpacing:0.5,fontSize:11,marginBottom:8}}>👥 ABOUT LEAGUEMATE OWNERSHIP &amp; TRADE HISTORY</div>
               <div style={{marginBottom:6}}>
                 Once you link your Sleeper account in the toolbar and pick a league, every result will show <span style={{color:'#10b981',fontWeight:700}}>👤 owned by @username</span> — the leaguemate in your league who currently rosters that player or pick.
               </div>
               <div>
-                Tap any username to open a popup with their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong>. The <span style={{color:'#FFD700',fontWeight:800}}>★ Relevant</span> tab filters to trades involving any player or pick from your current Trade Finder results — the most actionable "what has this person paid for assets like the one I'm working with?" context.
+                Tap any username to open a popup with their <strong style={{color:'#fff'}}>last 25 dynasty trades</strong>. The <span style={{color:'#DDB34D',fontWeight:800}}>★ Relevant</span> tab filters to trades involving any player or pick from your current Trade Finder results — the most actionable "what has this person paid for assets like the one I'm working with?" context.
               </div>
             </div>
           </div>
@@ -9222,9 +9222,9 @@ function NotFoundPage(){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
       <div style={{textAlign:'center',maxWidth:480}}>
-        <div style={{fontSize:96,fontWeight:900,color:'#FFD700',letterSpacing:6,textShadow:'0 0 30px #FFD70066'}}>404</div>
+        <div style={{fontSize:96,fontWeight:900,color:'#DDB34D',letterSpacing:6,textShadow:'0 0 30px #DDB34D66'}}>404</div>
         <div style={{fontSize:18,color:'#888',marginTop:8,letterSpacing:1}}>PAGE NOT FOUND</div>
-        <a href="/" style={{display:'inline-block',marginTop:24,padding:'10px 24px',background:'#FFD700',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,letterSpacing:1.5,fontSize:14}}>Back to Play For Keeps</a>
+        <a href="/" style={{display:'inline-block',marginTop:24,padding:'10px 24px',background:'#DDB34D',color:'#000',textDecoration:'none',borderRadius:8,fontWeight:900,letterSpacing:1.5,fontSize:14}}>Back to Play For Keeps</a>
       </div>
     </div>
   );
