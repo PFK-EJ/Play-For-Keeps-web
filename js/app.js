@@ -2750,38 +2750,73 @@ function useSleeperUser(){
       window.removeEventListener('storage', refresh);
     };
   },[]);
-  // Auto-restore from the user's Supabase row when local is empty but the
-  // user is signed in. Covers the iOS Safari ITP case (localStorage wiped
-  // after ~7 days of inactivity) and cross-device usage. Module-level
-  // guard so we only attempt the restore once per page load even if many
-  // components call useSleeperUser.
+  // DB-backed restore + opportunistic-upgrade. Two flows triggered by the
+  // same useEffect, run on first mount AND on every Supabase auth state
+  // change (so sign-in mid-session also fires it):
+  //
+  //   1. RESTORE: signed in + no local Sleeper link → fetch sleeper_username
+  //      from users-row, look up the live Sleeper user, populate locally.
+  //   2. OPPORTUNISTIC UPGRADE: signed in + LOCAL Sleeper link is set →
+  //      push it to users-row (upsert). Catches the case where someone
+  //      linked Sleeper before they signed up, OR before the DB-sync code
+  //      existed — without this they'd be silently un-linked once their
+  //      localStorage was eventually wiped (iOS Safari ITP).
+  //
+  // Guarded so the same flow doesn't duplicate-fire across multiple
+  // useSleeperUser callers within one auth state.
   useEffect(() => {
-    if(user) return; // already linked locally — nothing to do
     if(typeof sb === 'undefined' || !sb) return;
-    if(window.__pfkSleeperRestoreAttempted) return;
-    window.__pfkSleeperRestoreAttempted = true;
     let cancelled = false;
-    const tryRestore = async () => {
+    const lookupRecover = async (uid, email) => {
+      // (1) RESTORE — only when local is empty
+      if(!localStorage.getItem(SLEEPER_STORAGE_KEY)){
+        try{
+          const { data: row } = await sb.from('users').select('sleeper_username').eq('id', uid).maybeSingle();
+          if(cancelled) return;
+          if(row?.sleeper_username){
+            try{
+              const u = await lookupResolveUser(row.sleeper_username);
+              if(cancelled) return;
+              const next = { user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null };
+              localStorage.setItem(SLEEPER_STORAGE_KEY, JSON.stringify(next));
+              setUserState(next);
+              window.dispatchEvent(new Event(SLEEPER_CHANGE_EVENT));
+              return; // restored — done
+            }catch(e){/* sleeper lookup failed */}
+          }
+        }catch(e){/* db read failed */}
+      }
+      // (2) OPPORTUNISTIC UPGRADE — local link exists, push it to DB so it
+      // outlives a future localStorage wipe.
+      const localRaw = localStorage.getItem(SLEEPER_STORAGE_KEY);
+      if(!localRaw) return;
+      let local;
+      try{ local = JSON.parse(localRaw); }catch(e){ return; }
+      if(!local?.username) return;
+      sb.from('users').upsert({ id: uid, email: email || null, sleeper_username: local.username }).then(()=>{}, ()=>{});
+    };
+    const run = async () => {
       const { data } = await sb.auth.getSession();
       const uid = data?.session?.user?.id;
+      const email = data?.session?.user?.email;
       if(!uid || cancelled) return;
-      const { data: row } = await sb.from('users').select('sleeper_username').eq('id', uid).maybeSingle();
-      if(cancelled || !row?.sleeper_username) return;
-      // Already-linked locally? Skip — the link may have been re-set by another
-      // tab while we were awaiting the round-trip.
-      if(localStorage.getItem(SLEEPER_STORAGE_KEY)) return;
-      try{
-        const u = await lookupResolveUser(row.sleeper_username);
-        if(cancelled) return;
-        const next = { user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null };
-        localStorage.setItem(SLEEPER_STORAGE_KEY, JSON.stringify(next));
-        setUserState(next);
-        window.dispatchEvent(new Event(SLEEPER_CHANGE_EVENT));
-      }catch(e){/* sleeper lookup failed — silent */}
+      await lookupRecover(uid, email);
     };
-    tryRestore();
-    return () => { cancelled = true; };
-  },[user]);
+    run();
+    // Re-run on auth state changes — e.g., user opens the page signed-out
+    // and signs in mid-session. Without this hook, the restore would only
+    // fire on first mount and miss the sign-in event.
+    const sub = sb.auth.onAuthStateChange((event, session) => {
+      if(cancelled) return;
+      if(event === 'SIGNED_IN' && session?.user?.id){
+        lookupRecover(session.user.id, session.user.email);
+      }
+    });
+    return () => {
+      cancelled = true;
+      try{ sub?.data?.subscription?.unsubscribe?.(); }catch(e){}
+    };
+  },[]);
   const setUser = (next) => {
     if(next) localStorage.setItem(SLEEPER_STORAGE_KEY, JSON.stringify(next));
     else { localStorage.removeItem(SLEEPER_STORAGE_KEY); localStorage.removeItem('pfk_sleeper_league'); }
@@ -2789,13 +2824,18 @@ function useSleeperUser(){
     window.dispatchEvent(new Event(SLEEPER_CHANGE_EVENT));
     // Persist the username on the user's Supabase row when signed in so the
     // link survives a localStorage wipe (iOS Safari ITP clears site data
-    // after ~7 days of inactivity, which was forcing repeat re-link prompts).
+    // after ~7 days of inactivity) and follows them across devices. We
+    // UPSERT (not update) so that if the user signed up before they linked
+    // Sleeper and their row exists with a NULL username — or doesn't yet
+    // exist — we still write the value. Email is included so the row
+    // satisfies any NOT-NULL email constraint on first insert.
     // Fire-and-forget; failure is fine — local link still works.
     if(typeof sb !== 'undefined' && sb){
       sb.auth.getSession().then(({data}) => {
         const uid = data?.session?.user?.id;
+        const email = data?.session?.user?.email;
         if(!uid) return;
-        sb.from('users').update({ sleeper_username: next?.username || null }).eq('id', uid).then(()=>{}, ()=>{});
+        sb.from('users').upsert({ id: uid, email: email || null, sleeper_username: next?.username || null }).then(()=>{}, ()=>{});
       }).catch(()=>{});
     }
   };
