@@ -54,8 +54,14 @@ input, select { font-family:inherit; }
 }
 @media (max-width:600px){
   .pfk-sticky-header { padding:8px 12px !important; }
-  .pfk-logo-img { width:56px !important; height:56px !important; }
-  .pfk-header-subtitle { display:none !important; }
+  /* Logo size on mobile is dictated by inline styles in the JSX (default
+     toolbar uses 92px, compact dispersal uses 109px). Removed the previous
+     !important shrinker so each toolbar can size its own logo per Evan's
+     2026-05-02 5% bump, consistent across desktop + mobile. */
+  /* "Dynasty Fantasy Football" subtitle stays visible on mobile (was
+     hidden before to save vertical space, but with the centered layout
+     it fits cleanly under the title). */
+  .pfk-header-subtitle { font-size:10px !important; letter-spacing:2px !important; }
   .pfk-header-title { font-size:22px !important; letter-spacing:2px !important; }
   /* Tabs sit in a single horizontally-scrollable row on mobile so the master
      toolbar stays short — otherwise 5 tabs wrap into 3 rows and eat half the

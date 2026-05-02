@@ -2889,7 +2889,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
       <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"6px 14px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
-            <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:104,height:104,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:109,height:109,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
             <div style={{textAlign:"center"}}>
               <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D",lineHeight:1.05}}>PLAY FOR KEEPS</div>
               {subtitle && (
@@ -2905,20 +2905,22 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
       </div>
     );
   }
-  // Default layout (non-compact pages): existing left-aligned brand + nav tabs.
+  // Default layout (non-compact pages): centered brand block on top with the
+  // logo + "PLAY FOR KEEPS" + "Dynasty Fantasy Football" stacked. Account
+  // chips and nav tabs sit on centered rows below. Dispersal pages use the
+  // separate compact branch above (kept untouched per Evan's request).
   return (
-    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
-      <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:10}}>
-        {/* Top row: brand on left, account controls on right */}
-        <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-          <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none"}}>
-            <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
-            <div>
-              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D"}}>PLAY FOR KEEPS</div>
-              <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
-            </div>
-          </a>
-          <div style={{flex:1}}/>
+    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"10px 16px",position:"sticky",top:0,zIndex:100}}>
+      <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
+        <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
+          <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:92,height:92,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+          <div style={{textAlign:"center"}}>
+            <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D",lineHeight:1.05}}>PLAY FOR KEEPS</div>
+            <div style={{fontSize:12,color:"#DDB34DCC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:4,textAlign:"center"}}>Dynasty Fantasy Football</div>
+          </div>
+        </a>
+        {/* Account-control chips — centered, allowed to wrap. */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center",alignItems:"center"}}>
           {twitterChip}
           {emailChip}
           <SleeperLink/>
@@ -2928,8 +2930,8 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
             <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
           )}
         </div>
-        {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line. */}
-        <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-start"}}>
+        {/* Nav tabs — centered to match the rest of the header. */}
+        <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"center",width:"100%"}}>
           {tabs.map(([id,label,desc,href,isInPage])=>{
             const active = isActiveTab(id);
             return (
