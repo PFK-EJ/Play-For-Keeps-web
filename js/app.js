@@ -4728,10 +4728,18 @@ function DispersalSetup(){
       const order = teams.map((_,i)=>i);
       const timerSeconds = timer==='30m' ? 30*60 : timer==='1h' ? 3600 : timer==='2h' ? 2*3600 : timer==='4h' ? 4*3600 : timer==='8h' ? 8*3600 : null;
       setCreating(true);
+      // Persist the linked Sleeper league's lineup config so the live draft's
+      // TEAM tab can render an accurate starting-lineup view (QB/RB/WR/TE/
+      // FLEX/SF/etc) that matches what the league actually uses. If the
+      // dispersal_drafts table doesn't have this column the field is just
+      // dropped on insert; the TEAM tab falls back to a sensible default.
+      const rosterPositions = (sleeperData?.league?.roster_positions || []).filter(s => s !== 'BN' && s !== 'TAXI' && s !== 'IR');
       const { data, error } = await dispCreate({
         name:name.trim(), snake, timer_seconds:timerSeconds, auto_pick:autoPick,
         pool:poolItems, teams, pick_order:order, picks:[],
         current_pick_idx:0, status:'ready',
+        roster_positions: rosterPositions.length ? rosterPositions : null,
+        sleeper_league_id: sleeperData?.league?.league_id || null,
       });
       setCreating(false);
       if(error){ setErr(error.message || 'Create failed'); return; }
@@ -5771,21 +5779,62 @@ function DispersalSetup(){
 function DispersalDraft({draftId}){
   const [draft,setDraft] = useState(null);
   const [loading,setLoading] = useState(true);
-  // Rosters panel collapse state. First-visit default is EXPANDED (per Evan —
-  // users should see rosters out of the box, can hide if they want more screen
-  // for the player list). User's choice still persists across visits via
-  // localStorage so once they hide, it stays hidden until they reopen.
-  const [rostersCollapsed,setRostersCollapsed] = useState(() => {
-    const saved = typeof window!=='undefined' ? localStorage.getItem('pfk_disp_rosters_collapsed') : null;
-    if(saved !== null) return saved === '1';
-    return false;
+  // Bottom-sheet height (px). Draggable anywhere between collapsed (~56px,
+  // just the tab bar) and "view" (within 80px of the top of the viewport).
+  // First-visit default is ~25% of the viewport so users see the board but
+  // can pull the sheet up. Last-set height persists across visits.
+  // Migration: old localStorage key 'pfk_disp_rosters_collapsed' is honored
+  // — '1' (collapsed) → 56px, '0' (expanded) → 25% default.
+  const SHEET_COLLAPSED_PX = 56;
+  const sheetMaxPx = () => Math.max(SHEET_COLLAPSED_PX+1, (typeof window!=='undefined' ? window.innerHeight : 800) - 80);
+  const sheetDefaultPx = () => Math.round((typeof window!=='undefined' ? window.innerHeight : 800) * 0.25);
+  const [sheetHeight,setSheetHeight] = useState(() => {
+    if(typeof window === 'undefined') return 200;
+    const savedNum = localStorage.getItem('pfk_disp_sheet_h');
+    if(savedNum != null) {
+      const n = parseInt(savedNum, 10);
+      if(!isNaN(n)) return Math.max(SHEET_COLLAPSED_PX, Math.min(sheetMaxPx(), n));
+    }
+    // Honor legacy boolean key on first encounter
+    const legacy = localStorage.getItem('pfk_disp_rosters_collapsed');
+    if(legacy === '1') return SHEET_COLLAPSED_PX;
+    return sheetDefaultPx();
   });
-  const toggleRostersCollapsed = () => {
-    setRostersCollapsed(prev => {
-      const next = !prev;
-      try{ localStorage.setItem('pfk_disp_rosters_collapsed', next ? '1' : '0'); }catch(e){}
-      return next;
-    });
+  // Persist whenever the user drags or snaps. Debounced via passive setter —
+  // every change writes once. localStorage is fast enough for this.
+  useEffect(() => {
+    try{ localStorage.setItem('pfk_disp_sheet_h', String(sheetHeight)); }catch(e){}
+  },[sheetHeight]);
+  // Re-clamp on viewport resize so a sheet saved at 600px on a tablet doesn't
+  // exceed the viewport on a phone the user opens it on next.
+  useEffect(() => {
+    const onResize = () => setSheetHeight(h => Math.max(SHEET_COLLAPSED_PX, Math.min(sheetMaxPx(), h)));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  },[]);
+  // Drag handle uses pointer events for touch + mouse parity. Active drag is
+  // refed (no re-render per-pixel) and the live height is committed on each
+  // pointermove via setSheetHeight.
+  const sheetDrag = useRef({ active:false, startY:0, startH:0 });
+  const onSheetDragStart = (e) => {
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    sheetDrag.current = { active:true, startY:y, startH:sheetHeight };
+    if(e.cancelable) e.preventDefault();
+  };
+  const onSheetDragMove = (e) => {
+    if(!sheetDrag.current.active) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const delta = sheetDrag.current.startY - y; // upward drag = positive
+    const next = Math.max(SHEET_COLLAPSED_PX, Math.min(sheetMaxPx(), sheetDrag.current.startH + delta));
+    setSheetHeight(next);
+    if(e.cancelable) e.preventDefault();
+  };
+  const onSheetDragEnd = () => { sheetDrag.current.active = false; };
+  const isSheetCollapsed = sheetHeight <= SHEET_COLLAPSED_PX + 4;
+  // Convenience: jump to a useful expanded height when programmatic UI wants
+  // to make sure content is visible (e.g. tapping a TEAM avatar).
+  const ensureSheetOpen = () => {
+    if(isSheetCollapsed) setSheetHeight(Math.max(sheetDefaultPx(), 280));
   };
   // Spectator mode: ?spectate=1 in URL hides claim/pick UI; the user can watch
   // but never interact. Useful for league mates not in the disperse pool.
@@ -6259,10 +6308,10 @@ function DispersalDraft({draftId}){
   };
 
   // status==='lobby' has no bottom sheet so no extra bottom padding needed.
-  // When the sheet is collapsed (~56px) we just need a small buffer; expanded
-  // (~52vh) the page needs ~58vh so content above isn't hidden underneath.
+  // When the sheet is up, mirror its current height (+ a small buffer) so
+  // content above isn't hidden under the sheet as the user drags it.
   const stickyRostersActive = status==='ready' || status==='live' || status==='complete';
-  const sheetPadding = stickyRostersActive ? (rostersCollapsed ? 80 : '58vh') : 14;
+  const sheetPadding = stickyRostersActive ? (sheetHeight + 14) : 14;
   return (
     <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:sheetPadding}}>
       {/* Header */}
@@ -6311,7 +6360,7 @@ function DispersalDraft({draftId}){
             <div style={{fontSize:14,fontWeight:900,color:'#FFD700'}}>{teams.filter(t=>t.joined).length} <span style={{color:'#666',fontWeight:700}}>of</span> {teams.length} <span style={{color:'#888',fontWeight:700,fontSize:12}}>joined</span></div>
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {isCommish && <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>🎲 RANDOMIZE ORDER</button>}
+            {isCommish && <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>🎲 RANDOMIZE DRAFT ORDER</button>}
             <button onClick={goToDraft} style={{padding:'10px 18px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1.2,whiteSpace:'nowrap'}}>▶ GO TO DRAFT</button>
           </div>
           {claimErr && <div style={{flex:'1 1 100%',color:'#ef4444',fontSize:12,marginTop:4}}>{claimErr}</div>}
@@ -6346,7 +6395,7 @@ function DispersalDraft({draftId}){
                   <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order. Hit START DRAFT when everyone's ready.</div>
                 </div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',flex:'0 1 auto'}}>
-                  <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:120}}>🎲 RANDOMIZE</button>
+                  <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:160}}>🎲 RANDOMIZE DRAFT ORDER</button>
                   <button onClick={startDraft} style={{padding:'10px 18px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:140}}>▶ START DRAFT</button>
                 </div>
               </div>
@@ -6509,7 +6558,7 @@ function DispersalDraft({draftId}){
                           minHeight:138
                         }}>
                           <button
-                            onClick={() => { setSheetTab('team'); setTeamTabSlot(slotIdx); if(rostersCollapsed) toggleRostersCollapsed(); }}
+                            onClick={() => { setSheetTab('team'); setTeamTabSlot(slotIdx); ensureSheetOpen(); }}
                             title={`View @${t.username}'s roster`}
                             style={{
                               background:'transparent',border:'none',cursor:'pointer',
@@ -6722,21 +6771,32 @@ function DispersalDraft({draftId}){
             const SLOT_COLORS = ['#FFD700','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
             const initialOf = (s) => (s||'?').trim().charAt(0).toUpperCase();
             return (
-              <div className={"pfk-disp-bottom-sheet"+(rostersCollapsed?' collapsed':'')} style={{
+              <div className={"pfk-disp-bottom-sheet"+(isSheetCollapsed?' collapsed':'')} style={{
                 position:'fixed',left:0,right:0,bottom:0,
                 background:'#080808',borderTop:'2px solid #FFD700',
                 paddingBottom:'env(safe-area-inset-bottom)',
-                // Use explicit `height` (not maxHeight) so the inner flex child
-                // gets a real height to size against — without it, flex:1 on
-                // the scroll container collapses and the player list stops
-                // scrolling. Mobile CSS bumps this to 60vh.
-                height: rostersCollapsed ? 56 : '52vh',
+                // Drag-controlled height (px). Mobile CSS no longer overrides
+                // this — the user is in charge. SHEET_COLLAPSED_PX is the
+                // floor (just the tab bar); upper limit is computed at runtime.
+                height: sheetHeight,
                 display:'flex',flexDirection:'column',
                 zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)',
-                transition:'height 0.18s ease-out'
+                // No height transition during active drag (would feel laggy);
+                // only animate snap-to clicks.
+                transition: sheetDrag.current.active ? 'none' : 'height 0.18s ease-out'
               }}>
                 <div style={{maxWidth:1240,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',minHeight:0,flex:1}}>
-                  {/* Tab strip — PLAYERS · TEAM · collapse button */}
+                  {/* Drag handle bar — touch/mouse drag from anywhere along
+                      this strip resizes the sheet. The handle pill is purely
+                      visual; the whole strip is the drag target so the touch
+                      area is finger-friendly. */}
+                  <div
+                    onTouchStart={onSheetDragStart} onTouchMove={onSheetDragMove} onTouchEnd={onSheetDragEnd} onTouchCancel={onSheetDragEnd}
+                    onMouseDown={(e)=>{ onSheetDragStart(e); const move=(ev)=>onSheetDragMove(ev); const up=()=>{ onSheetDragEnd(); window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); }; window.addEventListener('mousemove',move); window.addEventListener('mouseup',up); }}
+                    style={{padding:'6px 0 4px',display:'flex',justifyContent:'center',cursor:'ns-resize',touchAction:'none'}}>
+                    <div style={{width:48,height:4,borderRadius:2,background:'#444'}}/>
+                  </div>
+                  {/* Tab strip — PLAYERS · TEAM · COLLAPSE · VIEW (snap buttons) */}
                   <div style={{display:'flex',alignItems:'stretch',borderBottom:'1px solid #1e1e1e'}}>
                     {[
                       {id:'players', label:'PLAYERS', count: counts.all},
@@ -6745,9 +6805,9 @@ function DispersalDraft({draftId}){
                       const sel = sheetTab === tab.id;
                       return (
                         <button key={tab.id}
-                          onClick={() => { setSheetTab(tab.id); if(rostersCollapsed) toggleRostersCollapsed(); }}
+                          onClick={() => { setSheetTab(tab.id); ensureSheetOpen(); }}
                           style={{
-                            flex:1,padding:'14px 6px',background:sel?'#0f0f0f':'transparent',border:'none',cursor:'pointer',
+                            flex:1,padding:'12px 6px',background:sel?'#0f0f0f':'transparent',border:'none',cursor:'pointer',
                             color:sel?'#FFD700':'#888',fontWeight:900,fontSize:12,letterSpacing:1.2,
                             borderBottom:'2px solid '+(sel?'#FFD700':'transparent')
                           }}>
@@ -6755,14 +6815,18 @@ function DispersalDraft({draftId}){
                         </button>
                       );
                     })}
-                    <button onClick={toggleRostersCollapsed} title={rostersCollapsed?'Expand':'Collapse'}
-                      style={{padding:'14px 18px',background:'transparent',border:'none',cursor:'pointer',color:'#FFD700',fontSize:14,fontWeight:900,minWidth:48}}>
-                      {rostersCollapsed ? '▲' : '▼'}
-                    </button>
+                    {/* COLLAPSE — snap to floor */}
+                    <button onClick={()=>setSheetHeight(SHEET_COLLAPSED_PX)} title="Collapse"
+                      style={{padding:'12px 12px',background:'transparent',border:'none',cursor:'pointer',color:'#888',fontSize:11,fontWeight:900,letterSpacing:0.5,minWidth:42}}>▼</button>
+                    {/* VIEW — snap to ceiling (full open) */}
+                    <button onClick={()=>setSheetHeight(sheetMaxPx())} title="Expand to full view"
+                      style={{padding:'12px 12px',background:'transparent',border:'none',cursor:'pointer',color:'#FFD700',fontSize:11,fontWeight:900,letterSpacing:0.5,minWidth:42}}>▲</button>
                   </div>
 
-                  {/* Tab content — only renders when sheet is expanded */}
-                  {!rostersCollapsed && (
+                  {/* Tab content — only renders when sheet is expanded enough
+                      to show meaningful content. Below the threshold the user
+                      is essentially "collapsed" so we save the render. */}
+                  {!isSheetCollapsed && (
                     <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
                       {/* ===== PLAYERS TAB ===== */}
                       {sheetTab === 'players' && (
@@ -6892,33 +6956,133 @@ function DispersalDraft({draftId}){
                                     style={{padding:'6px 12px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.5}}>📸 SCREENSHOT</button>
                                 )}
                               </div>
-                              {/* Picks grouped by position */}
-                              {activeTeamPicks.length === 0 ? (
-                                <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>No picks yet.</div>
-                              ) : (
-                                <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                                  {activeTeamPicks.map(p => {
-                                    const it = p.item;
-                                    const isPick = it?.type === 'pick';
-                                    const pos = isPick ? 'PICK' : posOf(it);
-                                    const color = isPick ? '#FFD700' : (POS_COLORS[pos] || '#9ca3af');
-                                    const cleanName = (it?.name || '(missing)').replace(/\s*\([A-Za-z]+\)\s*$/, '');
-                                    const r = Math.floor(p.pickIdx / Math.max(1,teams.length)) + 1;
-                                    const pInRound = (p.pickIdx % Math.max(1,teams.length)) + 1;
-                                    return (
-                                      <div key={p.pickIdx} style={{
-                                        display:'flex',alignItems:'center',gap:10,
-                                        padding:'8px 10px',background:'#0f0f0f',
-                                        borderLeft:'3px solid '+color,borderRadius:5
-                                      }}>
-                                        <span style={{padding:'3px 8px',borderRadius:4,fontSize:10,fontWeight:900,letterSpacing:0.5,background:color+'22',color:color,border:'1px solid '+color+'55',minWidth:40,textAlign:'center'}}>{pos || '—'}</span>
-                                        <span style={{flex:1,fontSize:14,fontWeight:700,color:'#eee',wordBreak:'break-word',minWidth:0}}>{cleanName}{p.auto && <span style={{color:'#f59e0b',fontStyle:'italic',marginLeft:6,fontSize:10,fontWeight:600}}>(auto)</span>}</span>
-                                        <span style={{fontSize:11,color:'#888',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}}>{r}.{pInRound}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                              {/* Sleeper-style starting lineup. If the draft was
+                                  created from a Sleeper league we use the
+                                  league's actual roster_positions (persisted
+                                  on draft create); otherwise we fall back to
+                                  a sensible dynasty default (1QB/2RB/3WR/1TE/
+                                  1FLEX/1SF/1K). Players auto-fill into their
+                                  best matching slot, sorted by FantasyCalc
+                                  value desc. Future picks + leftover players
+                                  go on the bench. */}
+                              {(() => {
+                                if(activeTeamPicks.length === 0) {
+                                  return <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>No picks yet.</div>;
+                                }
+                                // Slot eligibility — Sleeper roster_position
+                                // names map to the position groups they accept.
+                                const SLOT_ELIG = {
+                                  QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'], K: ['K'], DEF: ['DEF'],
+                                  FLEX: ['RB','WR','TE'],
+                                  WRT: ['RB','WR','TE'],
+                                  REC_FLEX: ['WR','TE'],
+                                  SUPER_FLEX: ['QB','RB','WR','TE'],
+                                  IDP_FLEX: ['DL','LB','DB'],
+                                };
+                                const SLOT_LABELS = {
+                                  QB:'QB', RB:'RB', WR:'WR', TE:'TE', K:'K', DEF:'DEF',
+                                  FLEX:'WRT', WRT:'WRT', REC_FLEX:'WR/TE',
+                                  SUPER_FLEX:'SF', IDP_FLEX:'IDP',
+                                };
+                                const DEFAULT_SLOTS = ['QB','RB','RB','WR','WR','WR','TE','FLEX','SUPER_FLEX','K'];
+                                const rawSlots = (Array.isArray(draft.roster_positions) && draft.roster_positions.length)
+                                  ? draft.roster_positions : DEFAULT_SLOTS;
+                                const starterSlots = rawSlots.filter(s => s !== 'BN' && s !== 'TAXI' && s !== 'IR');
+                                // Value lookup — same FC values used elsewhere.
+                                const valueOf = (it) => {
+                                  if(!it || it.type === 'pick') return -1;
+                                  if(!fcValues) return 0;
+                                  if(it.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
+                                  const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
+                                  const k = normDraftName(stripped);
+                                  return fcValues.byName[k] != null ? fcValues.byName[k] : 0;
+                                };
+                                // Split future picks off — they always go to bench.
+                                const playerPicks = activeTeamPicks.filter(p => p.item && p.item.type !== 'pick');
+                                const futurePicks = activeTeamPicks.filter(p => !p.item || p.item.type === 'pick');
+                                // Auto-fill: walk slots in order, take best
+                                // available eligible player for each. Greedy
+                                // — not optimal but matches the Sleeper feel.
+                                const sorted = playerPicks.slice().sort((a,b) => valueOf(b.item) - valueOf(a.item));
+                                const used = new Set(); // pickIdx of placed picks
+                                const lineup = starterSlots.map((slotKey) => {
+                                  const accepts = SLOT_ELIG[slotKey] || [slotKey];
+                                  const found = sorted.find(p => !used.has(p.pickIdx) && accepts.includes(posOf(p.item)));
+                                  if(found) used.add(found.pickIdx);
+                                  return { slotKey, label: SLOT_LABELS[slotKey] || slotKey, pick: found || null };
+                                });
+                                const bench = sorted.filter(p => !used.has(p.pickIdx));
+                                const benchPlusPicks = [...bench, ...futurePicks];
+                                // Slot color — use the position's color when
+                                // filled, otherwise grey.
+                                const lineupSlotColor = (slotKey, pick) => {
+                                  if(pick && pick.item) {
+                                    if(pick.item.type === 'pick') return '#FFD700';
+                                    return POS_COLORS[posOf(pick.item)] || '#9ca3af';
+                                  }
+                                  // Empty — slot accent based on slot type
+                                  if(['FLEX','WRT','REC_FLEX'].includes(slotKey)) return '#22d3ee';
+                                  if(slotKey === 'SUPER_FLEX') return '#ec4899';
+                                  return POS_COLORS[slotKey] || '#9ca3af';
+                                };
+                                const renderRow = (pick, slotLabel, slotColor, isBench) => {
+                                  const it = pick?.item;
+                                  const isFuturePick = it?.type === 'pick';
+                                  const cleanNm = it ? (it.name || '').replace(/\s*\([A-Za-z]+\)\s*$/, '') : '';
+                                  const r = pick ? (Math.floor(pick.pickIdx / Math.max(1,teams.length)) + 1) : null;
+                                  const pInRound = pick ? ((pick.pickIdx % Math.max(1,teams.length)) + 1) : null;
+                                  return (
+                                    <div style={{
+                                      display:'flex',alignItems:'center',gap:10,
+                                      padding:'8px 10px',background:isBench?'#0a0a0a':'#0f0f0f',
+                                      borderLeft:'3px solid '+slotColor,borderRadius:5
+                                    }}>
+                                      <span style={{padding:'4px 7px',borderRadius:4,fontSize:10,fontWeight:900,letterSpacing:0.4,background:slotColor+'22',color:slotColor,border:'1px solid '+slotColor+'55',minWidth:46,textAlign:'center'}}>{slotLabel}</span>
+                                      {pick ? (
+                                        <>
+                                          <span style={{flex:1,fontSize:14,fontWeight:700,color:'#eee',wordBreak:'break-word',minWidth:0}}>
+                                            {cleanNm || '(missing)'}
+                                            {!isFuturePick && it && <span style={{display:'block',fontSize:10,color:'#777',fontWeight:600,marginTop:1}}>{posOf(it)||'—'}</span>}
+                                            {isFuturePick && <span style={{display:'block',fontSize:10,color:'#a78bfa',fontWeight:600,marginTop:1}}>future pick</span>}
+                                            {pick.auto && <span style={{color:'#f59e0b',fontStyle:'italic',marginLeft:6,fontSize:10,fontWeight:600}}>(auto)</span>}
+                                          </span>
+                                          <span style={{fontSize:11,color:'#888',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}}>{r}.{pInRound}</span>
+                                        </>
+                                      ) : (
+                                        <span style={{flex:1,fontSize:13,color:'#555',fontStyle:'italic'}}>empty</span>
+                                      )}
+                                    </div>
+                                  );
+                                };
+                                return (
+                                  <>
+                                    {/* STARTERS */}
+                                    <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:'#888',marginBottom:6}}>STARTERS</div>
+                                    <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:12}}>
+                                      {lineup.map((row, i) => (
+                                        <div key={`s${i}`}>
+                                          {renderRow(row.pick, row.label, lineupSlotColor(row.slotKey, row.pick), false)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {/* BENCH */}
+                                    {benchPlusPicks.length > 0 && (
+                                      <>
+                                        <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:'#888',marginBottom:6}}>BENCH ({benchPlusPicks.length})</div>
+                                        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                                          {benchPlusPicks.map(p => {
+                                            const it = p.item;
+                                            const isFuturePick = it?.type === 'pick';
+                                            const pos = isFuturePick ? 'PICK' : posOf(it);
+                                            const color = isFuturePick ? '#FFD700' : (POS_COLORS[pos] || '#9ca3af');
+                                            return <div key={p.pickIdx}>{renderRow(p, pos || 'BN', color, true)}</div>;
+                                          })}
+                                        </div>
+                                      </>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>

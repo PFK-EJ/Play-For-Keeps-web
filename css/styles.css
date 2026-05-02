@@ -102,10 +102,8 @@ input, select { font-family:inherit; }
     min-height:42px; min-width:96px;
     flex:0 0 auto; order:3;
   }
-  /* Bottom sheet uses `height` (not maxHeight) so the inner flex:1 scroll
-     container has a real container to size against. 60vh on mobile so the
-     board still has room above. */
-  .pfk-disp-bottom-sheet:not(.collapsed) { height:60vh !important; }
+  /* Bottom sheet height is controlled in JS (drag-to-resize). Don't override
+     it here — the user is in charge of where the sheet sits. */
   /* Pick cards on mobile — slightly smaller min so 10-12 columns can crunch
      without forcing a wide horizontal scroll. */
   .pfk-disp-pick-card { min-height:58px !important; }
