@@ -6048,9 +6048,26 @@ function DispersalDraft({draftId}){
     if(error){ setPickErr(error.message || 'Pick failed'); return; }
   };
 
-  const signOut = () => {
-    localStorage.removeItem('pfk_disp_'+draftId);
-    setMe(null);
+  // "switch" button — releases the user's current team so they can claim a
+  // different one. Three things have to happen, in order, or you get stuck:
+  //   1. Mark the team as not joined in the DB
+  //   2. Clear the sleeper_user_id tag so Tier S auto-recover doesn't snap you
+  //      back to the same team on the next render
+  //   3. Clear localStorage + me state
+  // Confirms first since releasing a team is a meaningful action.
+  const signOut = async () => {
+    if(me && draft?.teams){
+      if(!confirm('Switch teams? Your current team will be released so you can claim a different one.')) return;
+      const newTeams = draft.teams.map(t => t.slot===me.slot ? {...t, joined:false, sleeper_user_id:undefined} : t);
+      setDraft(d => d ? {...d, teams:newTeams} : d); // optimistic
+      try{ localStorage.removeItem('pfk_disp_'+draftId); }catch(e){}
+      setMe(null);
+      await dispUpdate(draftId, { teams:newTeams });
+    } else {
+      // No active claim — just nuke the local state (rare path, defensive).
+      try{ localStorage.removeItem('pfk_disp_'+draftId); }catch(e){}
+      setMe(null);
+    }
   };
 
   // Auto-pick when the timer expires (only if draft.auto_pick is true). Any client viewing
@@ -6589,7 +6606,7 @@ function DispersalDraft({draftId}){
 
           {/* Rosters — sticky-bottom on viewport so they're always in view as you scroll the pool.
               Collapsible (default collapsed on mobile) so the panel doesn't eat the player list. */}
-          <div className={"pfk-disp-rosters" + (rostersCollapsed ? " collapsed" : "")} style={{position:'fixed',left:0,right:0,bottom:0,background:'#080808',borderTop:'2px solid #FFD700',padding:'10px 14px',maxHeight: rostersCollapsed ? 'auto' : '42vh',overflowY: rostersCollapsed ? 'visible' : 'auto',zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)'}}>
+          <div className={"pfk-disp-rosters" + (rostersCollapsed ? " collapsed" : "")} style={{position:'fixed',left:0,right:0,bottom:0,background:'#080808',borderTop:'2px solid #FFD700',padding:'10px 14px',paddingBottom:'max(10px, env(safe-area-inset-bottom))',maxHeight: rostersCollapsed ? 'auto' : '42vh',overflowY: rostersCollapsed ? 'visible' : 'auto',zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)'}}>
             <div style={{maxWidth:1240,margin:'0 auto'}}>
               <button onClick={toggleRostersCollapsed}
                       style={{width:'100%',display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',color:'inherit',cursor:'pointer',padding:'4px 0',marginBottom: rostersCollapsed ? 0 : 8,textAlign:'left',flexWrap:'wrap'}}>
