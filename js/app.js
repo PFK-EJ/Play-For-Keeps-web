@@ -5883,6 +5883,12 @@ function DispersalDraft({draftId}){
   const [linkCopied,setLinkCopied] = useState(false);
   const [fcValues,setFcValues] = useState(null); // {bySleeperId, byName} from FantasyCalc — silent sort
   useEffect(()=>{ fetchFcValues().then(setFcValues); },[]);
+  // Sleeper avatar lookup keyed by user_id. Populated by a debounced effect
+  // that runs whenever a new linked team appears in the draft, so claimants
+  // who linked Sleeper render with their actual Sleeper profile picture in the
+  // team-strip circle. Falls back to first-letter initial when missing/unset.
+  // Cached aggressively (force-cache) — avatar IDs rarely change.
+  const [teamAvatars,setTeamAvatars] = useState({}); // { [user_id]: avatar_hash | null }
   // Track in-flight auto-pick attempts so we don't double-fire on the same pick index.
   const autoPickAttempted = useRef(new Set());
   // 1-second tick for the live timer countdown (only ticks when live + deadline set)
@@ -5956,6 +5962,33 @@ function DispersalDraft({draftId}){
     setDraft(d => d ? {...d, teams:newTeams} : d);
     dispUpdate(draftId, { teams:newTeams }).catch(()=>{}); // fire-and-forget
   },[me?.slot, sleeperLinkedUser?.user_id, draft?.teams, draftId]);
+
+  // Pull Sleeper avatar hashes for any team linked via sleeper_user_id. Runs
+  // whenever the set of linked users in the draft changes. Each fetch is
+  // independently cached + recoverable; one network error doesn't blow away
+  // the whole map. Map value of `null` means "we tried, no avatar set" — keeps
+  // us from refetching the same user repeatedly.
+  useEffect(() => {
+    if(!Array.isArray(draft?.teams)) return;
+    const linkedIds = draft.teams.map(t => t.sleeper_user_id).filter(Boolean);
+    const missing = linkedIds.filter(id => !(id in teamAvatars));
+    if(missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map(id =>
+      fetch(`https://api.sleeper.app/v1/user/${id}`, {cache:'force-cache'})
+        .then(r => r.ok ? r.json() : null)
+        .then(u => [id, u?.avatar || null])
+        .catch(() => [id, null])
+    )).then(pairs => {
+      if(cancelled) return;
+      setTeamAvatars(prev => {
+        const next = {...prev};
+        pairs.forEach(([id, av]) => { next[id] = av; });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  },[draft?.teams?.map(t => t.sleeper_user_id||'').join('|')]);
 
   const claimSlot = async (slot) => {
     setClaimErr('');
@@ -6267,66 +6300,37 @@ function DispersalDraft({draftId}){
         </div>
       )}
 
-      {/* Lobby phase */}
+      {/* Lobby phase — minimal control banner. Per-team CLAIM / RECOVER /
+          UNCLAIM buttons live in the team-avatar strip below (rendered for
+          every phase), so this banner only carries the global controls:
+          waiting count, randomize order, and "GO TO DRAFT". */}
       {status === 'lobby' && (
-        <>
-          <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
-              <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>WAITING FOR MANAGERS · {teams.filter(t=>t.joined).length} of {teams.length} joined · DRAFT ORDER:</div>
-              {isCommish && <button onClick={randomizeOrder} style={{marginLeft:'auto',padding:'5px 11px',background:'transparent',border:'1px solid #FFD700',borderRadius:6,color:'#FFD700',fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:0.5}}>🎲 RANDOMIZE ORDER</button>}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
-              {pickOrder.map((slotIdx,i)=>{
-                const t = teams.find(x=>x.slot===slotIdx);
-                if(!t) return null;
-                const isMine = me && me.slot===t.slot;
-                const canClaim = !t.joined && !me && !isSpectator;
-                return (
-                  <div key={t.slot} style={{padding:'10px 12px',background:t.joined?'#0a2a1a':'#0a0a0a',border:'1px solid '+(t.joined?'#10b981':'#222'),borderRadius:8,display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{color:t.joined?'#10b981':'#666',fontSize:18,flexShrink:0}}>{t.joined?'✓':'○'}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:800,fontSize:14,wordBreak:'break-word'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11}}>(you)</span>}</div>
-                      <div style={{fontSize:11,color:'#666'}}>Pick #{i+1}</div>
-                    </div>
-                    {canClaim && <button onClick={()=>handleClaimClick(t.slot)} style={{padding:'5px 11px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:11,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
-                    {/* Recover claim — for users who lost their session (cleared cache /
-                        switched device) and need to re-attach as the original claimer. */}
-                    {t.joined && !isMine && !isSpectator && <button onClick={()=>recoverSlot(t.slot)} title="Take over this team — only if you're the original claimer and lost your session"
-                      style={{padding:'5px 9px',background:'transparent',border:'1px solid #FFD70066',borderRadius:5,color:'#FFD700',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>↻ RECOVER</button>}
-                    {/* User-facing unclaim — lets a manager release their own claim if
-                        they grabbed the wrong team and need to switch. Same path as
-                        the commish release. */}
-                    {isMine && <button onClick={()=>releaseSlot(t.slot)} title="Unclaim this team — frees it up so you can claim a different one"
-                      style={{padding:'5px 9px',background:'transparent',border:'1px solid #ef444466',borderRadius:5,color:'#ef4444',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>✕ UNCLAIM</button>}
-                    {t.joined && isCommish && !isMine && <button onClick={()=>releaseSlot(t.slot)} title="Release this claim" style={{padding:'3px 7px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11,flexShrink:0}}>✕</button>}
-                  </div>
-                );
-              })}
-            </div>
-            {claimErr && <div style={{marginTop:8,color:'#ef4444',fontSize:12}}>{claimErr}</div>}
-            <button onClick={goToDraft} style={{marginTop:14,padding:'12px 24px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ GO TO DRAFT</button>
+        <div className="pfk-disp-lobby-controls" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{flex:'1 1 200px',minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5,marginBottom:2}}>WAITING FOR MANAGERS</div>
+            <div style={{fontSize:14,fontWeight:900,color:'#FFD700'}}>{teams.filter(t=>t.joined).length} <span style={{color:'#666',fontWeight:700}}>of</span> {teams.length} <span style={{color:'#888',fontWeight:700,fontSize:12}}>joined</span></div>
           </div>
-          {!me && !isSpectator && !isCommish && (
-            <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'18px 22px',marginBottom:12,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-              <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:14,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:4}}>👑 RUNNING THIS DRAFT?</div>
-                <div style={{fontSize:13,color:'#aaa'}}>If you set this draft up and aren't drafting, click here to enter as commissioner. No passcode needed — you'll get start/randomize/undo controls.</div>
-              </div>
-              <button onClick={declareCommish} style={{padding:'12px 20px',background:'#FFD700',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>I AM THE COMMISSIONER</button>
-            </div>
-          )}
-          {!me && isCommish && (
-            <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'10px 16px',marginBottom:12,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:13,fontWeight:900,color:'#FFD700',letterSpacing:1}}>👑 COMMISSIONER MODE</span>
-              <span style={{fontSize:12,color:'#888'}}>You're not drafting — you'll run the lobby + start the draft. Claim a team below if you do want to draft.</span>
-            </div>
-          )}
-          {!me && !isSpectator && !isCommish && (
-            <div style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#aaa'}}>
-              👆 Click <strong style={{color:'#FFD700'}}>CLAIM</strong> next to your username above. If your team isn't listed, you're a spectator (view-only).
-            </div>
-          )}
-        </>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {isCommish && <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>🎲 RANDOMIZE ORDER</button>}
+            <button onClick={goToDraft} style={{padding:'10px 18px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1.2,whiteSpace:'nowrap'}}>▶ GO TO DRAFT</button>
+          </div>
+          {claimErr && <div style={{flex:'1 1 100%',color:'#ef4444',fontSize:12,marginTop:4}}>{claimErr}</div>}
+        </div>
+      )}
+      {status === 'lobby' && !me && !isSpectator && !isCommish && (
+        <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:10,padding:'14px 18px',marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontSize:13,fontWeight:900,color:'#FFD700',letterSpacing:1,marginBottom:2}}>👑 RUNNING THIS DRAFT?</div>
+            <div style={{fontSize:12,color:'#aaa'}}>Click in as commissioner — start/randomize/undo controls. No passcode needed.</div>
+          </div>
+          <button onClick={declareCommish} style={{padding:'10px 16px',background:'#FFD700',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1}}>I AM THE COMMISSIONER</button>
+        </div>
+      )}
+      {status === 'lobby' && !me && isCommish && (
+        <div style={{background:'#0f0a00',border:'1px solid #FFD700',borderRadius:10,padding:'10px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <span style={{fontSize:13,fontWeight:900,color:'#FFD700',letterSpacing:1}}>👑 COMMISSIONER MODE</span>
+          <span style={{fontSize:12,color:'#888'}}>You're not drafting — you run the lobby + start the draft. Claim a team below if you do want to draft.</span>
+        </div>
       )}
 
       {/* Ready / Live / Complete all share the draft view (pool + rosters). 'ready' adds a
@@ -6336,14 +6340,15 @@ function DispersalDraft({draftId}){
         <>
           {status === 'ready' && (
             <div style={{marginBottom:14}}>
-              <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:'10px 10px 0 0',padding:'14px 18px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',borderBottom:'none'}}>
-                <div>
+              <div style={{background:'#0f0a00',border:'2px solid #FFD700',borderRadius:'10px 10px 0 0',padding:'14px 16px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',borderBottom:'none'}}>
+                <div style={{flex:'1 1 220px',minWidth:0}}>
                   <div style={{fontSize:11,fontWeight:800,color:'#FFD700',letterSpacing:1.5}}>READY TO DRAFT</div>
                   <div style={{fontSize:13,color:'#aaa',marginTop:2}}>Review the draft order. Hit START DRAFT when everyone's ready.</div>
                 </div>
-                <span style={{flex:1}}/>
-                <button onClick={randomizeOrder} style={{padding:'10px 16px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:13,letterSpacing:1}}>🎲 RANDOMIZE ORDER</button>
-                <button onClick={startDraft} style={{padding:'12px 20px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:14,letterSpacing:1.5}}>▶ START DRAFT</button>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',flex:'0 1 auto'}}>
+                  <button onClick={randomizeOrder} style={{padding:'10px 14px',background:'transparent',border:'1px solid #FFD700',borderRadius:7,color:'#FFD700',fontWeight:800,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:120}}>🎲 RANDOMIZE</button>
+                  <button onClick={startDraft} style={{padding:'10px 18px',background:'#10b981',border:'none',borderRadius:7,color:'#000',fontWeight:900,cursor:'pointer',fontSize:13,letterSpacing:1,whiteSpace:'nowrap',flex:'1 1 auto',minWidth:140}}>▶ START DRAFT</button>
+                </div>
               </div>
               {/* Pick order strip — visible right under the READY banner so RANDOMIZE shows the reorder live */}
               <div style={{background:'#0a0a0a',border:'2px solid #FFD700',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'8px 12px',display:'flex',gap:6,overflowX:'auto'}}>
@@ -6426,12 +6431,16 @@ function DispersalDraft({draftId}){
               {status==='complete' && <button onClick={reopenDraft} style={{padding:'6px 12px',background:'transparent',border:'1px solid #10b981',borderRadius:6,color:'#10b981',fontSize:12,fontWeight:800,cursor:'pointer'}}>▶ Reopen draft</button>}
             </div>
           )}
+        </>
+      )}
 
-          {/* SLEEPER-STYLE DRAFT BOARD — team avatar strip on top, color-coded
-              pick grid below. Horizontal scroll keeps the 8-12 columns readable
-              on mobile. Tap a manager's avatar to jump the bottom sheet to
-              their TEAM tab. The pool list + per-manager rosters now live in
-              the bottom sheet — see <BottomSheet> further down. */}
+      {/* SLEEPER-STYLE DRAFT BOARD — team avatar strip on top, color-coded
+          pick grid below. Horizontal scroll keeps the 8-12 columns readable
+          on mobile. Tap a manager's avatar to jump the bottom sheet to their
+          TEAM tab. Renders in EVERY phase (lobby through complete) so the
+          team strip is the single, consistent place to claim/recover/unclaim
+          a team. The pool list + per-manager rosters live in the bottom
+          sheet, which is gated to ready/live/complete only. */}
           {(() => {
             const N = pickOrder.length || 1;
             const numRounds = Math.max(1, Math.ceil(pool.length / N));
@@ -6469,44 +6478,88 @@ function DispersalDraft({draftId}){
             return (
               <div className="pfk-disp-board-wrap" style={{marginBottom:14,border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden',background:'#0a0a0a'}}>
                 <div className="pfk-disp-board-scroll" style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-                  {/* Team avatar strip — first row of the synced horizontal scroll */}
+                  {/* Team avatar strip — sleeper avatars when linked, action chips
+                      (CLAIM / ↻ RECOVER / ✕ UNCLAIM) under each name so all team
+                      management lives here in every phase (replaces the old
+                      lobby claim grid). Tapping the avatar/name jumps the bottom
+                      sheet to that manager's TEAM tab; chip taps stop bubbling
+                      so the two interactions don't fight each other. */}
                   <div style={{
                     display:'grid',gridTemplateColumns:`repeat(${N}, minmax(${MIN_CELL}px, 1fr))`,
                     gap:0,minWidth:N*MIN_CELL,
                     background:'#0f0f0f',borderBottom:'1px solid #1e1e1e'
                   }}>
-                    {pickOrder.map((slotIdx) => {
+                    {pickOrder.map((slotIdx, idx) => {
                       const t = teamBySlot[slotIdx];
                       if(!t) return <div key={slotIdx} style={{padding:6}}/>;
                       const isOnClock = onClockSlot === slotIdx && status === 'live';
                       const isMe = me && me.slot === slotIdx;
                       const slotColor = SLOT_COLORS[slotIdx % SLOT_COLORS.length];
+                      const avatarHash = t.sleeper_user_id ? teamAvatars[t.sleeper_user_id] : null;
+                      const canClaim = !t.joined && !me && !isSpectator;
+                      const canRecover = t.joined && !isMe && !isSpectator;
+                      const canUnclaim = isMe;
                       return (
-                        <button key={slotIdx}
-                          onClick={() => { setSheetTab('team'); setTeamTabSlot(slotIdx); if(rostersCollapsed) toggleRostersCollapsed(); }}
-                          title={`View @${t.username}'s roster`}
-                          style={{
-                            background:'transparent',border:'none',cursor:'pointer',
-                            padding:'8px 4px 6px',display:'flex',flexDirection:'column',alignItems:'center',gap:4,
-                            color:'inherit',font:'inherit',
-                            opacity:t.joined?1:0.55,
-                            borderBottom:'2px solid '+(isOnClock?'#10b981':'transparent')
-                          }}>
-                          <div style={{
-                            width:36,height:36,borderRadius:'50%',
-                            background:slotColor+'33',
-                            border:'2px solid '+(isOnClock?'#10b981':isMe?'#FFD700':slotColor+'66'),
-                            color:slotColor,
-                            display:'flex',alignItems:'center',justifyContent:'center',
-                            fontSize:14,fontWeight:900,
-                            boxShadow:isOnClock?'0 0 0 3px rgba(16,185,129,0.25)':'none'
-                          }}>{initialOf(t.username)}</div>
-                          <div style={{
-                            fontSize:10,fontWeight:800,letterSpacing:0.3,
-                            color:isOnClock?'#10b981':isMe?'#FFD700':'#aaa',
-                            maxWidth:MIN_CELL-8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
-                          }}>{t.username}</div>
-                        </button>
+                        <div key={slotIdx} style={{
+                          position:'relative',
+                          display:'flex',flexDirection:'column',alignItems:'center',gap:4,
+                          padding:'8px 4px 8px',
+                          borderBottom:'2px solid '+(isOnClock?'#10b981':'transparent'),
+                          opacity:t.joined?1:0.78,
+                          minHeight:138
+                        }}>
+                          <button
+                            onClick={() => { setSheetTab('team'); setTeamTabSlot(slotIdx); if(rostersCollapsed) toggleRostersCollapsed(); }}
+                            title={`View @${t.username}'s roster`}
+                            style={{
+                              background:'transparent',border:'none',cursor:'pointer',
+                              padding:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+                              color:'inherit',font:'inherit',width:'100%'
+                            }}>
+                            <div style={{
+                              width:40,height:40,borderRadius:'50%',
+                              background:slotColor+'33',
+                              border:'2px solid '+(isOnClock?'#10b981':isMe?'#FFD700':t.joined?slotColor+'aa':'#444'),
+                              color:slotColor,
+                              overflow:'hidden',
+                              display:'flex',alignItems:'center',justifyContent:'center',
+                              fontSize:15,fontWeight:900,
+                              boxShadow:isOnClock?'0 0 0 3px rgba(16,185,129,0.25)':'none'
+                            }}>
+                              {avatarHash
+                                ? <img src={`https://sleepercdn.com/avatars/thumbs/${avatarHash}`} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e)=>{ e.target.style.display='none'; }}/>
+                                : initialOf(t.username)
+                              }
+                            </div>
+                            <div style={{
+                              fontSize:10,fontWeight:800,letterSpacing:0.3,
+                              color:isOnClock?'#10b981':isMe?'#FFD700':'#ddd',
+                              maxWidth:MIN_CELL-8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
+                            }}>{t.username}{isMe && <span style={{color:'#10b981',marginLeft:3}}>•you</span>}</div>
+                            <div style={{fontSize:9,color:'#666',fontWeight:700,letterSpacing:0.3}}>Pick #{idx+1}{!t.joined && <span style={{color:'#666',marginLeft:4}}>· open</span>}</div>
+                          </button>
+                          {/* Action chip row — only one at a time renders */}
+                          {canClaim && (
+                            <button onClick={(e)=>{e.stopPropagation(); handleClaimClick(slotIdx);}}
+                              style={{padding:'5px 10px',background:'#FFD700',border:'none',borderRadius:4,color:'#000',fontWeight:900,fontSize:10,letterSpacing:0.8,cursor:'pointer',width:'calc(100% - 6px)'}}>CLAIM</button>
+                          )}
+                          {!canClaim && canRecover && (
+                            <button onClick={(e)=>{e.stopPropagation(); recoverSlot(slotIdx);}}
+                              title="Take over this team — only if you're the original claimer and lost your session"
+                              style={{padding:'5px 8px',background:'transparent',border:'1px solid #FFD70077',borderRadius:4,color:'#FFD700',fontWeight:800,fontSize:9,letterSpacing:0.5,cursor:'pointer',width:'calc(100% - 6px)',whiteSpace:'nowrap'}}>↻ RECOVER</button>
+                          )}
+                          {canUnclaim && (
+                            <button onClick={(e)=>{e.stopPropagation(); releaseSlot(slotIdx);}}
+                              title="Unclaim — frees this team so you can claim another"
+                              style={{padding:'5px 8px',background:'transparent',border:'1px solid #ef444477',borderRadius:4,color:'#ef4444',fontWeight:800,fontSize:9,letterSpacing:0.5,cursor:'pointer',width:'calc(100% - 6px)',whiteSpace:'nowrap'}}>✕ UNCLAIM</button>
+                          )}
+                          {/* Commish quick-release — separate, smaller, only when commish + foreign claim */}
+                          {t.joined && isCommish && !isMe && !isSpectator && (
+                            <button onClick={(e)=>{e.stopPropagation(); releaseSlot(slotIdx);}}
+                              title="Commish: release this claim"
+                              style={{position:'absolute',top:4,right:4,padding:'1px 5px',background:'#1a1a1a',border:'1px solid #444',borderRadius:3,color:'#888',fontSize:9,fontWeight:700,cursor:'pointer'}}>✕</button>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -6631,10 +6684,14 @@ function DispersalDraft({draftId}){
             </div>
           )}
 
-          {/* SLEEPER-STYLE BOTTOM SHEET — PLAYERS / TEAM tabs.
-              PLAYERS: position-filtered pool (used to be the standalone pool block).
-              TEAM: a manager's roster grouped by position (used to be the rosters bar).
-              Collapses to ~64px showing only the tab strip; expands to ~52vh. */}
+      {/* SLEEPER-STYLE BOTTOM SHEET — PLAYERS / TEAM tabs.
+          PLAYERS: position-filtered pool (used to be the standalone pool block).
+          TEAM: a manager's roster grouped by position (used to be the rosters bar).
+          Only ready/live/complete render this — there's no point in a player
+          pool during the lobby. Collapses to ~56px; expands to ~52vh (60vh
+          on mobile via CSS). */}
+      {(status === 'ready' || status === 'live' || status === 'complete') && (
+        <>
           {(() => {
             const posOf = (it) => {
               if(!it) return '';
@@ -6669,10 +6726,14 @@ function DispersalDraft({draftId}){
                 position:'fixed',left:0,right:0,bottom:0,
                 background:'#080808',borderTop:'2px solid #FFD700',
                 paddingBottom:'env(safe-area-inset-bottom)',
-                maxHeight: rostersCollapsed ? 56 : '52vh',
+                // Use explicit `height` (not maxHeight) so the inner flex child
+                // gets a real height to size against — without it, flex:1 on
+                // the scroll container collapses and the player list stops
+                // scrolling. Mobile CSS bumps this to 60vh.
+                height: rostersCollapsed ? 56 : '52vh',
                 display:'flex',flexDirection:'column',
                 zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)',
-                transition:'max-height 0.18s ease-out'
+                transition:'height 0.18s ease-out'
               }}>
                 <div style={{maxWidth:1240,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',minHeight:0,flex:1}}>
                   {/* Tab strip — PLAYERS · TEAM · collapse button */}

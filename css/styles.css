@@ -92,14 +92,20 @@ input, select { font-family:inherit; }
   .pfk-admin-actions { width:100%; justify-content:flex-start !important; }
   .pfk-admin-actions button { flex:1 1 auto; padding:7px 8px !important; font-size:12px !important; }
   .pfk-admin-list { padding:10px 4px !important; }
-  /* Dispersal draft (Sleeper-style): pool rows live in the bottom sheet now,
-     so they need to fit in a narrow viewport without wrapping. Keep them on
-     a single row — badge | name | DRAFT button. */
-  .pfk-disp-pool-item { padding:10px 10px !important; gap:8px !important; }
-  .pfk-disp-pool-item .pfk-disp-pool-name { font-size:14px !important; }
-  .pfk-disp-pool-item .pfk-disp-pool-action { padding:8px 12px !important; font-size:12px !important; }
-  /* Bottom sheet caps at 60vh on mobile so the board still has room above. */
-  .pfk-disp-bottom-sheet:not(.collapsed) { max-height:60vh !important; }
+  /* Dispersal draft (Sleeper-style): pool rows live in the bottom sheet now.
+     On a phone, give the DRAFT button real tap-target size and let the row
+     wrap when it has to so the button can't get squeezed off-screen. */
+  .pfk-disp-pool-item { padding:10px 10px !important; gap:8px !important; flex-wrap:wrap !important; }
+  .pfk-disp-pool-item .pfk-disp-pool-name { font-size:14px !important; flex:1 1 50% !important; }
+  .pfk-disp-pool-item .pfk-disp-pool-action {
+    padding:11px 16px !important; font-size:13px !important;
+    min-height:42px; min-width:96px;
+    flex:0 0 auto; order:3;
+  }
+  /* Bottom sheet uses `height` (not maxHeight) so the inner flex:1 scroll
+     container has a real container to size against. 60vh on mobile so the
+     board still has room above. */
+  .pfk-disp-bottom-sheet:not(.collapsed) { height:60vh !important; }
   /* Pick cards on mobile — slightly smaller min so 10-12 columns can crunch
      without forcing a wide horizontal scroll. */
   .pfk-disp-pick-card { min-height:58px !important; }
