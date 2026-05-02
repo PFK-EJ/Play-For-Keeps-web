@@ -2888,12 +2888,12 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
     return (
       <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"6px 14px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-          <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center"}}>
-            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:72,height:72,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
-            <div style={{textAlign:"left"}}>
-              <div className="pfk-header-title" style={{fontSize:24,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700",lineHeight:1.05}}>PLAY FOR KEEPS</div>
+          <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
+            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:104,height:104,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <div style={{textAlign:"center"}}>
+              <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700",lineHeight:1.05}}>PLAY FOR KEEPS</div>
               {subtitle && (
-                <div style={{fontSize:11,color:"#FFD700CC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:3}}>{subtitle}</div>
+                <div style={{fontSize:11,color:"#FFD700CC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:4,textAlign:"center"}}>{subtitle}</div>
               )}
             </div>
           </a>
