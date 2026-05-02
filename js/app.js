@@ -5873,6 +5873,12 @@ function DispersalDraft({draftId}){
   // position; 'picks' shows draft picks only. Default 'all' so users see the
   // whole pool out of the box without having to hunt through tabs.
   const [poolTab,setPoolTab] = useState('all');
+  // Bottom-sheet tab (Sleeper-style): 'players' shows the available pool, 'team'
+  // shows a manager's roster. Default to 'players' so users immediately see who
+  // they can draft. Tapping a team's avatar in the strip jumps to 'team' with
+  // that manager pre-selected.
+  const [sheetTab,setSheetTab] = useState('players');
+  const [teamTabSlot,setTeamTabSlot] = useState(null); // which manager's roster to show in TEAM tab
   const [pickConfirm,setPickConfirm] = useState(null); // pool item awaiting Yes/No
   const [linkCopied,setLinkCopied] = useState(false);
   const [fcValues,setFcValues] = useState(null); // {bySleeperId, byName} from FantasyCalc — silent sort
@@ -6219,10 +6225,13 @@ function DispersalDraft({draftId}){
     }catch(e){ alert('Screenshot failed: ' + (e.message||e)); }
   };
 
-  // status==='lobby' has no sticky rosters bar so no extra bottom padding needed.
-  const stickyRostersActive = status==='live' || status==='complete';
+  // status==='lobby' has no bottom sheet so no extra bottom padding needed.
+  // When the sheet is collapsed (~56px) we just need a small buffer; expanded
+  // (~52vh) the page needs ~58vh so content above isn't hidden underneath.
+  const stickyRostersActive = status==='ready' || status==='live' || status==='complete';
+  const sheetPadding = stickyRostersActive ? (rostersCollapsed ? 80 : '58vh') : 14;
   return (
-    <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:stickyRostersActive?'46vh':14}}>
+    <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:sheetPadding}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
         <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
@@ -6418,130 +6427,148 @@ function DispersalDraft({draftId}){
             </div>
           )}
 
-          {/* Pool — flows in normal page scroll, has padding-bottom so it isn't hidden by the sticky-bottom rosters bar */}
-          <div className="pfk-disp-pool-block" style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'14px 16px',marginBottom:14,paddingBottom:14}}>
-            {(()=>{
-              // Derive position from item.pos OR fallback to "(POS)" suffix on
-              // the name. Older drafts in the DB may not have pos set on items,
-              // so this keeps the position tabs working for them too.
-              const posOf = (it) => {
-                if(it.pos) return it.pos.toUpperCase();
-                const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
-                return m ? m[1].toUpperCase() : '';
-              };
-              // Compute available counts per filter once so the tab badges stay
-              // honest (e.g. "QB · 0" if all QBs are drafted).
-              const undrafted = pool.filter(p => !p.drafted);
-              const counts = {
-                all: undrafted.length,
-                QB: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'QB').length,
-                RB: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'RB').length,
-                WR: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'WR').length,
-                TE: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'TE').length,
-                picks: undrafted.filter(p => p.type === 'pick').length,
-              };
-              // Position tab styling — gold for ALL/picks, position-color for the
-              // four position tabs (matches Trade Finder's posColor convention).
-              const tabDef = [
-                { id:'all',   label:'🌐 ALL',  active:'#FFD700',   inactiveColor:'#888' },
-                { id:'QB',    label:'QB',      active:'#a78bfa',   inactiveColor:'#888' },
-                { id:'RB',    label:'RB',      active:'#34d399',   inactiveColor:'#888' },
-                { id:'WR',    label:'WR',      active:'#60a5fa',   inactiveColor:'#888' },
-                { id:'TE',    label:'TE',      active:'#fb923c',   inactiveColor:'#888' },
-                { id:'picks', label:'🎟 PICKS', active:'#a78bfa',   inactiveColor:'#888' },
-              ];
-              return (
-                // Tabs — single horizontally-scrollable row on mobile so 6 fit
-                // without wrapping. flex-shrink:0 keeps each tab readable.
-                <div style={{display:'flex',gap:6,marginBottom:10,padding:4,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-                  {tabDef.map(t => {
-                    const sel = poolTab === t.id;
-                    return (
-                      <button key={t.id} onClick={()=>setPoolTab(t.id)}
-                        style={{flexShrink:0,padding:'8px 12px',background:sel?t.active:'transparent',border:'none',borderRadius:6,color:sel?'#000':t.inactiveColor,fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>
-                        {t.label} <span style={{opacity:0.75,fontWeight:700,marginLeft:3}}>· {counts[t.id]}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
-              <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder={poolTab==='picks'?'Search picks…':poolTab==='all'?'Search assets…':`Search ${poolTab}s…`} style={{flex:'1 1 140px',minWidth:120,padding:'7px 10px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
-              {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'5px 9px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:4}}>
-              {(()=>{
-                // Same pos fallback as the tab counts above — handles items
-                // saved before we started storing pos on each pool item.
-                const posOf = (it) => {
-                  if(it.pos) return it.pos.toUpperCase();
-                  const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
-                  return m ? m[1].toUpperCase() : '';
-                };
-                // Filter pipeline: undrafted → tab filter → search filter
-                const matchesTab = (p) => {
-                  if(poolTab === 'all') return true;
-                  if(poolTab === 'picks') return p.type === 'pick';
-                  return p.type !== 'pick' && posOf(p) === poolTab;
-                };
-                let items = pool.filter(p => !p.drafted)
-                  .filter(matchesTab)
-                  .filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase()));
-                // Sort by FantasyCalc dynasty value (silent — no value shown).
-                // Picks have FC values too (slot-specific) so the sort works for them as well.
-                if(fcValues){
-                  const valueOf = (it) => {
-                    if(it.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
-                    const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
-                    const k = normDraftName(stripped);
-                    return fcValues.byName[k] != null ? fcValues.byName[k] : -1;
-                  };
-                  items = items.slice().sort((a,b) => valueOf(b) - valueOf(a));
-                }
-                return items;
-              })().map(item=>{
-                // Commish can pick on behalf of the on-clock team when that team
-                // isn't the commish's own (handles stuck-user scenarios). Same
-                // confirmation modal flow as a regular pick.
-                const commishOverride = isCommish && status==='live' && onClockSlot != null && (!me || me.slot !== onClockSlot);
-                const clickable = (myTurn || commishOverride) && status==='live';
-                // Position-color the badge to match the rest of the site
-                // (Trade Finder posColor convention). Strip the "(POS)" suffix
-                // off the display name so position isn't shown twice — the
-                // colored badge already conveys it.
-                const inferredPos = item.pos || (item.name||'').match(/\(([A-Za-z]+)\)\s*$/)?.[1]?.toUpperCase() || '';
-                const badgeLabel = item.type === 'pick' ? 'PICK' : (inferredPos || 'PLAYER');
-                const badgeColor = ({QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', PICK:'#FFD700'}[badgeLabel]) || '#9ca3af';
-                const cleanName = (item.name || '').replace(/\s*\([A-Za-z]+\)\s*$/, '');
-                return (
-                  <div key={item.id} className="pfk-disp-pool-item"
-                    style={{padding:'8px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b981':'#222'),borderRadius:6,display:'flex',alignItems:'center',gap:8,transition:'all .1s'}}>
-                    <span className="pfk-disp-pool-badge" style={{padding:'2px 7px',borderRadius:4,fontSize:10,fontWeight:800,background:badgeColor+'22',color:badgeColor,border:'1px solid '+badgeColor+'55',minWidth:36,textAlign:'center'}}>{badgeLabel}</span>
-                    <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700}}>{cleanName}</span>
-                    {clickable && <button onClick={()=>setPickConfirm({...item, _commishOverride: !myTurn && commishOverride, _onClockSlot: onClockSlot, _onClockUsername: onClockTeam?.username})} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background: !myTurn && commishOverride ? '#a78bfa' : '#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'6px 12px',cursor:'pointer'}}>{!myTurn && commishOverride ? `DRAFT FOR @${onClockTeam?.username||'team'} →` : 'DRAFT →'}</button>}
+          {/* SLEEPER-STYLE DRAFT BOARD — team avatar strip on top, color-coded
+              pick grid below. Horizontal scroll keeps the 8-12 columns readable
+              on mobile. Tap a manager's avatar to jump the bottom sheet to
+              their TEAM tab. The pool list + per-manager rosters now live in
+              the bottom sheet — see <BottomSheet> further down. */}
+          {(() => {
+            const N = pickOrder.length || 1;
+            const numRounds = Math.max(1, Math.ceil(pool.length / N));
+            const pickByIdx = {};
+            picks.forEach(p => { pickByIdx[p.pickIdx] = p; });
+            const itemById = {};
+            pool.forEach(p => { itemById[p.id] = p; });
+            const teamBySlot = {};
+            teams.forEach(t => { teamBySlot[t.slot] = t; });
+            const posOf = (it) => {
+              if(!it) return '';
+              if(it.pos) return it.pos.toUpperCase();
+              const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
+              return m ? m[1].toUpperCase() : '';
+            };
+            const cleanName = (it) => (it?.name || '').replace(/\s*\([A-Za-z]+\)\s*$/, '');
+            const POS_COLORS = { QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', K:'#9ca3af' };
+            const cellColorOf = (it) => {
+              if(!it) return null;
+              if(it.type === 'pick') return '#FFD700';
+              return POS_COLORS[posOf(it)] || '#9ca3af';
+            };
+            // Snake mapping: even rounds flow left→right, odd rounds reverse.
+            // Each column always represents the same team across rounds.
+            const overallForCell = (r, c) => {
+              if(draft.snake && r % 2 === 1) return r * N + (N - 1 - c);
+              return r * N + c;
+            };
+            const SLOT_COLORS = ['#FFD700','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
+            const initialOf = (s) => (s||'?').trim().charAt(0).toUpperCase();
+            const currentIdx = draft.current_pick_idx || 0;
+            // Min cell width keeps player names legible while letting 12-team
+            // boards scroll horizontally on a 375-wide phone.
+            const MIN_CELL = 96;
+            return (
+              <div className="pfk-disp-board-wrap" style={{marginBottom:14,border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden',background:'#0a0a0a'}}>
+                <div className="pfk-disp-board-scroll" style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+                  {/* Team avatar strip — first row of the synced horizontal scroll */}
+                  <div style={{
+                    display:'grid',gridTemplateColumns:`repeat(${N}, minmax(${MIN_CELL}px, 1fr))`,
+                    gap:0,minWidth:N*MIN_CELL,
+                    background:'#0f0f0f',borderBottom:'1px solid #1e1e1e'
+                  }}>
+                    {pickOrder.map((slotIdx) => {
+                      const t = teamBySlot[slotIdx];
+                      if(!t) return <div key={slotIdx} style={{padding:6}}/>;
+                      const isOnClock = onClockSlot === slotIdx && status === 'live';
+                      const isMe = me && me.slot === slotIdx;
+                      const slotColor = SLOT_COLORS[slotIdx % SLOT_COLORS.length];
+                      return (
+                        <button key={slotIdx}
+                          onClick={() => { setSheetTab('team'); setTeamTabSlot(slotIdx); if(rostersCollapsed) toggleRostersCollapsed(); }}
+                          title={`View @${t.username}'s roster`}
+                          style={{
+                            background:'transparent',border:'none',cursor:'pointer',
+                            padding:'8px 4px 6px',display:'flex',flexDirection:'column',alignItems:'center',gap:4,
+                            color:'inherit',font:'inherit',
+                            opacity:t.joined?1:0.55,
+                            borderBottom:'2px solid '+(isOnClock?'#10b981':'transparent')
+                          }}>
+                          <div style={{
+                            width:36,height:36,borderRadius:'50%',
+                            background:slotColor+'33',
+                            border:'2px solid '+(isOnClock?'#10b981':isMe?'#FFD700':slotColor+'66'),
+                            color:slotColor,
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            fontSize:14,fontWeight:900,
+                            boxShadow:isOnClock?'0 0 0 3px rgba(16,185,129,0.25)':'none'
+                          }}>{initialOf(t.username)}</div>
+                          <div style={{
+                            fontSize:10,fontWeight:800,letterSpacing:0.3,
+                            color:isOnClock?'#10b981':isMe?'#FFD700':'#aaa',
+                            maxWidth:MIN_CELL-8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
+                          }}>{t.username}</div>
+                        </button>
+                      );
+                    })}
                   </div>
-                );
-              })}
-              {(() => {
-                const posOf = (it) => {
-                  if(it.pos) return it.pos.toUpperCase();
-                  const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
-                  return m ? m[1].toUpperCase() : '';
-                };
-                const visibleCount = pool.filter(p => !p.drafted).filter(p => {
-                  if(poolTab === 'all') return true;
-                  if(poolTab === 'picks') return p.type === 'pick';
-                  return p.type !== 'pick' && posOf(p) === poolTab;
-                }).filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).length;
-                if(visibleCount > 0) return null;
-                const emptyMsg = poolTab === 'all' ? 'No assets left.'
-                  : poolTab === 'picks' ? 'No draft picks left.'
-                  : `No ${poolTab}s left.`;
-                return <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>{poolFilter ? `No matches for "${poolFilter}".` : emptyMsg}</div>;
-              })()}
-            </div>
-          </div>
+                  {/* Pick grid — each row is a round, each cell is a position-colored card. */}
+                  <div style={{
+                    display:'grid',gridTemplateColumns:`repeat(${N}, minmax(${MIN_CELL}px, 1fr))`,
+                    gap:1,padding:1,minWidth:N*MIN_CELL,background:'#1a1a1a'
+                  }}>
+                    {Array.from({length:numRounds}).flatMap((_, r) =>
+                      pickOrder.map((slotIdx, c) => {
+                        const overallIdx = overallForCell(r, c);
+                        const pick = pickByIdx[overallIdx];
+                        const item = pick ? itemById[pick.poolItemId] : null;
+                        const cellColor = cellColorOf(item) || '#3a3a3a';
+                        const isOnClock = status === 'live' && overallIdx === currentIdx;
+                        const isPick = item?.type === 'pick';
+                        const pos = isPick ? 'PICK' : posOf(item);
+                        const pickInRound = (overallIdx % N) + 1;
+                        const pickLabel = `${r+1}.${pickInRound}`;
+                        const ownerTeam = teamBySlot[slotIdx];
+                        return (
+                          <div key={`${r}-${c}`} className={"pfk-disp-pick-card"+(isOnClock?' on-clock':'')} style={{
+                            background:item?(cellColor+'22'):'#0a0a0a',
+                            borderLeft:'3px solid '+(item?cellColor:'#1e1e1e'),
+                            padding:'6px 8px',minHeight:62,
+                            display:'flex',flexDirection:'column',justifyContent:'space-between',gap:4,
+                            position:'relative',
+                            outline:isOnClock?'2px solid #10b981':'none',
+                            outlineOffset:isOnClock?'-2px':0,
+                            animation:isOnClock?'pfk-pulse 1.6s infinite':'none'
+                          }}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
+                              <span style={{
+                                fontSize:9,fontWeight:900,letterSpacing:0.5,
+                                color:item?cellColor:'#444',
+                                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
+                              }}>{item?pos:'\u00a0'}</span>
+                              <span style={{fontSize:9,fontWeight:700,color:'#666',flexShrink:0}}>{pickLabel}</span>
+                            </div>
+                            <div style={{
+                              fontSize:11,fontWeight:800,color:item?'#fff':'#444',
+                              lineHeight:1.2,wordBreak:'break-word',
+                              overflow:'hidden',display:'-webkit-box',
+                              WebkitLineClamp:2,WebkitBoxOrient:'vertical'
+                            }}>
+                              {item ? cleanName(item) : (isOnClock?(<span style={{color:'#10b981',fontSize:10,letterSpacing:0.5}}>ON CLOCK</span>):'—')}
+                            </div>
+                            {pick?.auto && (
+                              <div style={{position:'absolute',top:3,right:4,fontSize:8,color:'#f59e0b',fontStyle:'italic',fontWeight:700}}>auto</div>
+                            )}
+                            {ownerTeam && me && me.slot===slotIdx && item && (
+                              <div style={{position:'absolute',top:3,right:4,fontSize:7,color:'#FFD700',fontWeight:900,letterSpacing:0.5}}>YOU</div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Claim-time link prompt — intercepts CLAIM clicks for unlinked
               users with a "link first?" modal. Two clear paths: link Sleeper
@@ -6604,60 +6631,243 @@ function DispersalDraft({draftId}){
             </div>
           )}
 
-          {/* Rosters — sticky-bottom on viewport so they're always in view as you scroll the pool.
-              Collapsible (default collapsed on mobile) so the panel doesn't eat the player list. */}
-          <div className={"pfk-disp-rosters" + (rostersCollapsed ? " collapsed" : "")} style={{position:'fixed',left:0,right:0,bottom:0,background:'#080808',borderTop:'2px solid #FFD700',padding:'10px 14px',paddingBottom:'max(10px, env(safe-area-inset-bottom))',maxHeight: rostersCollapsed ? 'auto' : '42vh',overflowY: rostersCollapsed ? 'visible' : 'auto',zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)'}}>
-            <div style={{maxWidth:1240,margin:'0 auto'}}>
-              <button onClick={toggleRostersCollapsed}
-                      style={{width:'100%',display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',color:'inherit',cursor:'pointer',padding:'4px 0',marginBottom: rostersCollapsed ? 0 : 8,textAlign:'left',flexWrap:'wrap'}}>
-                <span style={{fontSize:11,fontWeight:800,color:'#888',letterSpacing:1.5}}>ROSTERS · {rosters.length} teams</span>
-                {(() => {
-                  const onClockTeam = rosters.find(t => onClockSlot === t.slot);
-                  return onClockTeam && status!=='complete' ? (
-                    <span style={{fontSize:11,fontWeight:800,color:'#10b981',letterSpacing:0.5}}>· ON CLOCK: @{onClockTeam.username}</span>
-                  ) : null;
-                })()}
-                {status==='complete' && !rostersCollapsed && <span style={{fontSize:11,color:'#a78bfa',letterSpacing:1.5}}>· tap 📸 on any roster to download</span>}
-                <span style={{flex:1}}/>
-                <span style={{fontSize:13,color:'#FFD700',fontWeight:800,padding:'2px 8px',border:'1px solid #FFD70066',borderRadius:6,letterSpacing:0.5}}>{rostersCollapsed ? '▲ SHOW ROSTERS' : '▼ HIDE ROSTERS'}</span>
-              </button>
-              {!rostersCollapsed && (
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
-                {rosters.map(t=>{
-                  const isOnClock = onClockSlot === t.slot;
-                  const isMine = me && me.slot === t.slot;
-                  const canClaim = !t.joined && !me && !isSpectator;
-                  return (
-                    <div key={t.slot} ref={el=>{ if(el) rosterRefs.current[t.slot]=el; }} style={{background:'#0a0a0a',border:'1px solid '+(isOnClock?'#10b981':isMine?'#FFD70066':'#222'),borderRadius:8,padding:'10px 12px',overflow:'hidden'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap'}}>
-                        <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24,flexShrink:0}}>#{pickOrder.indexOf(t.slot)+1}</span>
-                        <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0,color:t.joined?'#eee':'#888'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11,fontWeight:700}}>(you)</span>}</span>
-                        {isOnClock && <span style={{fontSize:9,color:'#10b981',fontWeight:800,padding:'2px 5px',background:'#0a2a1a',borderRadius:3,letterSpacing:0.5,flexShrink:0}}>ON CLOCK</span>}
-                        {canClaim && <button onClick={()=>handleClaimClick(t.slot)} style={{padding:'4px 9px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:10,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
-                        {/* Recover claim — same as in the lobby. */}
-                        {t.joined && !isMine && !isSpectator && <button onClick={()=>recoverSlot(t.slot)} title="Take over this team — only if you're the original claimer and lost your session"
-                          style={{padding:'3px 7px',background:'transparent',border:'1px solid #FFD70066',borderRadius:5,color:'#FFD700',cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>↻ RECOVER</button>}
-                        {/* User-facing unclaim — same as in the lobby. */}
-                        {isMine && <button onClick={()=>releaseSlot(t.slot)} title="Unclaim this team — frees it up so you can claim a different one"
-                          style={{padding:'3px 7px',background:'transparent',border:'1px solid #ef444466',borderRadius:5,color:'#ef4444',cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>✕ UNCLAIM</button>}
-                        {t.joined && isCommish && !isMine && <button onClick={()=>releaseSlot(t.slot)} title="Release this claim" style={{padding:'2px 6px',background:'transparent',border:'1px solid #444',borderRadius:5,color:'#666',cursor:'pointer',fontSize:11,flexShrink:0}}>✕</button>}
-                        <span style={{fontSize:11,color:'#666',flexShrink:0}}>{t.picks.length}p</span>
-                        {status==='complete' && <button onClick={()=>screenshotRoster(t.slot, t.username)} title={`Download ${t.username}'s roster as PNG`} style={{padding:'2px 6px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11,flexShrink:0}}>📸</button>}
-                      </div>
-                      {t.picks.length>0 && (
-                        <div style={{fontSize:12,color:'#aaa',lineHeight:1.6,paddingLeft:0}}>
-                          {t.picks.map(p=>(
-                            <div key={p.pickIdx}><span style={{color:'#666',display:'inline-block',width:28}}>{p.pickIdx+1}.</span> {p.item?.name || '(missing)'}{p.auto && <span style={{color:'#f59e0b',fontStyle:'italic',marginLeft:6,fontSize:10}}>(auto)</span>}</div>
-                          ))}
+          {/* SLEEPER-STYLE BOTTOM SHEET — PLAYERS / TEAM tabs.
+              PLAYERS: position-filtered pool (used to be the standalone pool block).
+              TEAM: a manager's roster grouped by position (used to be the rosters bar).
+              Collapses to ~64px showing only the tab strip; expands to ~52vh. */}
+          {(() => {
+            const posOf = (it) => {
+              if(!it) return '';
+              if(it.pos) return it.pos.toUpperCase();
+              const m = (it.name||'').match(/\(([A-Za-z]+)\)\s*$/);
+              return m ? m[1].toUpperCase() : '';
+            };
+            const POS_COLORS = { QB:'#a78bfa', RB:'#34d399', WR:'#60a5fa', TE:'#fb923c', K:'#9ca3af' };
+            const undrafted = pool.filter(p => !p.drafted);
+            const counts = {
+              all: undrafted.length,
+              QB: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'QB').length,
+              RB: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'RB').length,
+              WR: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'WR').length,
+              TE: undrafted.filter(p => p.type !== 'pick' && posOf(p) === 'TE').length,
+              picks: undrafted.filter(p => p.type === 'pick').length,
+            };
+            // TEAM tab — which manager's roster is showing. Default to the
+            // claimed user, else the on-clock team, else first manager.
+            const activeTeamSlot = teamTabSlot != null ? teamTabSlot
+              : me?.slot != null ? me.slot
+              : onClockSlot != null ? onClockSlot
+              : pickOrder[0];
+            const activeTeam = teams.find(t => t.slot === activeTeamSlot);
+            const activeTeamPicks = picks.filter(p => p.slot === activeTeamSlot)
+              .map(p => ({...p, item: pool.find(it => it.id === p.poolItemId)}))
+              .sort((a,b) => a.pickIdx - b.pickIdx);
+            const SLOT_COLORS = ['#FFD700','#10b981','#a78bfa','#60a5fa','#fb923c','#ef4444','#34d399','#ec4899','#06b6d4','#f59e0b','#8b5cf6','#84cc16'];
+            const initialOf = (s) => (s||'?').trim().charAt(0).toUpperCase();
+            return (
+              <div className={"pfk-disp-bottom-sheet"+(rostersCollapsed?' collapsed':'')} style={{
+                position:'fixed',left:0,right:0,bottom:0,
+                background:'#080808',borderTop:'2px solid #FFD700',
+                paddingBottom:'env(safe-area-inset-bottom)',
+                maxHeight: rostersCollapsed ? 56 : '52vh',
+                display:'flex',flexDirection:'column',
+                zIndex:50,boxShadow:'0 -8px 24px rgba(0,0,0,0.7)',
+                transition:'max-height 0.18s ease-out'
+              }}>
+                <div style={{maxWidth:1240,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',minHeight:0,flex:1}}>
+                  {/* Tab strip — PLAYERS · TEAM · collapse button */}
+                  <div style={{display:'flex',alignItems:'stretch',borderBottom:'1px solid #1e1e1e'}}>
+                    {[
+                      {id:'players', label:'PLAYERS', count: counts.all},
+                      {id:'team',    label:'TEAM',    count: null},
+                    ].map(tab => {
+                      const sel = sheetTab === tab.id;
+                      return (
+                        <button key={tab.id}
+                          onClick={() => { setSheetTab(tab.id); if(rostersCollapsed) toggleRostersCollapsed(); }}
+                          style={{
+                            flex:1,padding:'14px 6px',background:sel?'#0f0f0f':'transparent',border:'none',cursor:'pointer',
+                            color:sel?'#FFD700':'#888',fontWeight:900,fontSize:12,letterSpacing:1.2,
+                            borderBottom:'2px solid '+(sel?'#FFD700':'transparent')
+                          }}>
+                          {tab.label}{tab.count!=null && <span style={{opacity:0.7,marginLeft:5,fontWeight:700}}>({tab.count})</span>}
+                        </button>
+                      );
+                    })}
+                    <button onClick={toggleRostersCollapsed} title={rostersCollapsed?'Expand':'Collapse'}
+                      style={{padding:'14px 18px',background:'transparent',border:'none',cursor:'pointer',color:'#FFD700',fontSize:14,fontWeight:900,minWidth:48}}>
+                      {rostersCollapsed ? '▲' : '▼'}
+                    </button>
+                  </div>
+
+                  {/* Tab content — only renders when sheet is expanded */}
+                  {!rostersCollapsed && (
+                    <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+                      {/* ===== PLAYERS TAB ===== */}
+                      {sheetTab === 'players' && (
+                        <div style={{padding:'10px 12px'}}>
+                          {/* Position filter chips with counts */}
+                          <div style={{display:'flex',gap:6,marginBottom:10,padding:4,background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+                            {[
+                              { id:'all',   label:'ALL',     active:'#FFD700' },
+                              { id:'QB',    label:'QB',      active:'#a78bfa' },
+                              { id:'RB',    label:'RB',      active:'#34d399' },
+                              { id:'WR',    label:'WR',      active:'#60a5fa' },
+                              { id:'TE',    label:'TE',      active:'#fb923c' },
+                              { id:'picks', label:'PICKS',   active:'#FFD700' },
+                            ].map(t => {
+                              const sel = poolTab === t.id;
+                              return (
+                                <button key={t.id} onClick={()=>setPoolTab(t.id)}
+                                  style={{flexShrink:0,padding:'8px 14px',background:sel?t.active:'transparent',border:'none',borderRadius:6,color:sel?'#000':'#888',fontWeight:900,cursor:'pointer',fontSize:12,letterSpacing:0.8,whiteSpace:'nowrap'}}>
+                                  {t.label} <span style={{opacity:0.75,fontWeight:700,marginLeft:3}}>{counts[t.id]}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {/* Search */}
+                          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                            <input value={poolFilter} onChange={e=>setPoolFilter(e.target.value)} placeholder={poolTab==='picks'?'Search picks…':poolTab==='all'?'Search assets…':`Search ${poolTab}s…`} style={{flex:1,minWidth:0,padding:'9px 12px',background:'#0a0a0a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:13}}/>
+                            {poolFilter && <button onClick={()=>setPoolFilter('')} style={{padding:'7px 10px',background:'transparent',border:'1px solid #333',borderRadius:5,color:'#888',cursor:'pointer',fontSize:11}}>✕</button>}
+                          </div>
+                          {/* Player rows */}
+                          <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                            {(() => {
+                              const matchesTab = (p) => {
+                                if(poolTab === 'all') return true;
+                                if(poolTab === 'picks') return p.type === 'pick';
+                                return p.type !== 'pick' && posOf(p) === poolTab;
+                              };
+                              let items = pool.filter(p => !p.drafted)
+                                .filter(matchesTab)
+                                .filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase()));
+                              if(fcValues){
+                                const valueOf = (it) => {
+                                  if(it.sleeperId && fcValues.bySleeperId[it.sleeperId] != null) return fcValues.bySleeperId[it.sleeperId];
+                                  const stripped = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '');
+                                  const k = normDraftName(stripped);
+                                  return fcValues.byName[k] != null ? fcValues.byName[k] : -1;
+                                };
+                                items = items.slice().sort((a,b) => valueOf(b) - valueOf(a));
+                              }
+                              return items;
+                            })().map(item => {
+                              const commishOverride = isCommish && status==='live' && onClockSlot != null && (!me || me.slot !== onClockSlot);
+                              const clickable = (myTurn || commishOverride) && status==='live';
+                              const inferredPos = item.pos || (item.name||'').match(/\(([A-Za-z]+)\)\s*$/)?.[1]?.toUpperCase() || '';
+                              const badgeLabel = item.type === 'pick' ? 'PICK' : (inferredPos || 'PLAYER');
+                              const badgeColor = item.type === 'pick' ? '#FFD700' : (POS_COLORS[badgeLabel] || '#9ca3af');
+                              const cleanName = (item.name || '').replace(/\s*\([A-Za-z]+\)\s*$/, '');
+                              return (
+                                <div key={item.id} className="pfk-disp-pool-item"
+                                  style={{padding:'10px 12px',background:'#0a0a0a',border:'1px solid '+(clickable?'#10b98166':'#1e1e1e'),borderLeft:'3px solid '+badgeColor,borderRadius:6,display:'flex',alignItems:'center',gap:10}}>
+                                  <span className="pfk-disp-pool-badge" style={{padding:'3px 8px',borderRadius:4,fontSize:10,fontWeight:900,letterSpacing:0.5,background:badgeColor+'22',color:badgeColor,border:'1px solid '+badgeColor+'55',minWidth:40,textAlign:'center'}}>{badgeLabel}</span>
+                                  <span className="pfk-disp-pool-name" style={{flex:1,fontSize:14,fontWeight:700,color:'#eee'}}>{cleanName}</span>
+                                  {clickable && <button onClick={()=>setPickConfirm({...item, _commishOverride: !myTurn && commishOverride, _onClockSlot: onClockSlot, _onClockUsername: onClockTeam?.username})} className="pfk-disp-pool-action" style={{fontSize:11,color:'#000',background: !myTurn && commishOverride ? '#a78bfa' : '#10b981',fontWeight:900,letterSpacing:1,border:'none',borderRadius:5,padding:'7px 14px',cursor:'pointer',whiteSpace:'nowrap'}}>{!myTurn && commishOverride ? `DRAFT FOR @${onClockTeam?.username||'team'}` : 'DRAFT'}</button>}
+                                </div>
+                              );
+                            })}
+                            {(() => {
+                              const matchesTab = (p) => {
+                                if(poolTab === 'all') return true;
+                                if(poolTab === 'picks') return p.type === 'pick';
+                                return p.type !== 'pick' && posOf(p) === poolTab;
+                              };
+                              const visibleCount = pool.filter(p => !p.drafted).filter(matchesTab).filter(p => !poolFilter || p.name.toLowerCase().includes(poolFilter.toLowerCase())).length;
+                              if(visibleCount > 0) return null;
+                              const emptyMsg = poolTab === 'all' ? 'No assets left.'
+                                : poolTab === 'picks' ? 'No draft picks left.'
+                                : `No ${poolTab}s left.`;
+                              return <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>{poolFilter ? `No matches for "${poolFilter}".` : emptyMsg}</div>;
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ===== TEAM TAB ===== */}
+                      {sheetTab === 'team' && (
+                        <div style={{padding:'10px 12px'}}>
+                          {/* Manager picker chips — horizontal scroll */}
+                          <div style={{display:'flex',gap:6,marginBottom:10,overflowX:'auto',WebkitOverflowScrolling:'touch',padding:'2px 0 6px'}}>
+                            {pickOrder.map((slotIdx) => {
+                              const t = teams.find(x => x.slot === slotIdx);
+                              if(!t) return null;
+                              const sel = activeTeamSlot === slotIdx;
+                              const slotColor = SLOT_COLORS[slotIdx % SLOT_COLORS.length];
+                              const isMine = me && me.slot === slotIdx;
+                              return (
+                                <button key={slotIdx} onClick={()=>setTeamTabSlot(slotIdx)}
+                                  style={{
+                                    flexShrink:0,display:'flex',alignItems:'center',gap:8,
+                                    padding:'6px 12px 6px 6px',borderRadius:24,
+                                    background:sel?'#0f0f0f':'transparent',
+                                    border:'1px solid '+(sel?'#FFD700':'#222'),
+                                    cursor:'pointer',color:sel?'#FFD700':'#aaa',
+                                    fontSize:12,fontWeight:800,letterSpacing:0.3
+                                  }}>
+                                  <span style={{
+                                    width:24,height:24,borderRadius:'50%',
+                                    background:slotColor+'33',
+                                    border:'1px solid '+slotColor+'66',
+                                    color:slotColor,
+                                    display:'inline-flex',alignItems:'center',justifyContent:'center',
+                                    fontSize:11,fontWeight:900
+                                  }}>{initialOf(t.username)}</span>
+                                  {t.username}{isMine && <span style={{color:'#10b981',fontSize:10,marginLeft:2}}>(you)</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Active manager header — name + pick count + screenshot button */}
+                          {activeTeam && (
+                            <div ref={el=>{ if(el) rosterRefs.current[activeTeamSlot]=el; }} style={{background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,padding:'12px 14px'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+                                <span style={{fontSize:11,color:'#666',fontWeight:800}}>#{pickOrder.indexOf(activeTeamSlot)+1}</span>
+                                <span style={{fontSize:16,fontWeight:900,color:'#eee',flex:'1 1 auto',minWidth:0,wordBreak:'break-word'}}>{activeTeam.username}</span>
+                                <span style={{fontSize:11,color:'#888'}}>{activeTeamPicks.length} pick{activeTeamPicks.length===1?'':'s'}</span>
+                                {status==='complete' && (
+                                  <button onClick={()=>screenshotRoster(activeTeamSlot, activeTeam.username)} title={`Download ${activeTeam.username}'s roster as PNG`}
+                                    style={{padding:'6px 12px',background:'transparent',border:'1px solid #a78bfa',borderRadius:5,color:'#a78bfa',cursor:'pointer',fontSize:11,fontWeight:800,letterSpacing:0.5}}>📸 SCREENSHOT</button>
+                                )}
+                              </div>
+                              {/* Picks grouped by position */}
+                              {activeTeamPicks.length === 0 ? (
+                                <div style={{color:'#666',fontSize:13,padding:14,textAlign:'center'}}>No picks yet.</div>
+                              ) : (
+                                <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                                  {activeTeamPicks.map(p => {
+                                    const it = p.item;
+                                    const isPick = it?.type === 'pick';
+                                    const pos = isPick ? 'PICK' : posOf(it);
+                                    const color = isPick ? '#FFD700' : (POS_COLORS[pos] || '#9ca3af');
+                                    const cleanName = (it?.name || '(missing)').replace(/\s*\([A-Za-z]+\)\s*$/, '');
+                                    const r = Math.floor(p.pickIdx / Math.max(1,teams.length)) + 1;
+                                    const pInRound = (p.pickIdx % Math.max(1,teams.length)) + 1;
+                                    return (
+                                      <div key={p.pickIdx} style={{
+                                        display:'flex',alignItems:'center',gap:10,
+                                        padding:'8px 10px',background:'#0f0f0f',
+                                        borderLeft:'3px solid '+color,borderRadius:5
+                                      }}>
+                                        <span style={{padding:'3px 8px',borderRadius:4,fontSize:10,fontWeight:900,letterSpacing:0.5,background:color+'22',color:color,border:'1px solid '+color+'55',minWidth:40,textAlign:'center'}}>{pos || '—'}</span>
+                                        <span style={{flex:1,fontSize:14,fontWeight:700,color:'#eee',wordBreak:'break-word',minWidth:0}}>{cleanName}{p.auto && <span style={{color:'#f59e0b',fontStyle:'italic',marginLeft:6,fontSize:10,fontWeight:600}}>(auto)</span>}</span>
+                                        <span style={{fontSize:11,color:'#888',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}}>{r}.{pInRound}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  );
-                })}
+                  )}
+                </div>
               </div>
-              )}
-            </div>
-          </div>
+            );
+          })()}
         </>
       )}
     </div>
