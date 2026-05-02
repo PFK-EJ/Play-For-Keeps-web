@@ -944,7 +944,11 @@ const fetchLeagueChampionships = async (lg) => {
 };
 
 function TeamTab() {
-  const [username, setUsername]           = useState(()=>loadStorage('pfk_sleeper_user',''));
+  // 'pfk_team_username' was previously 'pfk_sleeper_user', which collided
+  // with the global useSleeperUser hook's JSON-object storage at the same
+  // key. The collision corrupted the JSON, making users get re-prompted to
+  // link Sleeper on every visit. Renamed 2026-05-02.
+  const [username, setUsername]           = useState(()=>loadStorage('pfk_team_username',''));
   useEffect(()=>{
     if(username||!sb) return;
     sb.auth.getSession().then(({data})=>{
@@ -993,7 +997,7 @@ function TeamTab() {
       if (!u?.user_id) throw new Error('Username not found on Sleeper');
       setSleeperUser(u);
       localStorage.setItem('pfk_sleeper_obj', JSON.stringify(u));
-      localStorage.setItem('pfk_sleeper_user', username.trim());
+      localStorage.setItem('pfk_team_username', JSON.stringify(username.trim()));
       setLoading('leagues');
       // Try current year first, then fall back — dynasty leagues roll over each season
       const curYear = new Date().getFullYear();
@@ -1008,7 +1012,7 @@ function TeamTab() {
   };
 
   useEffect(()=>{
-    if(username) localStorage.setItem('pfk_sleeper_user', username);
+    if(username) localStorage.setItem('pfk_team_username', JSON.stringify(username));
   },[username]);
 
   const autoTriedRef = useRef(false);
@@ -2719,7 +2723,22 @@ const SLEEPER_STORAGE_KEY = 'pfk_sleeper_user';
 const SLEEPER_CHANGE_EVENT = 'pfk:sleeper-changed';
 function useSleeperUser(){
   const read = () => {
-    try{ return JSON.parse(localStorage.getItem(SLEEPER_STORAGE_KEY) || 'null'); }catch(e){ return null; }
+    try{
+      const raw = localStorage.getItem(SLEEPER_STORAGE_KEY);
+      if(!raw) return null;
+      const parsed = JSON.parse(raw);
+      // Validate shape — must be an object with user_id. If a previous bug
+      // (or another component) wrote a bare string or other shape under this
+      // key, treat it as "not linked" AND scrub the bad value so we stop
+      // trying to parse it on every page load.
+      if(parsed && typeof parsed === 'object' && parsed.user_id) return parsed;
+      localStorage.removeItem(SLEEPER_STORAGE_KEY);
+      return null;
+    }catch(e){
+      // Parse failed (e.g. legacy bare-string write) — clean up and start fresh.
+      try{ localStorage.removeItem(SLEEPER_STORAGE_KEY); }catch(_e){}
+      return null;
+    }
   };
   const [user, setUserState] = useState(read);
   useEffect(() => {
@@ -2731,11 +2750,54 @@ function useSleeperUser(){
       window.removeEventListener('storage', refresh);
     };
   },[]);
+  // Auto-restore from the user's Supabase row when local is empty but the
+  // user is signed in. Covers the iOS Safari ITP case (localStorage wiped
+  // after ~7 days of inactivity) and cross-device usage. Module-level
+  // guard so we only attempt the restore once per page load even if many
+  // components call useSleeperUser.
+  useEffect(() => {
+    if(user) return; // already linked locally — nothing to do
+    if(typeof sb === 'undefined' || !sb) return;
+    if(window.__pfkSleeperRestoreAttempted) return;
+    window.__pfkSleeperRestoreAttempted = true;
+    let cancelled = false;
+    const tryRestore = async () => {
+      const { data } = await sb.auth.getSession();
+      const uid = data?.session?.user?.id;
+      if(!uid || cancelled) return;
+      const { data: row } = await sb.from('users').select('sleeper_username').eq('id', uid).maybeSingle();
+      if(cancelled || !row?.sleeper_username) return;
+      // Already-linked locally? Skip — the link may have been re-set by another
+      // tab while we were awaiting the round-trip.
+      if(localStorage.getItem(SLEEPER_STORAGE_KEY)) return;
+      try{
+        const u = await lookupResolveUser(row.sleeper_username);
+        if(cancelled) return;
+        const next = { user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null };
+        localStorage.setItem(SLEEPER_STORAGE_KEY, JSON.stringify(next));
+        setUserState(next);
+        window.dispatchEvent(new Event(SLEEPER_CHANGE_EVENT));
+      }catch(e){/* sleeper lookup failed — silent */}
+    };
+    tryRestore();
+    return () => { cancelled = true; };
+  },[user]);
   const setUser = (next) => {
     if(next) localStorage.setItem(SLEEPER_STORAGE_KEY, JSON.stringify(next));
     else { localStorage.removeItem(SLEEPER_STORAGE_KEY); localStorage.removeItem('pfk_sleeper_league'); }
     setUserState(next);
     window.dispatchEvent(new Event(SLEEPER_CHANGE_EVENT));
+    // Persist the username on the user's Supabase row when signed in so the
+    // link survives a localStorage wipe (iOS Safari ITP clears site data
+    // after ~7 days of inactivity, which was forcing repeat re-link prompts).
+    // Fire-and-forget; failure is fine — local link still works.
+    if(typeof sb !== 'undefined' && sb){
+      sb.auth.getSession().then(({data}) => {
+        const uid = data?.session?.user?.id;
+        if(!uid) return;
+        sb.from('users').update({ sleeper_username: next?.username || null }).eq('id', uid).then(()=>{}, ()=>{});
+      }).catch(()=>{});
+    }
   };
   return [user, setUser];
 }
