@@ -5838,7 +5838,16 @@ function DispersalDraft({draftId}){
   // sheet is at its floor — Evan needs the snap buttons reachable from the
   // collapsed state so he can re-expand with one tap.
   const SHEET_COLLAPSED_PX = 110;
-  const sheetMaxPx = () => Math.max(SHEET_COLLAPSED_PX+1, (typeof window!=='undefined' ? window.innerHeight : 800) - 80);
+  // Max height = viewport minus the actual toolbar height (queried live so it
+  // adapts to desktop's bigger logo and mobile's compact one). Without this
+  // the sheet can expand BEHIND the sticky toolbar — on desktop the ▼ button
+  // ends up obscured by the toolbar's z-index, leaving users stuck at the top.
+  const sheetMaxPx = () => {
+    if(typeof window === 'undefined') return 600;
+    const tb = typeof document !== 'undefined' ? document.querySelector('.pfk-sticky-header') : null;
+    const tbH = tb ? tb.offsetHeight : 80;
+    return Math.max(SHEET_COLLAPSED_PX+1, window.innerHeight - tbH - 12);
+  };
   const sheetDefaultPx = () => Math.round((typeof window!=='undefined' ? window.innerHeight : 800) * 0.25);
   const [sheetHeight,setSheetHeight] = useState(() => {
     if(typeof window === 'undefined') return 200;
