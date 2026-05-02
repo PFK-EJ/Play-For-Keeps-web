@@ -5888,8 +5888,10 @@ function DispersalDraft({draftId}){
     if(!sheetDrag.current.active) return;
     const y = e.touches ? e.touches[0].clientY : e.clientY;
     const delta = sheetDrag.current.startY - y; // upward drag = positive
-    const max = Math.max(SHEET_COLLAPSED_PX+1, (typeof window!=='undefined' ? window.innerHeight : 800) - 80);
-    const next = Math.max(SHEET_COLLAPSED_PX, Math.min(max, sheetDrag.current.startH + delta));
+    // Use the same sheetMaxPx() ceiling that the ▲ snap button uses, so the
+    // drag can't sneak the sheet behind the sticky toolbar (which would hide
+    // the ▼ button and trap the user). Was using a hardcoded -80 buffer.
+    const next = Math.max(SHEET_COLLAPSED_PX, Math.min(sheetMaxPx(), sheetDrag.current.startH + delta));
     setSheetHeight(next);
     if(e.cancelable) e.preventDefault();
   };
