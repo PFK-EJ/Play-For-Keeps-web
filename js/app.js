@@ -5810,7 +5810,60 @@ function DispersalDraft({draftId}){
   // (clear cache, device switch, iOS eviction) we can silently restore their
   // identity by matching on their Sleeper account. RECOVER button stays as the
   // last-resort fallback for unlinked users.
-  const [sleeperLinkedUser] = useSleeperUser();
+  const [sleeperLinkedUser, setSleeperLinkedUser] = useSleeperUser();
+  // Nudge state: banner dismiss is sticky-per-browser, claim-link prompt
+  // intercepts CLAIM clicks for unlinked users with a "link first?" modal.
+  const [unlinkBannerDismissed, setUnlinkBannerDismissed] = useState(() => {
+    try{ return localStorage.getItem('pfk_disp_link_nudge_dismissed') === '1'; }catch(e){ return false; }
+  });
+  const dismissUnlinkBanner = () => {
+    try{ localStorage.setItem('pfk_disp_link_nudge_dismissed', '1'); }catch(e){}
+    setUnlinkBannerDismissed(true);
+  };
+  // Modal state: holds the pending slot the user is trying to claim. When
+  // non-null we show the "link first?" modal. Cleared when user picks a path.
+  const [pendingClaimSlot, setPendingClaimSlot] = useState(null);
+  const [claimLinkInput, setClaimLinkInput] = useState('');
+  const [claimLinkErr, setClaimLinkErr] = useState('');
+  const [claimLinkBusy, setClaimLinkBusy] = useState(false);
+  // Wrapper around claimSlot — for unlinked users, route through the "link
+  // first?" modal so they hit the nudge at the highest-impact moment. Linked
+  // users skip the modal entirely.
+  const handleClaimClick = (slot) => {
+    if(sleeperLinkedUser?.user_id){
+      claimSlot(slot);
+    } else {
+      setClaimLinkInput('');
+      setClaimLinkErr('');
+      setPendingClaimSlot(slot);
+    }
+  };
+  const claimLinkSubmit = async () => {
+    setClaimLinkErr('');
+    const q = (claimLinkInput||'').trim();
+    if(!q){ setClaimLinkErr('Enter your Sleeper username'); return; }
+    setClaimLinkBusy(true);
+    try{
+      const u = await lookupResolveUser(q);
+      setSleeperLinkedUser({ user_id: u.user_id, username: u.username, display_name: u.display_name || u.username, avatar: u.avatar || null });
+      const slotToClaim = pendingClaimSlot;
+      setPendingClaimSlot(null);
+      setClaimLinkInput('');
+      // Defer claim so the new sleeperLinkedUser state has flushed — claimSlot
+      // reads sleeperLinkedUser via closure to tag the team with sleeper_user_id.
+      // Without the defer the closure would still see null and skip the tag.
+      setTimeout(() => claimSlot(slotToClaim), 50);
+    }catch(e){
+      setClaimLinkErr(e.message || 'Could not find that Sleeper user');
+    }finally{
+      setClaimLinkBusy(false);
+    }
+  };
+  const claimLinkSkip = () => {
+    const slotToClaim = pendingClaimSlot;
+    setPendingClaimSlot(null);
+    claimSlot(slotToClaim);
+  };
   const [claimUser,setClaimUser] = useState('');
   const [claimPass,setClaimPass] = useState('');
   const [claimErr,setClaimErr] = useState('');
@@ -6175,6 +6228,19 @@ function DispersalDraft({draftId}){
         </div>
       )}
 
+      {/* Sleeper-link nudge banner — shows in lobby for unlinked users.
+          Dismissible (sticks per browser via localStorage). Benefit-framed copy
+          rather than warning copy — converts better. */}
+      {status === 'lobby' && !isSpectator && !sleeperLinkedUser && !unlinkBannerDismissed && (
+        <div style={{background:'#0a1a14',border:'1px dashed #10b98166',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'#ddd',lineHeight:1.55,display:'flex',alignItems:'flex-start',gap:10}}>
+          <div style={{flex:1}}>
+            🔗 <strong style={{color:'#10b981'}}>Pro tip:</strong> Tap <strong style={{color:'#FFD700'}}>🔗 Link Sleeper</strong> in the toolbar above before you claim. Linking your Sleeper account means your team claim follows you across browsers and devices — no risk of getting locked out if your phone clears its cache mid-draft. One-time setup, no password, takes 5 seconds.
+          </div>
+          <button onClick={dismissUnlinkBanner} title="Dismiss"
+            style={{flexShrink:0,background:'transparent',border:'1px solid #444',borderRadius:5,color:'#888',padding:'2px 8px',fontSize:13,fontWeight:700,cursor:'pointer'}}>×</button>
+        </div>
+      )}
+
       {/* Lobby phase */}
       {status === 'lobby' && (
         <>
@@ -6196,7 +6262,7 @@ function DispersalDraft({draftId}){
                       <div style={{fontWeight:800,fontSize:14,wordBreak:'break-word'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11}}>(you)</span>}</div>
                       <div style={{fontSize:11,color:'#666'}}>Pick #{i+1}</div>
                     </div>
-                    {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'5px 11px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:11,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                    {canClaim && <button onClick={()=>handleClaimClick(t.slot)} style={{padding:'5px 11px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:11,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
                     {/* Recover claim — for users who lost their session (cleared cache /
                         switched device) and need to re-attach as the original claimer. */}
                     {t.joined && !isMine && !isSpectator && <button onClick={()=>recoverSlot(t.slot)} title="Take over this team — only if you're the original claimer and lost your session"
@@ -6460,6 +6526,42 @@ function DispersalDraft({draftId}){
             </div>
           </div>
 
+          {/* Claim-time link prompt — intercepts CLAIM clicks for unlinked
+              users with a "link first?" modal. Two clear paths: link Sleeper
+              inline (recommended, recovery superpower), or skip and claim
+              anyway (preserves existing behavior). Not blocking — same
+              end-state available either way. */}
+          {pendingClaimSlot != null && (
+            <div onClick={()=>setPendingClaimSlot(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+              <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:400,background:'#0f0f0f',border:'2px solid #10b981',borderRadius:12,padding:'22px 24px'}}>
+                <div style={{fontSize:11,fontWeight:800,color:'#10b981',letterSpacing:1.5,marginBottom:8,textAlign:'center'}}>BEFORE YOU CLAIM</div>
+                <div style={{fontSize:16,fontWeight:900,color:'#fff',textAlign:'center',marginBottom:8}}>Link Sleeper for safer drafting?</div>
+                <div style={{fontSize:13,color:'#aaa',textAlign:'center',lineHeight:1.55,marginBottom:14}}>
+                  Linking your Sleeper account means your team claim follows you across browsers and devices — no risk of getting locked out if your phone clears its cache mid-draft. One-time setup, no password, takes 5 seconds.
+                </div>
+                <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap'}}>
+                  <input value={claimLinkInput} onChange={e=>{setClaimLinkInput(e.target.value); setClaimLinkErr('');}}
+                    onKeyDown={e=>e.key==='Enter'&&claimLinkSubmit()}
+                    placeholder="Sleeper username"
+                    disabled={claimLinkBusy}
+                    name="sleeper-handle"
+                    autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false}
+                    data-1p-ignore="true" data-lpignore="true"
+                    style={{flex:'1 1 180px',minWidth:0,padding:'10px 12px',background:'#0a0a0a',border:'1.5px solid #FFD70066',borderRadius:6,color:'#fff',fontSize:14,fontFamily:'inherit'}}/>
+                  <button onClick={claimLinkSubmit} disabled={claimLinkBusy}
+                    style={{padding:'10px 16px',background:claimLinkBusy?'#444':'#FFD700',border:'none',borderRadius:6,color:'#000',fontWeight:900,cursor:claimLinkBusy?'wait':'pointer',fontSize:13,letterSpacing:0.5,whiteSpace:'nowrap'}}>
+                    {claimLinkBusy ? '…' : '🔗 LINK & CLAIM'}
+                  </button>
+                </div>
+                {claimLinkErr && <div style={{color:'#ef4444',fontSize:12,marginBottom:6}}>{claimLinkErr}</div>}
+                <div style={{display:'flex',gap:8,marginTop:14}}>
+                  <button onClick={()=>setPendingClaimSlot(null)} style={{flex:1,padding:'10px',background:'transparent',border:'1px solid #444',borderRadius:6,color:'#888',fontWeight:700,cursor:'pointer',fontSize:12,letterSpacing:0.5}}>CANCEL</button>
+                  <button onClick={claimLinkSkip} style={{flex:2,padding:'10px',background:'transparent',border:'1px solid #555',borderRadius:6,color:'#aaa',fontWeight:700,cursor:'pointer',fontSize:12,letterSpacing:0.5}}>Skip — claim without linking</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Pick confirmation modal — surfaces commish-override state so the
               commish knows they're picking on someone else's behalf. */}
           {pickConfirm && (
@@ -6514,7 +6616,7 @@ function DispersalDraft({draftId}){
                         <span style={{fontSize:11,color:'#666',fontWeight:800,minWidth:24,flexShrink:0}}>#{pickOrder.indexOf(t.slot)+1}</span>
                         <span style={{fontWeight:800,fontSize:14,wordBreak:'break-word',flex:'1 1 auto',minWidth:0,color:t.joined?'#eee':'#888'}}>{t.username}{isMine && <span style={{color:'#10b981',marginLeft:6,fontSize:11,fontWeight:700}}>(you)</span>}</span>
                         {isOnClock && <span style={{fontSize:9,color:'#10b981',fontWeight:800,padding:'2px 5px',background:'#0a2a1a',borderRadius:3,letterSpacing:0.5,flexShrink:0}}>ON CLOCK</span>}
-                        {canClaim && <button onClick={()=>claimSlot(t.slot)} style={{padding:'4px 9px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:10,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
+                        {canClaim && <button onClick={()=>handleClaimClick(t.slot)} style={{padding:'4px 9px',background:'#FFD700',border:'none',borderRadius:5,color:'#000',fontWeight:900,cursor:'pointer',fontSize:10,letterSpacing:1,flexShrink:0}}>CLAIM</button>}
                         {/* Recover claim — same as in the lobby. */}
                         {t.joined && !isMine && !isSpectator && <button onClick={()=>recoverSlot(t.slot)} title="Take over this team — only if you're the original claimer and lost your session"
                           style={{padding:'3px 7px',background:'transparent',border:'1px solid #FFD70066',borderRadius:5,color:'#FFD700',cursor:'pointer',fontSize:10,fontWeight:800,letterSpacing:0.5,flexShrink:0}}>↻ RECOVER</button>}
