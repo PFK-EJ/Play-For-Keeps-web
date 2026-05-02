@@ -5860,24 +5860,54 @@ function DispersalDraft({draftId}){
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   },[]);
-  // Drag handle uses pointer events for touch + mouse parity. Active drag is
-  // refed (no re-render per-pixel) and the live height is committed on each
-  // pointermove via setSheetHeight.
+  // Drag handle: native event listeners attached via useEffect with
+  // {passive:false} so iOS Safari actually honors preventDefault. React's
+  // synthetic touch handlers are passive by default → preventDefault is a
+  // no-op and the page would scroll instead of dragging the sheet, which felt
+  // awful on iPhone. We track the live height via a ref so the drag closure
+  // doesn't capture a stale value, but listeners only attach once.
   const sheetDrag = useRef({ active:false, startY:0, startH:0 });
-  const onSheetDragStart = (e) => {
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    sheetDrag.current = { active:true, startY:y, startH:sheetHeight };
-    if(e.cancelable) e.preventDefault();
-  };
-  const onSheetDragMove = (e) => {
-    if(!sheetDrag.current.active) return;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const delta = sheetDrag.current.startY - y; // upward drag = positive
-    const next = Math.max(SHEET_COLLAPSED_PX, Math.min(sheetMaxPx(), sheetDrag.current.startH + delta));
-    setSheetHeight(next);
-    if(e.cancelable) e.preventDefault();
-  };
-  const onSheetDragEnd = () => { sheetDrag.current.active = false; };
+  const sheetHeightRef = useRef(sheetHeight);
+  sheetHeightRef.current = sheetHeight; // refreshed every render so handlers always see the latest
+  const sheetHandleRef = useRef(null);
+  useEffect(() => {
+    const el = sheetHandleRef.current;
+    if(!el) return;
+    const start = (e) => {
+      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      sheetDrag.current = { active:true, startY:y, startH:sheetHeightRef.current };
+      if(e.cancelable) e.preventDefault();
+    };
+    const move = (e) => {
+      if(!sheetDrag.current.active) return;
+      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      const delta = sheetDrag.current.startY - y; // upward drag = positive
+      const max = Math.max(SHEET_COLLAPSED_PX+1, window.innerHeight - 80);
+      const next = Math.max(SHEET_COLLAPSED_PX, Math.min(max, sheetDrag.current.startH + delta));
+      setSheetHeight(next);
+      if(e.cancelable) e.preventDefault();
+    };
+    const end = () => { sheetDrag.current.active = false; };
+    // touchstart MUST be non-passive so preventDefault stops the page from
+    // hijacking the gesture. Move/end on the window so the drag continues
+    // smoothly even if the user's finger leaves the handle.
+    el.addEventListener('touchstart', start, { passive:false });
+    window.addEventListener('touchmove', move, { passive:false });
+    window.addEventListener('touchend', end);
+    window.addEventListener('touchcancel', end);
+    el.addEventListener('mousedown', start);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    return () => {
+      el.removeEventListener('touchstart', start);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', end);
+      window.removeEventListener('touchcancel', end);
+      el.removeEventListener('mousedown', start);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', end);
+    };
+  },[]); // attach once
   const isSheetCollapsed = sheetHeight <= SHEET_COLLAPSED_PX + 4;
   // Convenience: jump to a useful expanded height when programmatic UI wants
   // to make sure content is visible (e.g. tapping a TEAM avatar).
@@ -6831,15 +6861,16 @@ function DispersalDraft({draftId}){
                 transition: sheetDrag.current.active ? 'none' : 'height 0.18s ease-out'
               }}>
                 <div style={{maxWidth:1240,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',minHeight:0,flex:1}}>
-                  {/* Drag handle bar — touch/mouse drag from anywhere along
-                      this strip resizes the sheet. The handle pill is purely
-                      visual; the whole strip is the drag target so the touch
-                      area is finger-friendly. */}
+                  {/* Drag handle bar — full-width touch target (~48px tall on
+                      mobile via padding so it clears Apple's 44pt minimum).
+                      Native non-passive listeners are attached in the effect
+                      above so iOS Safari respects preventDefault and the page
+                      doesn't scroll while you're dragging. */}
                   <div
-                    onTouchStart={onSheetDragStart} onTouchMove={onSheetDragMove} onTouchEnd={onSheetDragEnd} onTouchCancel={onSheetDragEnd}
-                    onMouseDown={(e)=>{ onSheetDragStart(e); const move=(ev)=>onSheetDragMove(ev); const up=()=>{ onSheetDragEnd(); window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); }; window.addEventListener('mousemove',move); window.addEventListener('mouseup',up); }}
-                    style={{padding:'6px 0 4px',display:'flex',justifyContent:'center',cursor:'ns-resize',touchAction:'none'}}>
-                    <div style={{width:48,height:4,borderRadius:2,background:'#444'}}/>
+                    ref={sheetHandleRef}
+                    className="pfk-disp-sheet-handle"
+                    style={{padding:'18px 0 12px',display:'flex',justifyContent:'center',cursor:'ns-resize',touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}>
+                    <div style={{width:64,height:6,borderRadius:3,background:'#FFD700AA',boxShadow:'0 0 6px rgba(255,215,0,0.35)'}}/>
                   </div>
                   {/* Tab strip — PLAYERS · TEAM · COLLAPSE · VIEW (snap buttons) */}
                   <div style={{display:'flex',alignItems:'stretch',borderBottom:'1px solid #1e1e1e'}}>
@@ -6850,9 +6881,10 @@ function DispersalDraft({draftId}){
                       const sel = sheetTab === tab.id;
                       return (
                         <button key={tab.id}
+                          className="pfk-disp-sheet-tab"
                           onClick={() => { setSheetTab(tab.id); ensureSheetOpen(); }}
                           style={{
-                            flex:1,padding:'12px 6px',background:sel?'#0f0f0f':'transparent',border:'none',cursor:'pointer',
+                            flex:1,padding:'14px 6px',background:sel?'#0f0f0f':'transparent',border:'none',cursor:'pointer',
                             color:sel?'#FFD700':'#888',fontWeight:900,fontSize:12,letterSpacing:1.2,
                             borderBottom:'2px solid '+(sel?'#FFD700':'transparent')
                           }}>
@@ -6862,10 +6894,12 @@ function DispersalDraft({draftId}){
                     })}
                     {/* COLLAPSE — snap to floor */}
                     <button onClick={()=>setSheetHeight(SHEET_COLLAPSED_PX)} title="Collapse"
-                      style={{padding:'12px 12px',background:'transparent',border:'none',cursor:'pointer',color:'#888',fontSize:11,fontWeight:900,letterSpacing:0.5,minWidth:42}}>▼</button>
+                      className="pfk-disp-sheet-snap"
+                      style={{padding:'14px 14px',background:'transparent',border:'none',cursor:'pointer',color:'#888',fontSize:14,fontWeight:900,letterSpacing:0.5,minWidth:54,minHeight:48}}>▼</button>
                     {/* VIEW — snap to ceiling (full open) */}
                     <button onClick={()=>setSheetHeight(sheetMaxPx())} title="Expand to full view"
-                      style={{padding:'12px 12px',background:'transparent',border:'none',cursor:'pointer',color:'#FFD700',fontSize:11,fontWeight:900,letterSpacing:0.5,minWidth:42}}>▲</button>
+                      className="pfk-disp-sheet-snap"
+                      style={{padding:'14px 14px',background:'transparent',border:'none',cursor:'pointer',color:'#FFD700',fontSize:14,fontWeight:900,letterSpacing:0.5,minWidth:54,minHeight:48}}>▲</button>
                   </div>
 
                   {/* Tab content — only renders when sheet is expanded enough
