@@ -2818,7 +2818,7 @@ function SleeperLink(){
 //   onSignInClick   — only set on the main App; opens its full auth modal
 //                     when not provided, "Sign In" navigates to /?signin=1 instead
 // ============================================================================
-function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, compact }){
+function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, compact, subtitle }){
   const [session, setSession] = useState(null);
   // Read the linked Sleeper user so the Sleeper Snapshot tab can deep-link to
   // YOUR OWN profile instead of the empty search page when you're linked.
@@ -2860,6 +2860,52 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
     if(id === 'pfk') return currentTab === 'pfk' || currentTab === 'custom';
     return currentTab === id;
   };
+  // Reusable bits used by both layouts so we don't duplicate URLs / aria.
+  const twitterChip = (
+    <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
+       aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayforkeepsFF on X"
+       style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
+       onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
+       onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+      <span>@PlayforkeepsFF</span>
+    </a>
+  );
+  const emailChip = (
+    <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
+       aria-label="Email PFK support with feedback or bug reports"
+       data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
+       style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
+      📧 Email Support
+    </a>
+  );
+  // Compact layout — used on dispersal pages. Brand is centered with the
+  // page-specific subtitle (e.g. "Dispersal Draft") below, and the social
+  // chips sit on a centered row underneath. Padding is tightened so the
+  // page content can start much higher up the viewport. The full-fat layout
+  // (other pages) keeps its left-aligned brand + nav tabs.
+  if (compact) {
+    return (
+      <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"6px 14px",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+          <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center"}}>
+            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:72,height:72,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <div style={{textAlign:"left"}}>
+              <div className="pfk-header-title" style={{fontSize:24,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700",lineHeight:1.05}}>PLAY FOR KEEPS</div>
+              {subtitle && (
+                <div style={{fontSize:11,color:"#FFD700CC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:3}}>{subtitle}</div>
+              )}
+            </div>
+          </a>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+            {twitterChip}
+            {emailChip}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // Default layout (non-compact pages): existing left-aligned brand + nav tabs.
   return (
     <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
       <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:10}}>
@@ -2873,39 +2919,16 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
             </div>
           </a>
           <div style={{flex:1}}/>
-          <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
-             aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayforkeepsFF on X"
-             style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 9px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:800,fontSize:11,letterSpacing:0.3,transition:"all .15s"}}
-             onMouseEnter={e=>{e.currentTarget.style.background='#FFD700';e.currentTarget.style.color='#000';e.currentTarget.querySelector('svg').setAttribute('fill','#000');}}
-             onMouseLeave={e=>{e.currentTarget.style.background='#0a0a0a';e.currentTarget.style.color='#FFD700';e.currentTarget.querySelector('svg').setAttribute('fill','#FFD700');}}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFD700" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
-            <span>@PlayforkeepsFF</span>
-          </a>
-          <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
-             aria-label="Email PFK support with feedback or bug reports"
-             data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
-             style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",background:"#0a0a0a",border:"1px solid #FFD70055",borderRadius:16,color:"#FFD700",textDecoration:"none",fontWeight:700,fontSize:11,letterSpacing:0.3}}>
-            📧 Email Support
-          </a>
-          {/* In compact mode (live dispersal draft) we hide the Sleeper link
-              chip + Sign In/Out so the toolbar slims down to just brand +
-              support contacts. Live drafts need every pixel for the player
-              pool and rosters; account controls are one tap away on other pages. */}
-          {!compact && (
-            <>
-              <SleeperLink/>
-              {session ? (
-                <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
-              ) : (
-                <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
-              )}
-            </>
+          {twitterChip}
+          {emailChip}
+          <SleeperLink/>
+          {session ? (
+            <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
+          ) : (
+            <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#FFD700",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
           )}
         </div>
-        {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line.
-            Hidden in compact mode so dispersal-draft view recovers the screen
-            real estate that the multi-row mobile toolbar normally consumes. */}
-        {!compact && (
+        {/* Bottom row: nav tabs LEFT-aligned, just above the yellow border line. */}
         <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-start"}}>
           {tabs.map(([id,label,desc,href,isInPage])=>{
             const active = isActiveTab(id);
@@ -2915,7 +2938,6 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
             );
           })}
         </div>
-        )}
       </div>
     </div>
   );
@@ -6339,10 +6361,10 @@ function DispersalDraft({draftId}){
   const stickyRostersActive = status==='ready' || status==='live' || status==='complete';
   const sheetPadding = stickyRostersActive ? (sheetHeight + 14) : 14;
   return (
-    <div style={{padding:'14px 16px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:sheetPadding}}>
+    <div style={{padding:'8px 14px',color:'#eee',maxWidth:1240,margin:'0 auto',paddingBottom:sheetPadding}}>
       {/* Header */}
-      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
-        <div style={{fontSize:20,fontWeight:900,color:'#FFD700',letterSpacing:1.5}}>🎲 {draft.name}</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
+        <div style={{fontSize:18,fontWeight:900,color:'#FFD700',letterSpacing:1.2}}>🎲 {draft.name}</div>
         <div style={{padding:'4px 10px',background:status==='live'?'#0a2a1a':status==='complete'?'#1a1a3a':'#2a1a0a',border:'1px solid '+(status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'),borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:1.5,color:status==='live'?'#10b981':status==='complete'?'#a78bfa':'#FFD700'}}>{status.toUpperCase()}</div>
         <button onClick={()=>{
           try{ navigator.clipboard.writeText(window.location.origin + '/dispersal/' + draftId); }catch(e){}
@@ -6683,10 +6705,7 @@ function DispersalDraft({draftId}){
                               {item ? cleanName(item) : (isOnClock?(<span style={{color:'#10b981',fontSize:10,letterSpacing:0.5}}>ON CLOCK</span>):'—')}
                             </div>
                             {pick?.auto && (
-                              <div style={{position:'absolute',top:3,right:4,fontSize:8,color:'#f59e0b',fontStyle:'italic',fontWeight:700}}>auto</div>
-                            )}
-                            {ownerTeam && me && me.slot===slotIdx && item && (
-                              <div style={{position:'absolute',top:3,right:4,fontSize:7,color:'#FFD700',fontWeight:900,letterSpacing:0.5}}>YOU</div>
+                              <div style={{position:'absolute',bottom:2,right:4,fontSize:8,color:'#f59e0b',fontStyle:'italic',fontWeight:700}}>auto</div>
                             )}
                           </div>
                         );
@@ -7152,8 +7171,11 @@ function DispersalApp({draftId}){
   },[]);
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif"}}>
-      <MasterToolbar currentTab="dispersal" compact={!!draftId}/>
-      {isDevHost() && (
+      <MasterToolbar currentTab="dispersal" compact={!!draftId} subtitle={draftId ? 'Dispersal Draft' : 'New Dispersal Draft'}/>
+      {/* Dev-only completed-drafts counter. Live draft view hides this — Evan
+          wants every pixel for the draft board there. Setup view keeps it so
+          the counter is still visible while creating new drafts. */}
+      {isDevHost() && !draftId && (
         <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 14px 0',maxWidth:1240,margin:'0 auto'}}>
           <div style={{display:'inline-block',padding:'6px 12px',background:'#0a0a0a',border:'1px solid #FFD70066',borderRadius:20,fontSize:11,color:'#FFD700',fontWeight:800,letterSpacing:0.5,whiteSpace:'nowrap'}}>
             {completedDispersalCount !== null
