@@ -2889,7 +2889,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
       <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #FFD700",padding:"6px 14px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
-            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:104,height:104,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:104,height:104,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
             <div style={{textAlign:"center"}}>
               <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700",lineHeight:1.05}}>PLAY FOR KEEPS</div>
               {subtitle && (
@@ -2912,7 +2912,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
         {/* Top row: brand on left, account controls on right */}
         <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
           <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none"}}>
-            <img className="pfk-logo-img" src="https://i.imgur.com/ftHKrQX.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+            <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:88,height:88,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
             <div>
               <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#FFD700",letterSpacing:3,textShadow:"0 0 20px #FFD700"}}>PLAY FOR KEEPS</div>
               <div className="pfk-header-subtitle" style={{fontSize:12,color:"#8B6914",letterSpacing:3,textTransform:"uppercase",fontWeight:600}}>Dynasty Fantasy Football Tools</div>
@@ -5833,7 +5833,11 @@ function DispersalDraft({draftId}){
   // can pull the sheet up. Last-set height persists across visits.
   // Migration: old localStorage key 'pfk_disp_rosters_collapsed' is honored
   // — '1' (collapsed) → 56px, '0' (expanded) → 25% default.
-  const SHEET_COLLAPSED_PX = 56;
+  // Collapsed height fits both the drag handle (~38px) and the full tab bar
+  // (~50px) so PLAYERS / TEAM / ▼ / ▲ stay visible and tappable when the
+  // sheet is at its floor — Evan needs the snap buttons reachable from the
+  // collapsed state so he can re-expand with one tap.
+  const SHEET_COLLAPSED_PX = 110;
   const sheetMaxPx = () => Math.max(SHEET_COLLAPSED_PX+1, (typeof window!=='undefined' ? window.innerHeight : 800) - 80);
   const sheetDefaultPx = () => Math.round((typeof window!=='undefined' ? window.innerHeight : 800) * 0.25);
   const [sheetHeight,setSheetHeight] = useState(() => {
@@ -5860,54 +5864,27 @@ function DispersalDraft({draftId}){
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   },[]);
-  // Drag handle: native event listeners attached via useEffect with
-  // {passive:false} so iOS Safari actually honors preventDefault. React's
-  // synthetic touch handlers are passive by default → preventDefault is a
-  // no-op and the page would scroll instead of dragging the sheet, which felt
-  // awful on iPhone. We track the live height via a ref so the drag closure
-  // doesn't capture a stale value, but listeners only attach once.
+  // Drag handle uses React synthetic touch + an inline mouse drag pattern.
+  // CSS `touch-action: none` on the handle (set inline below) is what stops
+  // the browser from hijacking the gesture as a page scroll — preventDefault
+  // is a belt-and-suspenders no-op on passive listeners. Active drag is
+  // tracked via ref so we don't re-render between touchmove ticks.
   const sheetDrag = useRef({ active:false, startY:0, startH:0 });
-  const sheetHeightRef = useRef(sheetHeight);
-  sheetHeightRef.current = sheetHeight; // refreshed every render so handlers always see the latest
-  const sheetHandleRef = useRef(null);
-  useEffect(() => {
-    const el = sheetHandleRef.current;
-    if(!el) return;
-    const start = (e) => {
-      const y = e.touches ? e.touches[0].clientY : e.clientY;
-      sheetDrag.current = { active:true, startY:y, startH:sheetHeightRef.current };
-      if(e.cancelable) e.preventDefault();
-    };
-    const move = (e) => {
-      if(!sheetDrag.current.active) return;
-      const y = e.touches ? e.touches[0].clientY : e.clientY;
-      const delta = sheetDrag.current.startY - y; // upward drag = positive
-      const max = Math.max(SHEET_COLLAPSED_PX+1, window.innerHeight - 80);
-      const next = Math.max(SHEET_COLLAPSED_PX, Math.min(max, sheetDrag.current.startH + delta));
-      setSheetHeight(next);
-      if(e.cancelable) e.preventDefault();
-    };
-    const end = () => { sheetDrag.current.active = false; };
-    // touchstart MUST be non-passive so preventDefault stops the page from
-    // hijacking the gesture. Move/end on the window so the drag continues
-    // smoothly even if the user's finger leaves the handle.
-    el.addEventListener('touchstart', start, { passive:false });
-    window.addEventListener('touchmove', move, { passive:false });
-    window.addEventListener('touchend', end);
-    window.addEventListener('touchcancel', end);
-    el.addEventListener('mousedown', start);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
-    return () => {
-      el.removeEventListener('touchstart', start);
-      window.removeEventListener('touchmove', move);
-      window.removeEventListener('touchend', end);
-      window.removeEventListener('touchcancel', end);
-      el.removeEventListener('mousedown', start);
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', end);
-    };
-  },[]); // attach once
+  const onSheetDragStart = (e) => {
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    sheetDrag.current = { active:true, startY:y, startH:sheetHeight };
+    if(e.cancelable) e.preventDefault();
+  };
+  const onSheetDragMove = (e) => {
+    if(!sheetDrag.current.active) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const delta = sheetDrag.current.startY - y; // upward drag = positive
+    const max = Math.max(SHEET_COLLAPSED_PX+1, (typeof window!=='undefined' ? window.innerHeight : 800) - 80);
+    const next = Math.max(SHEET_COLLAPSED_PX, Math.min(max, sheetDrag.current.startH + delta));
+    setSheetHeight(next);
+    if(e.cancelable) e.preventDefault();
+  };
+  const onSheetDragEnd = () => { sheetDrag.current.active = false; };
   const isSheetCollapsed = sheetHeight <= SHEET_COLLAPSED_PX + 4;
   // Convenience: jump to a useful expanded height when programmatic UI wants
   // to make sure content is visible (e.g. tapping a TEAM avatar).
@@ -6861,16 +6838,16 @@ function DispersalDraft({draftId}){
                 transition: sheetDrag.current.active ? 'none' : 'height 0.18s ease-out'
               }}>
                 <div style={{maxWidth:1240,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',minHeight:0,flex:1}}>
-                  {/* Drag handle bar — full-width touch target (~48px tall on
-                      mobile via padding so it clears Apple's 44pt minimum).
-                      Native non-passive listeners are attached in the effect
-                      above so iOS Safari respects preventDefault and the page
-                      doesn't scroll while you're dragging. */}
+                  {/* Drag handle bar — full-width touch target. CSS `touch-
+                      action: none` keeps the browser from interpreting the
+                      gesture as a page scroll. ~38px tall touch zone with a
+                      bright gold pill in the middle so it's findable. */}
                   <div
-                    ref={sheetHandleRef}
                     className="pfk-disp-sheet-handle"
-                    style={{padding:'18px 0 12px',display:'flex',justifyContent:'center',cursor:'ns-resize',touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}>
-                    <div style={{width:64,height:6,borderRadius:3,background:'#FFD700AA',boxShadow:'0 0 6px rgba(255,215,0,0.35)'}}/>
+                    onTouchStart={onSheetDragStart} onTouchMove={onSheetDragMove} onTouchEnd={onSheetDragEnd} onTouchCancel={onSheetDragEnd}
+                    onMouseDown={(e)=>{ onSheetDragStart(e); const move=(ev)=>onSheetDragMove(ev); const up=()=>{ onSheetDragEnd(); window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); }; window.addEventListener('mousemove',move); window.addEventListener('mouseup',up); }}
+                    style={{padding:'14px 0 14px',display:'flex',justifyContent:'center',cursor:'ns-resize',touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}>
+                    <div style={{width:80,height:8,borderRadius:4,background:'#FFD700',boxShadow:'0 0 8px rgba(255,215,0,0.45)'}}/>
                   </div>
                   {/* Tab strip — PLAYERS · TEAM · COLLAPSE · VIEW (snap buttons) */}
                   <div style={{display:'flex',alignItems:'stretch',borderBottom:'1px solid #1e1e1e'}}>
