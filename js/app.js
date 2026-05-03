@@ -3053,33 +3053,38 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
   // chips and nav tabs sit on centered rows below. Dispersal pages use the
   // separate compact branch above (kept untouched per Evan's request).
   return (
-    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"10px 16px",position:"sticky",top:0,zIndex:100}}>
-      {/* SIGN IN / OUT — anchored to the top-right corner of the toolbar so
-          the account state has a permanent home users always know where to
-          find. Email Support is no longer in the toolbar — it lives in the
-          site-wide PFKFooter now. The pfk-signin-anchor class lets mobile
-          CSS shrink the button to free up horizontal room for the brand. */}
-      <div className="pfk-signin-anchor" style={{position:"absolute",top:8,right:12,zIndex:101}}>
-        {session ? (
-          <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
-        ) : (
-          <a href="/?signin=1" onClick={doSignIn} style={{padding:"7px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none",display:"inline-block",boxShadow:"0 0 12px rgba(221,179,77,0.25)"}}>SIGN IN</a>
-        )}
+    <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"8px 12px",position:"sticky",top:0,zIndex:100}}>
+      {/* Twitter chip — absolute top-LEFT corner. Was inline below the brand;
+          moving it into the corner reclaims vertical space so more of the
+          page is visible above the fold. */}
+      <div className="pfk-toolbar-tl" style={{position:"absolute",top:8,left:12,zIndex:101}}>
+        {twitterChip}
       </div>
-      <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
-        <a href="/" className="pfk-brand-link" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
-          <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:92,height:92,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+      {/* SIGN IN / OUT (top) + Sleeper account (directly underneath) — both
+          live in the top-right corner so account state has a permanent home
+          and the brand block in the center has full width to breathe. The
+          .pfk-signin-anchor + .pfk-toolbar-tr classes let mobile CSS shrink
+          everything in this corner to free up horizontal room. */}
+      <div className="pfk-toolbar-tr" style={{position:"absolute",top:8,right:12,zIndex:101,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+        <div className="pfk-signin-anchor">
+          {session ? (
+            <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
+          ) : (
+            <a href="/?signin=1" onClick={doSignIn} style={{padding:"7px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none",display:"inline-block",boxShadow:"0 0 12px rgba(221,179,77,0.25)"}}>SIGN IN</a>
+          )}
+        </div>
+        <SleeperLink/>
+      </div>
+      <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:6,alignItems:"center"}}>
+        <a href="/" className="pfk-brand-link" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,textDecoration:"none",justifyContent:"center"}}>
+          {/* Mark-only logo — the wordmark is rendered as text below so we
+              don't end up with "Play For Keeps" twice (image + heading). */}
+          <img className="pfk-logo-img" src="/img/pfk-logo-mark.png" alt="PFK" style={{width:80,height:80,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
           <div style={{textAlign:"center"}}>
             <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D",lineHeight:1.05}}>PLAY FOR KEEPS</div>
             <div style={{fontSize:12,color:"#DDB34DCC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:4,textAlign:"center"}}>Dynasty Fantasy Football</div>
           </div>
         </a>
-        {/* Account-control chips — Twitter + SleeperLink. SIGN IN moved to
-            top-right corner above; Email Support moved to PFKFooter. */}
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center",alignItems:"center"}}>
-          {twitterChip}
-          <SleeperLink/>
-        </div>
         {/* Nav tabs — centered on desktop, anchored to flex-start on mobile
             via CSS. The wrapper exists purely to host the right-edge gradient
             overlay (.pfk-tabs-wrap::after) that hints at horizontal scroll on

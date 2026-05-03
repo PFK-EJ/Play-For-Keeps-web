@@ -54,19 +54,49 @@ input, select { font-family:inherit; }
 }
 @media (max-width:600px){
   .pfk-sticky-header { padding:8px 12px !important; }
-  /* SIGN IN / OUT button is absolute-anchored to the top-right corner of
-     the toolbar — on mobile the brand wordmark could extend underneath it.
-     Two-part fix: shrink the button so it takes less horizontal room, AND
-     reserve right-padding on the brand link so its rightmost text never
-     enters the SIGN IN zone. The matching left-padding keeps the brand
-     visually centered within the now-narrower available width. */
+  /* Corner chips on mobile: Twitter top-left, SIGN IN + Sleeper-link
+     stacked top-right. Shrink everything in those corners so the brand
+     block in the center has room to breathe. The .pfk-brand-link gutters
+     mirror the corners so the wordmark stays visually centered between
+     them. */
   .pfk-signin-anchor a, .pfk-signin-anchor button {
     padding:5px 10px !important;
     font-size:10px !important;
     letter-spacing:0.5px !important;
   }
+  /* Top-right column (.pfk-toolbar-tr) holds SIGN IN above + SleeperLink
+     below. Compact spacing so the stack stays out of the brand area. */
+  .pfk-toolbar-tr { gap:4px !important; }
+  /* The SleeperLink chip itself when shown — make its avatar + text
+     compact on mobile. Targets the chip's outer div and inner spans. */
+  .pfk-toolbar-tr > div:not(.pfk-signin-anchor) > div {
+    padding:2px 5px 2px 2px !important;
+    border-radius:14px !important;
+  }
+  .pfk-toolbar-tr > div:not(.pfk-signin-anchor) img,
+  .pfk-toolbar-tr > div:not(.pfk-signin-anchor) > div > div:first-child {
+    width:18px !important;
+    height:18px !important;
+    font-size:9px !important;
+  }
+  .pfk-toolbar-tr > div:not(.pfk-signin-anchor) span {
+    font-size:9px !important;
+    letter-spacing:0.2px !important;
+    max-width:70px !important;
+  }
+  .pfk-toolbar-tr > div:not(.pfk-signin-anchor) button {
+    font-size:10px !important;
+    padding:0 3px !important;
+  }
+  /* Top-left Twitter chip — compact on mobile too. */
+  .pfk-toolbar-tl a {
+    padding:3px 8px !important;
+    font-size:10px !important;
+    letter-spacing:0.2px !important;
+  }
+  /* Brand has gutters on BOTH sides now (corners on left + right). */
   .pfk-brand-link {
-    padding:0 70px !important;
+    padding:0 90px !important;
     box-sizing:border-box;
   }
   /* Logo size on mobile is dictated by inline styles in the JSX (default
