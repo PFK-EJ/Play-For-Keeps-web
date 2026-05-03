@@ -2910,6 +2910,47 @@ function SleeperLink(){
 }
 
 // ============================================================================
+// PFKFooter — site-wide footer with mini brand, contact + social, copyright.
+// Renders at the bottom of every top-level page (App, LookupApp, TradeFinderApp,
+// AdminApp, DispersalApp setup screen). Skipped on the live dispersal draft
+// view since the bottom-sheet covers the bottom of the screen there.
+// ============================================================================
+function PFKFooter(){
+  const year = new Date().getFullYear();
+  return (
+    <footer style={{borderTop:"1px solid #1e1e1e",background:"#0a0a0a",padding:"22px 16px 26px",marginTop:32}}>
+      <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+        {/* Mini brand strip — small logo + wordmark */}
+        <a href="/" style={{display:"flex",alignItems:"center",gap:10,textDecoration:"none"}}>
+          <img src="/img/pfk-logo.png" alt="" style={{width:36,height:36,objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+          <div>
+            <div style={{fontSize:14,fontWeight:900,color:"#DDB34D",letterSpacing:2}}>PLAY FOR KEEPS</div>
+            <div style={{fontSize:9,color:"#DDB34DAA",letterSpacing:2,fontWeight:700,textTransform:"uppercase",marginTop:1}}>Dynasty Fantasy Football</div>
+          </div>
+        </a>
+        {/* Contact + social row */}
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center"}}>
+          <a href="https://x.com/PlayForKeepsFF" target="_blank" rel="noopener noreferrer"
+             aria-label="Follow @PlayForKeepsFF on X" data-tooltip="Follow @PlayforkeepsFF on X"
+             style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:"transparent",border:"1px solid #DDB34D55",borderRadius:18,color:"#DDB34D",textDecoration:"none",fontWeight:800,fontSize:12,letterSpacing:0.3}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#DDB34D" aria-hidden="true"><path d="M18.244 2H21.5l-7.5 8.57L23 22h-6.844l-5.36-6.72L4.5 22H1.244l8.04-9.187L1 2h7.016l4.844 6.12L18.244 2zm-1.2 18h1.9L7.048 4H5.05l12 16z"/></svg>
+            <span>@PlayforkeepsFF</span>
+          </a>
+          <a href="mailto:ej@playforkeepsdynasty.com?subject=PFK%20Support"
+             aria-label="Email PFK support with feedback or bug reports"
+             data-tooltip="Email PFK support with feedback, bug reports, or partnership inquiries"
+             style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:"transparent",border:"1px solid #DDB34D55",borderRadius:18,color:"#DDB34D",textDecoration:"none",fontWeight:800,fontSize:12,letterSpacing:0.3}}>
+            📧 Email Support
+          </a>
+        </div>
+        {/* Copyright */}
+        <div style={{fontSize:11,color:"#555",letterSpacing:0.4,textAlign:"center"}}>© {year} Play For Keeps. All rights reserved.</div>
+      </div>
+    </footer>
+  );
+}
+
+// ============================================================================
 // MasterToolbar — shared header across every PFK page (App, DispersalApp, LookupApp).
 // Above the yellow line: brand + all 5 nav tabs (left) + X + Email Support + Sign in/out (right).
 // Used so users can jump between tools from any page without going home first.
@@ -3002,7 +3043,6 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
           </a>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
             {twitterChip}
-            {emailChip}
           </div>
         </div>
       </div>
@@ -3014,6 +3054,17 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
   // separate compact branch above (kept untouched per Evan's request).
   return (
     <div className="pfk-sticky-header" style={{background:"#0a0a0a",borderBottom:"2px solid #DDB34D",padding:"10px 16px",position:"sticky",top:0,zIndex:100}}>
+      {/* SIGN IN / OUT — anchored to the top-right corner of the toolbar so
+          the account state has a permanent home users always know where to
+          find. Email Support is no longer in the toolbar — it lives in the
+          site-wide PFKFooter now. */}
+      <div style={{position:"absolute",top:8,right:12,zIndex:101}}>
+        {session ? (
+          <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
+        ) : (
+          <a href="/?signin=1" onClick={doSignIn} style={{padding:"7px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none",display:"inline-block",boxShadow:"0 0 12px rgba(221,179,77,0.25)"}}>SIGN IN</a>
+        )}
+      </div>
       <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
         <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
           <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:92,height:92,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
@@ -3022,16 +3073,11 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
             <div style={{fontSize:12,color:"#DDB34DCC",letterSpacing:2.5,textTransform:"uppercase",fontWeight:700,marginTop:4,textAlign:"center"}}>Dynasty Fantasy Football</div>
           </div>
         </a>
-        {/* Account-control chips — centered, allowed to wrap. */}
+        {/* Account-control chips — Twitter + SleeperLink. SIGN IN moved to
+            top-right corner above; Email Support moved to PFKFooter. */}
         <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center",alignItems:"center"}}>
           {twitterChip}
-          {emailChip}
           <SleeperLink/>
-          {session ? (
-            <button onClick={doLogout} style={{padding:"4px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
-          ) : (
-            <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
-          )}
         </div>
         {/* Nav tabs — centered on desktop, anchored to flex-start on mobile
             via CSS. The wrapper exists purely to host the right-edge gradient
@@ -3718,6 +3764,7 @@ function App(){
         <div style={{display:tab==="team"?"block":"none"}}><TeamTab/></div>
         {tab==="polls"&&<TradePollsTab session={session} onRequestSignIn={()=>{setAuthMode('signin');setAuthOpen(true);}}/>}
       </div>
+      <PFKFooter/>
     </div>
   );
 }
@@ -7319,6 +7366,10 @@ function DispersalApp({draftId}){
         </div>
       )}
       {draftId ? <DispersalDraft draftId={draftId}/> : <DispersalSetup/>}
+      {/* Skip footer on the live draft view — the fixed bottom-sheet covers
+          the bottom of the screen there and a footer below it would never
+          be visible. Setup screen still renders the footer. */}
+      {!draftId && <PFKFooter/>}
     </div>
   );
 }
@@ -8658,6 +8709,7 @@ function LookupApp({ identifier }){
         </div>
       )}
       {identifier ? <LookupProfile identifier={identifier}/> : <LookupSearch/>}
+      <PFKFooter/>
     </div>
   );
 }
@@ -9598,6 +9650,7 @@ function TradeFinderApp(){
           relevantContext={relevantContext}
         />
       )}
+      <PFKFooter/>
     </div>
   );
 }
