@@ -3057,8 +3057,9 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
       {/* SIGN IN / OUT — anchored to the top-right corner of the toolbar so
           the account state has a permanent home users always know where to
           find. Email Support is no longer in the toolbar — it lives in the
-          site-wide PFKFooter now. */}
-      <div style={{position:"absolute",top:8,right:12,zIndex:101}}>
+          site-wide PFKFooter now. The pfk-signin-anchor class lets mobile
+          CSS shrink the button to free up horizontal room for the brand. */}
+      <div className="pfk-signin-anchor" style={{position:"absolute",top:8,right:12,zIndex:101}}>
         {session ? (
           <button onClick={doLogout} style={{padding:"6px 10px",background:"transparent",border:"1px solid #555",borderRadius:6,color:"#888",cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:0.3}}>Sign Out</button>
         ) : (
@@ -3066,7 +3067,7 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
         )}
       </div>
       <div style={{maxWidth:1140,margin:"0 auto",display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
-        <a href="/" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
+        <a href="/" className="pfk-brand-link" style={{display:"flex",alignItems:"center",gap:14,textDecoration:"none",justifyContent:"center",flexWrap:"wrap"}}>
           <img className="pfk-logo-img" src="/img/pfk-logo.png" alt="PFK" style={{width:92,height:92,objectFit:"contain",flexShrink:0}} onError={e=>e.target.style.display="none"}/>
           <div style={{textAlign:"center"}}>
             <div className="pfk-header-title" style={{fontSize:26,fontWeight:900,color:"#DDB34D",letterSpacing:3,textShadow:"0 0 20px #DDB34D",lineHeight:1.05}}>PLAY FOR KEEPS</div>

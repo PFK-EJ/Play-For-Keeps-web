@@ -54,6 +54,21 @@ input, select { font-family:inherit; }
 }
 @media (max-width:600px){
   .pfk-sticky-header { padding:8px 12px !important; }
+  /* SIGN IN / OUT button is absolute-anchored to the top-right corner of
+     the toolbar — on mobile the brand wordmark could extend underneath it.
+     Two-part fix: shrink the button so it takes less horizontal room, AND
+     reserve right-padding on the brand link so its rightmost text never
+     enters the SIGN IN zone. The matching left-padding keeps the brand
+     visually centered within the now-narrower available width. */
+  .pfk-signin-anchor a, .pfk-signin-anchor button {
+    padding:5px 10px !important;
+    font-size:10px !important;
+    letter-spacing:0.5px !important;
+  }
+  .pfk-brand-link {
+    padding:0 70px !important;
+    box-sizing:border-box;
+  }
   /* Logo size on mobile is dictated by inline styles in the JSX (default
      toolbar uses 92px, compact dispersal uses 109px). Removed the previous
      !important shrinker so each toolbar can size its own logo per Evan's
