@@ -8172,8 +8172,10 @@ function LookupProfile({ identifier }){
                 </div>
                 <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.peakRingCount || 0}</div>
-                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>PEAK RING YEAR</div>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.peakRingCount > 0 ? `${careerStats.peakRingCount === 1 ? 'one ring' : `${careerStats.peakRingCount} rings`} · ${careerStats.peakRingYear}` : '—'}</div>
+                  {/* Long label intentionally wraps onto 2 lines so it fits in
+                      the tile box at the same min-width (140px) as the others. */}
+                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1,marginTop:6,lineHeight:1.25}}>MOST TITLES WON IN A SINGLE SEASON</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.peakRingCount > 0 ? `${careerStats.peakRingCount === 1 ? 'in' : 'in'} ${careerStats.peakRingYear}` : '—'}</div>
                 </div>
                 <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalSeasons}</div>
