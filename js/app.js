@@ -7864,7 +7864,22 @@ const lookupCareerStats = async (userId, allLeagues) => {
       else cur = 0;
     }
   }
-  return { totalWins, totalLosses, totalSeasons, championships, longestStreak, leagueChains: chains.length };
+  // Peak ring year: the calendar season in which the user won the most
+  // championships. If they're in 5 dynasty leagues and won 3 of them in
+  // the same year, that year totals 3 rings — beat that and you have a
+  // new peak. Ties resolve to the most recent year (we sort by year desc
+  // before walking).
+  const ringsByYear = {};
+  results.forEach(r => { if(r.won) ringsByYear[r.season] = (ringsByYear[r.season] || 0) + 1; });
+  const yearsDesc = Object.keys(ringsByYear).sort((a, b) => Number(b) - Number(a));
+  let peakRingCount = 0, peakRingYear = null;
+  for(const y of yearsDesc){
+    if(ringsByYear[y] > peakRingCount){
+      peakRingCount = ringsByYear[y];
+      peakRingYear = y;
+    }
+  }
+  return { totalWins, totalLosses, totalSeasons, championships, longestStreak, leagueChains: chains.length, peakRingCount, peakRingYear };
 };
 
 // Format a date as "X time ago" (e.g. "2 hours ago", "3 days ago", "5 yrs ago")
@@ -8156,6 +8171,11 @@ function LookupProfile({ identifier }){
                   <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.longestStreak === 0 ? '—' : `${careerStats.longestStreak === 1 ? 'one ring' : `${careerStats.longestStreak} in a row`}`}</div>
                 </div>
                 <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.peakRingCount || 0}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>PEAK RING YEAR</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.peakRingCount > 0 ? `${careerStats.peakRingCount === 1 ? 'one ring' : `${careerStats.peakRingCount} rings`} · ${careerStats.peakRingYear}` : '—'}</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalSeasons}</div>
                   <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>SEASONS PLAYED</div>
                 </div>
@@ -8253,12 +8273,12 @@ function LookupProfile({ identifier }){
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG RANK</div>
               </div>
               <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D'}}>{teamStrength.avgTeams.toFixed(0)}</div>
-                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
-              </div>
-              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#DDB34D'}}>{teamStrength.leaguesCount}</div>
                 <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES</div>
+              </div>
+              <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:900,color:'#DDB34D'}}>{teamStrength.avgTeams.toFixed(0)}</div>
+                <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
               </div>
             </div>
             <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Co-managed leagues where this user isn't the primary manager aren't factored in.</div>
@@ -8399,12 +8419,12 @@ function LookupProfile({ identifier }){
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>AVG RANK</div>
                 </div>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgTeams.toFixed(0)}</div>
-                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
-                </div>
-                <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.leaguesCount}</div>
                   <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>LEAGUES</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgTeams.toFixed(0)}</div>
+                  <div style={{fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>TYPICAL LEAGUE SIZE</div>
                 </div>
               </div>
             </div>
