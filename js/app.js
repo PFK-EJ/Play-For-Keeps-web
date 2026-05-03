@@ -7762,6 +7762,111 @@ const lookupTeamStrength = async (userId, allLeagues) => {
   return { leaguesCount: ranks.length, avgRank, avgTeams, ranks };
 };
 
+// Career stats — total W/L, championships, championship %, longest title streak.
+// Walks each unique dynasty league chain back via previous_league_id (deeper
+// than SEASONS_TO_SCAN, so multi-year dynasties get full credit). Only counts
+// COMPLETED seasons — in-progress leagues distort the W-L and ring-rate.
+//
+// Streak definition: longest run of consecutive championship wins WITHIN a
+// single league chain. Winning different leagues in different years doesn't
+// stack.
+const lookupCareerStats = async (userId, allLeagues) => {
+  const dynasty = (allLeagues||[]).filter(lg => (lg.settings||{}).type === 2);
+  if(!dynasty.length){
+    return { totalWins:0, totalLosses:0, totalSeasons:0, championships:0, longestStreak:0, leagueChains:0 };
+  }
+  // Index leagues we already have by league_id for chain-walking lookup.
+  const byId = {};
+  dynasty.forEach(lg => { byId[String(lg.league_id)] = lg; });
+  // Find the leaves (most-recent leagues in each chain) — leagues whose
+  // league_id isn't anyone's previous_league_id within our scan.
+  const referenced = new Set();
+  dynasty.forEach(lg => { if(lg.previous_league_id) referenced.add(String(lg.previous_league_id)); });
+  const leaves = dynasty.filter(lg => !referenced.has(String(lg.league_id)));
+  // Dedupe leaves by league_id in case the same league_id appears multiple times.
+  const seenLeafIds = new Set();
+  const uniqueLeaves = leaves.filter(l => {
+    const k = String(l.league_id);
+    if(seenLeafIds.has(k)) return false;
+    seenLeafIds.add(k);
+    return true;
+  });
+  // Walk each leaf back via previous_league_id, fetching older seasons we
+  // didn't already have in the SEASONS_TO_SCAN window.
+  const chains = []; // each entry: array of leagues (oldest-first)
+  await Promise.all(uniqueLeaves.map(async (leaf) => {
+    const chain = [leaf];
+    let cur = leaf;
+    for(let i = 0; i < 12; i++){
+      if(!cur.previous_league_id || String(cur.previous_league_id) === '0') break;
+      const prevKey = String(cur.previous_league_id);
+      let prev = byId[prevKey];
+      if(!prev){
+        try{
+          prev = await fetch(`${SLEEPER}/league/${cur.previous_league_id}`).then(r=>r.json()).catch(()=>null);
+        }catch(e){ prev = null; }
+        if(!prev || !prev.league_id) break;
+        byId[prevKey] = prev;
+      }
+      // Only walk back into dynasty parents — if we hit a redraft predecessor
+      // (the redraft→dynasty conversion case), stop. Older redraft data
+      // would distort the streak/W-L numbers.
+      if(prev.settings && prev.settings.type !== 2 && prev.settings.type !== undefined) break;
+      chain.push(prev);
+      cur = prev;
+    }
+    chains.push(chain.slice().reverse()); // oldest first
+  }));
+  // For each season in each chain: fetch rosters + winners_bracket, score it.
+  // Wins/losses come from roster.settings (Sleeper's standings cache).
+  // Championship is the winners_bracket final-round winner.
+  const results = []; // {chainIdx, season, won, played}
+  await Promise.all(chains.flatMap((chain, chainIdx) =>
+    chain.map(async (lg, seasonIdx) => {
+      // Skip in-progress / pre-draft leagues — their W/L and bracket aren't final.
+      if(lg.status && lg.status !== 'complete') return;
+      try{
+        const [rosters, bracket] = await Promise.all([
+          fetch(`${SLEEPER}/league/${lg.league_id}/rosters`).then(r=>r.json()).catch(()=>[]),
+          fetch(`${SLEEPER}/league/${lg.league_id}/winners_bracket`).then(r=>r.json()).catch(()=>[]),
+        ]);
+        const myRoster = (Array.isArray(rosters) ? rosters : []).find(r =>
+          r.owner_id === userId || (Array.isArray(r.co_owners) && r.co_owners.includes(userId))
+        );
+        if(!myRoster) return;
+        const wins = Number(myRoster.settings?.wins || 0);
+        const losses = Number(myRoster.settings?.losses || 0);
+        if(wins + losses === 0) return; // didn't play any regular-season games
+        // Championship — final round winner of the playoff bracket.
+        let won = false;
+        if(Array.isArray(bracket) && bracket.length > 0){
+          const maxR = Math.max(...bracket.map(g => g.r));
+          const finalRound = bracket.filter(g => g.r === maxR);
+          // p===null is the championship game (not a 3rd-place match)
+          const champGame = finalRound.find(g => g.p == null) || finalRound[0];
+          if(champGame?.w === myRoster.roster_id) won = true;
+        }
+        results.push({ chainIdx, season: Number(lg.season || seasonIdx), wins, losses, won });
+      }catch(e){}
+    })
+  ));
+  // Aggregate
+  let totalWins = 0, totalLosses = 0, championships = 0;
+  results.forEach(r => { totalWins += r.wins; totalLosses += r.losses; if(r.won) championships++; });
+  const totalSeasons = results.length;
+  // Longest streak: per chain, sort seasons chronologically and count consecutive wins.
+  let longestStreak = 0;
+  for(let ci = 0; ci < chains.length; ci++){
+    const chainResults = results.filter(r => r.chainIdx === ci).sort((a, b) => a.season - b.season);
+    let cur = 0;
+    for(const r of chainResults){
+      if(r.won){ cur++; if(cur > longestStreak) longestStreak = cur; }
+      else cur = 0;
+    }
+  }
+  return { totalWins, totalLosses, totalSeasons, championships, longestStreak, leagueChains: chains.length };
+};
+
 // Format a date as "X time ago" (e.g. "2 hours ago", "3 days ago", "5 yrs ago")
 const lookupTimeAgo = (date) => {
   if(!date) return null;
@@ -7833,6 +7938,11 @@ function LookupProfile({ identifier }){
   // Team strength (avg power-rank across current dynasty leagues) — also background.
   const [teamStrength,setTeamStrength] = useState(null);
   const [strengthLoading,setStrengthLoading] = useState(false);
+  // Career stats — total W/L, championships, championship %, longest title
+  // streak. Heavy: walks every dynasty league chain back via previous_league_id
+  // and fetches rosters + winners_bracket per season. Background-loaded.
+  const [careerStats,setCareerStats] = useState(null);
+  const [careerLoading,setCareerLoading] = useState(false);
   // Snapshot share state — same pattern as the dispersal share-pool feature.
   const profileCardRef = useRef(null);
   const [profileShareBusy,setProfileShareBusy] = useState(false);
@@ -7885,6 +7995,23 @@ function LookupProfile({ identifier }){
         if(!cancelled) setTeamStrength(ts);
       }catch(e){}
       finally{ if(!cancelled) setStrengthLoading(false); }
+    })();
+    return ()=>{ cancelled = true; };
+  },[user, leagues]);
+
+  // Background load: career stats (W/L, championships, longest streak). Walks
+  // each dynasty league chain backward, so it can take a few seconds on heavy
+  // users — runs after main profile renders, doesn't block.
+  useEffect(()=>{
+    if(!user || !leagues) return;
+    let cancelled = false;
+    (async () => {
+      setCareerLoading(true);
+      try{
+        const cs = await lookupCareerStats(user.user_id, leagues);
+        if(!cancelled) setCareerStats(cs);
+      }catch(e){}
+      finally{ if(!cancelled) setCareerLoading(false); }
     })();
     return ()=>{ cancelled = true; };
   },[user, leagues]);
@@ -8087,6 +8214,53 @@ function LookupProfile({ identifier }){
             <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Co-managed leagues where this user isn't the primary manager aren't factored in.</div>
           </>
         )}
+      </div>
+
+      {/* Career stats — W/L, championships, championship %, longest title streak.
+          Walks every dynasty league chain back via previous_league_id so this
+          counts every season we can find, not just the last 5. Skips
+          in-progress leagues so the rates aren't distorted by mid-season data. */}
+      <div style={card}>
+        <div style={sectionHdr}>🏆 CAREER DYNASTY RECORD</div>
+        <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5}}>Lifetime W/L, ring count, and best title streak — across every completed season of every dynasty league we can chain together.</div>
+        {careerLoading && !careerStats && (
+          <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Walking dynasty league chains…</div>
+        )}
+        {careerStats && careerStats.totalSeasons === 0 && (
+          <div style={{padding:'14px',color:'#888',fontSize:13,textAlign:'center'}}>No completed dynasty seasons yet.</div>
+        )}
+        {careerStats && careerStats.totalSeasons > 0 && (() => {
+          const totalGames = careerStats.totalWins + careerStats.totalLosses;
+          const winPct = totalGames > 0 ? (careerStats.totalWins / totalGames * 100) : 0;
+          const ringPct = careerStats.totalSeasons > 0 ? (careerStats.championships / careerStats.totalSeasons * 100) : 0;
+          return (
+            <>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalWins}-{careerStats.totalLosses}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>RECORD</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{winPct.toFixed(1)}% win rate</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.championships}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>CHAMPIONSHIPS</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{ringPct.toFixed(1)}% of seasons</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.longestStreak}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>LONGEST TITLE STREAK</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.longestStreak === 0 ? '—' : `${careerStats.longestStreak === 1 ? 'one ring' : `${careerStats.longestStreak} in a row`}`}</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalSeasons}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>SEASONS PLAYED</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>across {careerStats.leagueChains} {careerStats.leagueChains === 1 ? 'league' : 'leagues'}</div>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Title streak counts consecutive championships in the same league. In-progress seasons are not included.</div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Orphan history — dynasty leagues only */}
