@@ -8037,6 +8037,15 @@ function LookupProfile({ identifier }){
     setTimeout(()=>setLinkCopied(false), 2000);
   };
 
+  // Mirror the latest "background data loaded" status into a ref so the
+  // share function (which lives in a closure) can poll it without stale-
+  // closure bugs. Each background section gates its own card with `&&`,
+  // so if SHARE fires before trade activity / team strength / career
+  // stats have landed, those sections are silently dropped from the
+  // captured image. Refs let us hold the share until everything is ready.
+  const shareDataReadyRef = useRef(false);
+  shareDataReadyRef.current = !!(tradeActivity && teamStrength && careerStats);
+
   // 📸 SHARE PROFILE — captures the off-screen profile card and:
   //   mobile: native share sheet (Photos / iMessage / X / Discord)
   //   desktop: pops a modal with Download / Copy / Share to X
@@ -8046,6 +8055,17 @@ function LookupProfile({ identifier }){
     if(!profileCardRef.current){ alert('Profile card not ready — try again in a sec.'); return; }
     setProfileShareBusy(true);
     try{
+      // Auto-wait for all background sections to finish loading so the
+      // captured image isn't missing data the user expects (especially
+      // Trade Activity, which is the slowest — ~200 API calls). Cap at
+      // 20 seconds so the share never hangs indefinitely; if a section
+      // genuinely failed to load we still capture what's there.
+      if(!shareDataReadyRef.current){
+        const waitStart = Date.now();
+        while(!shareDataReadyRef.current && Date.now() - waitStart < 20000){
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
       const canvas = await window.html2canvas(profileCardRef.current, { backgroundColor:'#080808', scale:2, useCORS:true });
       const filename = `pfk_${(user?.username||user?.user_id||'profile').replace(/[^a-z0-9]/gi,'_')}.png`;
       const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
@@ -8131,7 +8151,18 @@ function LookupProfile({ identifier }){
           <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,textTransform:'uppercase'}}>Sleeper</div>
           <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,textTransform:'uppercase'}}>Snapshot</div>
         </div>
-        <button onClick={shareProfileImage} disabled={profileShareBusy} title="Share a PFK-branded snapshot of this profile" style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#DDB34D'),borderRadius:7,color:profileShareBusy?'#888':'#DDB34D',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{profileShareBusy?'BUILDING…':'📸 SHARE'}</button>
+        {(() => {
+          const allDataReady = !!(tradeActivity && teamStrength && careerStats);
+          // When sections are still loading we let the user click anyway —
+          // the share function auto-waits up to 20s — but the button copy
+          // signals what's happening so it doesn't feel frozen.
+          const label = profileShareBusy
+            ? (allDataReady ? 'BUILDING…' : 'WAITING ON DATA…')
+            : (allDataReady ? '📸 SHARE' : '📸 SHARE (loading)');
+          return (
+            <button onClick={shareProfileImage} disabled={profileShareBusy} title={allDataReady ? 'Share a PFK-branded snapshot of this profile' : 'Share — waits for trade activity + career stats to finish loading first'} style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#DDB34D'),borderRadius:7,color:profileShareBusy?'#888':'#DDB34D',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{label}</button>
+          );
+        })()}
       </div>
 
       {/* Career stats — moved to the top per Evan 2026-05-02 (was below trade
