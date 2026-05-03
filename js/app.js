@@ -8387,11 +8387,16 @@ function LookupProfile({ identifier }){
       {/* Off-screen share card — captured via html2canvas. Painted at -99999px so
           the layout is correct without ever being visible to the user. */}
       <div style={{position:'fixed',left:'-99999px',top:0,pointerEvents:'none'}} aria-hidden="true">
-        <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'30px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #DDB34D',borderRadius:14,boxSizing:'border-box'}}>
-          {/* Card header — PFK brand + logo centered on top, user info below */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:14,paddingBottom:14,borderBottom:'2px solid #DDB34D44'}}>
-            <img src="/img/pfk-logo.jpg" alt="PFK" style={{height:48,width:'auto',objectFit:'contain',flexShrink:0}}/>
-            <div style={{fontSize:22,fontWeight:900,color:'#DDB34D',letterSpacing:2.5}}>PLAY FOR KEEPS</div>
+        <div ref={profileCardRef} style={{width:780,background:'#080808',padding:'28px 34px',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",border:'3px solid #DDB34D',borderRadius:14,boxSizing:'border-box'}}>
+          {/* Card header — transparent square logo above centered "PLAY FOR
+              KEEPS" wordmark and "Dynasty Fantasy Football" subtitle. This
+              card is one of PFK's biggest promo surfaces (users post these
+              snapshots into their leagues), so the brand stack at the top
+              is intentionally hero-sized. */}
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,marginBottom:18,paddingBottom:16,borderBottom:'2px solid #DDB34D44'}}>
+            <img src="/img/pfk-logo.png" alt="PFK" style={{width:96,height:96,objectFit:'contain',flexShrink:0}}/>
+            <div style={{fontSize:30,fontWeight:900,color:'#DDB34D',letterSpacing:3,textShadow:'0 0 18px #DDB34D',lineHeight:1.05}}>PLAY FOR KEEPS</div>
+            <div style={{fontSize:11,color:'#DDB34DCC',letterSpacing:2.5,textTransform:'uppercase',fontWeight:700,marginTop:2}}>Dynasty Fantasy Football</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
             {/* Real Sleeper avatar — proxied through /api/avatar/{id} so it's
@@ -8410,10 +8415,62 @@ function LookupProfile({ identifier }){
             </div>
           </div>
 
+          {/* Career Dynasty Record — the headline content for the share image.
+              Six tiles in two rows of three so each label is fully readable
+              at the share-card scale (smaller than the live page). Falls
+              through silently if the user has no completed dynasty seasons. */}
+          {careerStats && careerStats.totalSeasons > 0 && (() => {
+            const totalGames = careerStats.totalWins + careerStats.totalLosses;
+            const winPct = totalGames > 0 ? (careerStats.totalWins / totalGames * 100) : 0;
+            const ringPct = (careerStats.championships / careerStats.totalSeasons * 100);
+            const tileStyle = {padding:'12px 10px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'};
+            const big = {fontSize:22,fontWeight:900,color:'#DDB34D',lineHeight:1};
+            const label = {fontSize:9,color:'#888',fontWeight:800,letterSpacing:1.2,marginTop:5,lineHeight:1.25};
+            const sub = {fontSize:9,color:'#666',fontWeight:700,marginTop:2};
+            return (
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8,textAlign:'center'}}>🏆 CAREER DYNASTY RECORD</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:8}}>
+                  <div style={tileStyle}>
+                    <div style={big}>{careerStats.totalWins}-{careerStats.totalLosses}</div>
+                    <div style={label}>RECORD</div>
+                    <div style={sub}>{winPct.toFixed(1)}% win rate</div>
+                  </div>
+                  <div style={tileStyle}>
+                    <div style={big}>{careerStats.championships}</div>
+                    <div style={label}>CHAMPIONSHIPS</div>
+                    <div style={sub}>{ringPct.toFixed(1)}% of seasons</div>
+                  </div>
+                  <div style={tileStyle}>
+                    <div style={big}>{careerStats.longestStreak}</div>
+                    <div style={label}>LONGEST TITLE STREAK</div>
+                    <div style={sub}>{careerStats.longestStreak === 0 ? '—' : (careerStats.longestStreak === 1 ? 'one ring' : `${careerStats.longestStreak} in a row`)}</div>
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                  <div style={tileStyle}>
+                    <div style={big}>{careerStats.peakRingCount || 0}</div>
+                    <div style={label}>MOST TITLES WON IN A SINGLE SEASON</div>
+                    <div style={sub}>{careerStats.peakRingCount > 0 ? `in ${careerStats.peakRingYear}` : '—'}</div>
+                  </div>
+                  <div style={tileStyle}>
+                    <div style={big}>{careerStats.totalSeasons}</div>
+                    <div style={label}>SEASONS PLAYED</div>
+                  </div>
+                  <div style={tileStyle}>
+                    <div style={big}>{dynastyActive.length}</div>
+                    <div style={label}>TOTAL LEAGUES</div>
+                    <div style={sub}>{displayedActiveYear} active</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Avg dynasty value standings */}
           {teamStrength && teamStrength.leaguesCount > 0 && (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>💪 AVG LEAGUE POWER RANK STANDINGS</div>
+              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8,textAlign:'center'}}>💪 AVG LEAGUE POWER RANK STANDINGS</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgRank.toFixed(1)}</div>
@@ -8434,7 +8491,7 @@ function LookupProfile({ identifier }){
           {/* Trade activity — current shows LAST TRADE; prior years drop it (always stale) */}
           {tradeActivity && (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>🤝 TRADE ACTIVITY</div>
+              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8,textAlign:'center'}}>🤝 TRADE ACTIVITY</div>
               {[
                 { label: `${tradeActivity.current?.season || LOOKUP_CURRENT_YEAR} (CURRENT)`, data: tradeActivity.current, showLast: true },
                 { label: `${tradeActivity.prior?.season || LOOKUP_CURRENT_YEAR-1} SEASON`, data: tradeActivity.prior, showLast: false },
@@ -8465,7 +8522,7 @@ function LookupProfile({ identifier }){
 
           {/* Orphan history — last 12mo / 24mo + overall orphan rate % */}
           <div style={{marginBottom:18}}>
-            <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>🪦 DYNASTY ORPHAN HISTORY</div>
+            <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8,textAlign:'center'}}>🪦 DYNASTY ORPHAN HISTORY</div>
             <div style={{display:'flex',gap:10}}>
               <div style={{flex:1,padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                 <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{orphan?.last12mo ?? 0}</div>
