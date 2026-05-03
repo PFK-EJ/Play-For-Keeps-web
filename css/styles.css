@@ -74,6 +74,12 @@ input, select { font-family:inherit; }
     overflow-x:auto;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
+    /* On mobile the desktop's `justifyContent:center` (set inline in
+       MasterToolbar) was pushing the first tab off the left edge when
+       combined tab width exceeded the viewport — Evan saw "Sleeper Snapshot"
+       cut off as just "ot" on first paint. Force flex-start on mobile so
+       tabs anchor to the left and scroll right naturally. */
+    justify-content:flex-start !important;
   }
   .pfk-top-tabs::-webkit-scrollbar { display:none; }
   .pfk-top-tabs > button, .pfk-top-tabs > a {
