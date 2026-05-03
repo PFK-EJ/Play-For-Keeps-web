@@ -2936,20 +2936,21 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
     if(onSignInClick){ e.preventDefault(); onSignInClick(); }
     // else let the link navigate to /?signin=1
   };
-  // Sleeper Snapshot tab gets a smart href: linked → land on YOUR snapshot
-  // (with the in-page search bar below the yellow line for looking up others);
-  // not linked → go to the regular search page.
-  const lookupHref = sleeperLinked?.username ? `/lookup/${encodeURIComponent(sleeperLinked.username)}` : '/lookup';
+  // Sleeper Snapshot is now the home page (Evan 2026-05-02). The tab points
+  // at "/" — the root route auto-detects the linked Sleeper username from
+  // localStorage and loads that user's profile directly, otherwise shows
+  // the search page. Keeping `/lookup/{username}` working as the explicit
+  // shareable URL for individual snapshots.
   // Tab definitions — Power Rankings has been moved out of the public nav
   // and into the admin panel; we'll work on it there until it's ready to ship.
   // Each tab: [id, label, descriptionForTooltip, href, isInPageOnMainPage]
-  // Order locked by Evan 2026-04-30: Trade Finder → Sleeper Snapshot → Dispersal → Trade Polls → Rookie Ranks
+  // Order locked by Evan 2026-05-02: Sleeper Snapshot (home) → Dispersal → Trade Finder → Rookie Ranks → Trade Polls
   const tabs = [
-    ["trade","⚖️ Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
-    ["lookup","🔍 Sleeper Snapshot",sleeperLinked?.username?"Open your own Sleeper Snapshot — search any other username from inside":"Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in",lookupHref,false],
+    ["lookup","🔍 Sleeper Snapshot",sleeperLinked?.username?"Open your own Sleeper Snapshot — search any other username from inside":"Type any Sleeper username and see their account age, dynasty leagues, trade activity, orphan history, and roster strength — vet new leaguemates before letting them in","/",false],
     ["dispersal","🎲 Dispersal Draft","Pool teams from a Sleeper league, share a link, and draft live with mobile-friendly real-time picks","/dispersal",false],
-    ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
+    ["trade","⚖️ Trade Finder","Type a rookie pick or player and see every equivalent-value asset grouped by position — find trade ideas in one click","/trade-finder",false],
     ["pfk","👑 Rookie Ranks","PFK's official 2026 dynasty rookie rankings — view the staff tier list or build your own","/?tab=pfk",true],
+    ["polls","🗳️ Trade Polls","Create a dynasty trade poll, share the link, and get votes from the community","/?tab=polls",true],
   ];
   const handleTabClick = (e, id, isInPage) => {
     if(isInPage && onSetTab){
@@ -8290,7 +8291,7 @@ function LookupProfile({ identifier }){
 
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
       <div style={card}>
-        <div style={sectionHdr}>💪 AVG LEAGUE POWER RANK STANDINGS</div>
+        <div style={sectionHdr}>💪 AVG LEAGUE POWER RANKING</div>
         <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5}}>Where you rank in dynasty value on avg across all your leagues. <span style={{color:'#666'}}>Values via fantasycalc.com.</span></div>
         {strengthLoading && !teamStrength && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Calculating roster ranks across leagues…</div>
@@ -8502,7 +8503,7 @@ function LookupProfile({ identifier }){
           {/* Avg dynasty value standings */}
           {teamStrength && teamStrength.leaguesCount > 0 && (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8,textAlign:'center'}}>💪 AVG LEAGUE POWER RANK STANDINGS</div>
+              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8,textAlign:'center'}}>💪 AVG LEAGUE POWER RANKING</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgRank.toFixed(1)}</div>
@@ -9602,13 +9603,22 @@ const dispersalMatch = path.match(/^\/dispersal(?:\/([0-9a-f-]+))?$/i);
 const lookupMatch = path.match(/^\/lookup(?:\/([^/]+))?$/i);
 const isTradeFinderRoute = path === '/trade-finder';
 const isDeadRoute = path === '/zolty' || path === '/compare';
-// Root path defaults to Trade Finder (PFK's most-used tool). The legacy App
-// (Rookie Ranks / Trade Polls) still renders at root if a relevant query
-// param is present — `?tab=pfk`, `?tab=polls`, etc. for direct nav, or
-// `?signin=1` for cross-page sign-in links.
+// Root path defaults to Sleeper Snapshot (Evan 2026-05-02 — promoted to
+// home page). If the visitor has linked their Sleeper account, we auto-fill
+// the page with their own snapshot instead of dropping them on the search
+// form. The legacy App (Rookie Ranks / Trade Polls) still renders at root
+// when a relevant query param is present — `?tab=pfk`, `?tab=polls`, etc.
+// for direct nav, or `?signin=1` for cross-page sign-in links.
 const _rootParams = new URLSearchParams(window.location.search);
 const rootGoesToApp = path === '' && (_rootParams.has('tab') || _rootParams.has('signin'));
-const rootGoesToTradeFinder = path === '' && !rootGoesToApp;
+const rootGoesToLookup = path === '' && !rootGoesToApp;
+let rootLookupIdentifier = null;
+if(rootGoesToLookup){
+  try{
+    const linked = JSON.parse(localStorage.getItem('pfk_sleeper_user') || 'null');
+    if(linked && typeof linked === 'object' && linked.username) rootLookupIdentifier = linked.username;
+  }catch(e){}
+}
 function NotFoundPage(){
   return (
     <div style={{background:'#080808',minHeight:'100vh',color:'#f0f0f0',fontFamily:"'Inter','Segoe UI',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
@@ -9625,7 +9635,7 @@ ReactDOM.render(
   : dispersalMatch ? <DispersalApp draftId={dispersalMatch[1] || null}/>
   : lookupMatch ? <LookupApp identifier={lookupMatch[1] ? decodeURIComponent(lookupMatch[1]) : null}/>
   : isTradeFinderRoute ? <TradeFinderApp/>
-  : rootGoesToTradeFinder ? <TradeFinderApp/>
+  : rootGoesToLookup ? <LookupApp identifier={rootLookupIdentifier}/>
   : isDeadRoute ? <NotFoundPage/>
   : <App/>,
   document.getElementById("root")
