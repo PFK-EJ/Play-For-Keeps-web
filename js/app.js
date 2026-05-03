@@ -8124,7 +8124,7 @@ function LookupProfile({ identifier }){
         {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} onError={e=>e.target.style.display='none'}/>}
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
-          <div style={{fontSize:12,color:'#666',marginTop:2}}>{user.username && user.username !== user.display_name ? `@${user.username} · ` : ''}user_id <code style={{color:'#888'}}>{user.user_id}</code></div>
+          {user.username && user.username !== user.display_name && <div style={{fontSize:12,color:'#666',marginTop:2}}>@{user.username}</div>}
           {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
         </div>
         <div style={{textAlign:'center',padding:'4px 10px',flexShrink:0}}>
