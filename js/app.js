@@ -3033,15 +3033,20 @@ function MasterToolbar({ currentTab, onSetTab, onSignInClick, userSleeperName, c
             <a href="/?signin=1" onClick={doSignIn} style={{padding:"6px 14px",background:"#DDB34D",border:"none",borderRadius:6,color:"#000",fontWeight:900,cursor:"pointer",fontSize:12,letterSpacing:1,textDecoration:"none"}}>SIGN IN</a>
           )}
         </div>
-        {/* Nav tabs — centered to match the rest of the header. */}
-        <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"center",width:"100%"}}>
-          {tabs.map(([id,label,desc,href,isInPage])=>{
-            const active = isActiveTab(id);
-            return (
-              <a key={id} href={href} onClick={e=>handleTabClick(e,id,isInPage)} aria-label={desc} data-tooltip={desc}
-                 style={{padding:"5px 10px",borderRadius:6,border:active?"1.5px solid #DDB34D":"1.5px solid #1e1e1e",background:active?"#DDB34D":"transparent",color:active?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4,transition:"all .15s"}}>{label}</a>
-            );
-          })}
+        {/* Nav tabs — centered on desktop, anchored to flex-start on mobile
+            via CSS. The wrapper exists purely to host the right-edge gradient
+            overlay (.pfk-tabs-wrap::after) that hints at horizontal scroll on
+            mobile when not all tabs fit on screen. */}
+        <div className="pfk-tabs-wrap" style={{position:"relative",width:"100%"}}>
+          <div className="pfk-top-tabs" style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"center",width:"100%"}}>
+            {tabs.map(([id,label,desc,href,isInPage])=>{
+              const active = isActiveTab(id);
+              return (
+                <a key={id} href={href} onClick={e=>handleTabClick(e,id,isInPage)} aria-label={desc} data-tooltip={desc}
+                   style={{padding:"5px 10px",borderRadius:6,border:active?"1.5px solid #DDB34D":"1.5px solid #1e1e1e",background:active?"#DDB34D":"transparent",color:active?"#000":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.6,textDecoration:"none",display:"inline-flex",alignItems:"center",lineHeight:1.4,transition:"all .15s"}}>{label}</a>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

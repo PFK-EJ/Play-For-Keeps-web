@@ -82,6 +82,21 @@ input, select { font-family:inherit; }
     justify-content:flex-start !important;
   }
   .pfk-top-tabs::-webkit-scrollbar { display:none; }
+  /* Right-edge gradient hint that the tab row scrolls horizontally — without
+     it most users don't notice tabs off-screen to the right. The wrapper
+     stays in place while the inner .pfk-top-tabs scrolls underneath, so the
+     fade always lives on the right edge of the visible area. */
+  .pfk-tabs-wrap { overflow:hidden; }
+  .pfk-tabs-wrap::after {
+    content:'';
+    position:absolute;
+    top:0;
+    right:0;
+    bottom:0;
+    width:32px;
+    pointer-events:none;
+    background:linear-gradient(to right, rgba(10,10,10,0), rgba(10,10,10,0.95) 70%);
+  }
   .pfk-top-tabs > button, .pfk-top-tabs > a {
     flex:0 0 auto !important;
     white-space:nowrap;
