@@ -3246,6 +3246,12 @@ function App(){
       if(error){ setAuthMsg(error.message); return; }
       setAuthOpen(false);
       setAuthEmail(''); setAuthPassword(''); setAuthSleeper('');
+      // Sign In is reachable from anywhere via /?signin=1 — that URL drops
+      // users onto the legacy App (Rookie Ranks). After successful auth we
+      // bounce them to the home page (Sleeper Snapshot) instead of leaving
+      // them stranded on Rookie Ranks. Full reload also ensures the new
+      // auth state triggers the Sleeper-link auto-restore.
+      try{ window.location.href = '/'; }catch(e){}
     }
   };
 
