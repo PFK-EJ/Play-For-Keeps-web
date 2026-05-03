@@ -8096,12 +8096,15 @@ function LookupProfile({ identifier }){
   const createdMs = user.metadata?.created || user.created;
   const createdDate = createdMs ? new Date(Number(createdMs)) : null;
 
-  const sectionHdr = {fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:1.5,marginBottom:10};
+  const sectionHdr = {fontSize:11,color:'#DDB34D',fontWeight:800,letterSpacing:1.5,marginBottom:10,textAlign:'center'};
   const card = {background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:10,padding:'18px 22px',marginBottom:14};
 
   return (
     <div style={{maxWidth:680,margin:'40px auto',padding:'0 20px',color:'#eee'}}>
-      {/* Profile header */}
+      {/* Profile header — username on the left, "SLEEPER SNAPSHOT" centered
+          label between, share button on the right. The standalone Activity
+          Snapshot card was removed; its dynasty-leagues count moved into the
+          Career Record stats row below per Evan 2026-05-02. */}
       <div style={{...card,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
         {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} onError={e=>e.target.style.display='none'}/>}
         <div style={{flex:1,minWidth:0}}>
@@ -8109,16 +8112,63 @@ function LookupProfile({ identifier }){
           <div style={{fontSize:12,color:'#666',marginTop:2}}>{user.username && user.username !== user.display_name ? `@${user.username} · ` : ''}user_id <code style={{color:'#888'}}>{user.user_id}</code></div>
           {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
         </div>
+        <div style={{textAlign:'center',padding:'4px 10px',flexShrink:0}}>
+          <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,textTransform:'uppercase'}}>Sleeper</div>
+          <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,textTransform:'uppercase'}}>Snapshot</div>
+        </div>
         <button onClick={shareProfileImage} disabled={profileShareBusy} title="Share a PFK-branded snapshot of this profile" style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#DDB34D'),borderRadius:7,color:profileShareBusy?'#888':'#DDB34D',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{profileShareBusy?'BUILDING…':'📸 SHARE'}</button>
       </div>
 
-      {/* Activity snapshot — dynasty-focused */}
+      {/* Career stats — moved to the top per Evan 2026-05-02 (was below trade
+          activity / standings). Walks every dynasty league chain back via
+          previous_league_id so this counts every completed season we can find,
+          not just the last 5. Skips in-progress leagues so the rates aren't
+          distorted by mid-season data. */}
       <div style={card}>
-        <div style={sectionHdr}>📊 ACTIVITY SNAPSHOT</div>
-        <div style={{padding:'14px 16px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-          <div style={{fontSize:32,fontWeight:900,color:'#DDB34D'}}>{dynastyActive.length}</div>
-          <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:4}}>DYNASTY LEAGUES ({displayedActiveYear})</div>
-        </div>
+        <div style={sectionHdr}>🏆 CAREER DYNASTY RECORD</div>
+        <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5,textAlign:'center'}}>Lifetime W/L, ring count, and best title streak — across every completed season of every dynasty league we can chain together.</div>
+        {careerLoading && !careerStats && (
+          <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Walking dynasty league chains…</div>
+        )}
+        {careerStats && careerStats.totalSeasons === 0 && (
+          <div style={{padding:'14px',color:'#888',fontSize:13,textAlign:'center'}}>No completed dynasty seasons yet.</div>
+        )}
+        {careerStats && careerStats.totalSeasons > 0 && (() => {
+          const totalGames = careerStats.totalWins + careerStats.totalLosses;
+          const winPct = totalGames > 0 ? (careerStats.totalWins / totalGames * 100) : 0;
+          const ringPct = careerStats.totalSeasons > 0 ? (careerStats.championships / careerStats.totalSeasons * 100) : 0;
+          return (
+            <>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalWins}-{careerStats.totalLosses}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>RECORD</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{winPct.toFixed(1)}% win rate</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.championships}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>CHAMPIONSHIPS</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{ringPct.toFixed(1)}% of seasons</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.longestStreak}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>LONGEST TITLE STREAK</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.longestStreak === 0 ? '—' : `${careerStats.longestStreak === 1 ? 'one ring' : `${careerStats.longestStreak} in a row`}`}</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalSeasons}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>SEASONS PLAYED</div>
+                </div>
+                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{dynastyActive.length}</div>
+                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>TOTAL LEAGUES</div>
+                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{displayedActiveYear} active</div>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6,textAlign:'center'}}>Title streak counts consecutive championships in the same league. In-progress seasons are not included.</div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Trade activity — current + prior season. Both load in background.
@@ -8187,7 +8237,7 @@ function LookupProfile({ identifier }){
 
       {/* Team strength — avg power-rank by FantasyCalc value across current dynasty leagues */}
       <div style={card}>
-        <div style={sectionHdr}>💪 AVG DYNASTY VALUE STANDINGS</div>
+        <div style={sectionHdr}>💪 AVG LEAGUE POWER RANK STANDINGS</div>
         <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5}}>Where you rank in dynasty value on avg across all your leagues. <span style={{color:'#666'}}>Values via fantasycalc.com.</span></div>
         {strengthLoading && !teamStrength && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Calculating roster ranks across leagues…</div>
@@ -8214,53 +8264,6 @@ function LookupProfile({ identifier }){
             <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Co-managed leagues where this user isn't the primary manager aren't factored in.</div>
           </>
         )}
-      </div>
-
-      {/* Career stats — W/L, championships, championship %, longest title streak.
-          Walks every dynasty league chain back via previous_league_id so this
-          counts every season we can find, not just the last 5. Skips
-          in-progress leagues so the rates aren't distorted by mid-season data. */}
-      <div style={card}>
-        <div style={sectionHdr}>🏆 CAREER DYNASTY RECORD</div>
-        <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5}}>Lifetime W/L, ring count, and best title streak — across every completed season of every dynasty league we can chain together.</div>
-        {careerLoading && !careerStats && (
-          <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Walking dynasty league chains…</div>
-        )}
-        {careerStats && careerStats.totalSeasons === 0 && (
-          <div style={{padding:'14px',color:'#888',fontSize:13,textAlign:'center'}}>No completed dynasty seasons yet.</div>
-        )}
-        {careerStats && careerStats.totalSeasons > 0 && (() => {
-          const totalGames = careerStats.totalWins + careerStats.totalLosses;
-          const winPct = totalGames > 0 ? (careerStats.totalWins / totalGames * 100) : 0;
-          const ringPct = careerStats.totalSeasons > 0 ? (careerStats.championships / careerStats.totalSeasons * 100) : 0;
-          return (
-            <>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
-                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalWins}-{careerStats.totalLosses}</div>
-                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>RECORD</div>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{winPct.toFixed(1)}% win rate</div>
-                </div>
-                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.championships}</div>
-                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>CHAMPIONSHIPS</div>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{ringPct.toFixed(1)}% of seasons</div>
-                </div>
-                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.longestStreak}</div>
-                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>LONGEST TITLE STREAK</div>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>{careerStats.longestStreak === 0 ? '—' : `${careerStats.longestStreak === 1 ? 'one ring' : `${careerStats.longestStreak} in a row`}`}</div>
-                </div>
-                <div style={{padding:'12px 14px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
-                  <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{careerStats.totalSeasons}</div>
-                  <div style={{fontSize:10,color:'#888',fontWeight:800,letterSpacing:1.5,marginTop:6}}>SEASONS PLAYED</div>
-                  <div style={{fontSize:11,color:'#666',fontWeight:700,marginTop:2}}>across {careerStats.leagueChains} {careerStats.leagueChains === 1 ? 'league' : 'leagues'}</div>
-                </div>
-              </div>
-              <div style={{fontSize:11,color:'#555',marginTop:10,fontStyle:'italic',lineHeight:1.6}}>Title streak counts consecutive championships in the same league. In-progress seasons are not included.</div>
-            </>
-          );
-        })()}
       </div>
 
       {/* Orphan history — dynasty leagues only */}
@@ -8389,7 +8392,7 @@ function LookupProfile({ identifier }){
           {/* Avg dynasty value standings */}
           {teamStrength && teamStrength.leaguesCount > 0 && (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>💪 AVG DYNASTY VALUE STANDINGS</div>
+              <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,marginBottom:8}}>💪 AVG LEAGUE POWER RANK STANDINGS</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
                 <div style={{padding:'12px 14px',background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:8,textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',lineHeight:1}}>{teamStrength.avgRank.toFixed(1)}</div>
