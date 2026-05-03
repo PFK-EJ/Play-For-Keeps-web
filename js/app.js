@@ -8136,22 +8136,22 @@ function LookupProfile({ identifier }){
 
   return (
     <div style={{maxWidth:680,margin:'40px auto',padding:'0 20px',color:'#eee'}}>
-      {/* Profile header — username on the left, "SLEEPER SNAPSHOT" centered
-          label between, share button on the right. The standalone Activity
-          Snapshot card was removed; its dynasty-leagues count moved into the
-          Career Record stats row below per Evan 2026-05-02. */}
-      <div style={{...card,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
-        {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} onError={e=>e.target.style.display='none'}/>}
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
-          {user.username && user.username !== user.display_name && <div style={{fontSize:12,color:'#666',marginTop:2}}>@{user.username}</div>}
-          {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
+      {/* Profile header — "SLEEPER SNAPSHOT" page title centered on its own
+          row at the top of the card, then avatar + username + share button
+          on the row below it. Evan 2026-05-02 wanted the title fully
+          centered on the page rather than tucked next to the username. */}
+      <div style={card}>
+        <div style={{textAlign:'center',marginBottom:14,paddingBottom:12,borderBottom:'1px solid #1e1e1e'}}>
+          <div style={{fontSize:13,fontWeight:900,color:'#DDB34D',letterSpacing:3,textTransform:'uppercase'}}>Sleeper Snapshot</div>
         </div>
-        <div style={{textAlign:'center',padding:'4px 10px',flexShrink:0}}>
-          <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,textTransform:'uppercase'}}>Sleeper</div>
-          <div style={{fontSize:11,fontWeight:900,color:'#DDB34D',letterSpacing:2,textTransform:'uppercase'}}>Snapshot</div>
-        </div>
-        {(() => {
+        <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+          {user.avatar && <img src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',background:'#0a0a0a',border:'1px solid #1e1e1e'}} onError={e=>e.target.style.display='none'}/>}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:24,fontWeight:900,color:'#DDB34D',letterSpacing:0.5,wordBreak:'break-word'}}>{user.display_name || user.username}</div>
+            {user.username && user.username !== user.display_name && <div style={{fontSize:12,color:'#666',marginTop:2}}>@{user.username}</div>}
+            {createdDate && <div style={{fontSize:13,color:'#aaa',marginTop:6}}>Account created: <span style={{color:'#fff'}}>{createdDate.toISOString().slice(0,10)}</span> ({lookupTimeAgo(createdDate)})</div>}
+          </div>
+          {(() => {
           const allDataReady = !!(tradeActivity && teamStrength && careerStats);
           // When sections are still loading we let the user click anyway —
           // the share function auto-waits up to 20s — but the button copy
@@ -8163,6 +8163,7 @@ function LookupProfile({ identifier }){
             <button onClick={shareProfileImage} disabled={profileShareBusy} title={allDataReady ? 'Share a PFK-branded snapshot of this profile' : 'Share — waits for trade activity + career stats to finish loading first'} style={{padding:'10px 14px',background:profileShareBusy?'#222':'transparent',border:'1.5px solid '+(profileShareBusy?'#444':'#DDB34D'),borderRadius:7,color:profileShareBusy?'#888':'#DDB34D',fontWeight:900,cursor:profileShareBusy?'default':'pointer',fontSize:12,letterSpacing:1.2,whiteSpace:'nowrap'}}>{label}</button>
           );
         })()}
+        </div>
       </div>
 
       {/* Career stats — moved to the top per Evan 2026-05-02 (was below trade
