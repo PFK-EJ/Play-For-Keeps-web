@@ -3,7 +3,58 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
-<title>Play For Keeps — Dynasty Analyzer</title>
+<title>Play For Keeps — Dynasty Fantasy Football Tools</title>
+<!-- Page metadata. PFK is a single-page React app that boots client-side via
+     Babel-standalone, which means crawlers (Twitter, iMessage, Slack, Google,
+     ChatGPT, Perplexity) only see this raw HTML — they don't run JS. So
+     everything they need to summarize the site has to live here as static
+     tags. Without them, link previews show a bare URL with no card. -->
+<meta name="description" content="A free toolkit for dynasty fantasy football managers — Sleeper Snapshot, Dispersal Draft live picker, Trade Finder, Rookie Ranks, and Trade Polls."/>
+<link rel="canonical" href="https://playforkeepsdynasty.com/"/>
+<!-- Open Graph (Twitter / iMessage / Slack / Discord / Facebook share preview) -->
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Play For Keeps"/>
+<meta property="og:title" content="Play For Keeps — Dynasty Fantasy Football Tools"/>
+<meta property="og:description" content="A free toolkit for dynasty fantasy football managers — Sleeper Snapshot, Dispersal Draft live picker, Trade Finder, Rookie Ranks, and Trade Polls."/>
+<meta property="og:url" content="https://playforkeepsdynasty.com/"/>
+<meta property="og:image" content="https://playforkeepsdynasty.com/img/og-image.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="Play For Keeps — Dynasty Fantasy Football Tools"/>
+<!-- Twitter Card (overrides og: tags for the Twitter preview specifically) -->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:site" content="@PlayforkeepsFF"/>
+<meta name="twitter:creator" content="@PlayforkeepsFF"/>
+<meta name="twitter:title" content="Play For Keeps — Dynasty Fantasy Football Tools"/>
+<meta name="twitter:description" content="A free toolkit for dynasty fantasy football managers — Sleeper Snapshot, Dispersal Draft live picker, Trade Finder, Rookie Ranks, and Trade Polls."/>
+<meta name="twitter:image" content="https://playforkeepsdynasty.com/img/og-image.png"/>
+<meta name="twitter:image:alt" content="Play For Keeps — Dynasty Fantasy Football Tools"/>
+<!-- JSON-LD WebApplication schema — helps Google Search Console + AI
+     crawlers (ChatGPT, Perplexity, Gemini) understand what this site IS,
+     not just what it says. Invisible to humans. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Play For Keeps",
+  "alternateName": "PFK",
+  "url": "https://playforkeepsdynasty.com/",
+  "description": "A free toolkit for dynasty fantasy football managers — Sleeper Snapshot, Dispersal Draft live picker, Trade Finder, Rookie Ranks, and Trade Polls.",
+  "applicationCategory": "SportsApplication",
+  "operatingSystem": "Any (web)",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "creator": {
+    "@type": "Organization",
+    "name": "Play For Keeps",
+    "url": "https://playforkeepsdynasty.com/",
+    "sameAs": ["https://x.com/PlayForKeepsFF"]
+  }
+}
+</script>
 <!-- Favicons + home-screen icons. Generated from /img/pfk-logo.png with the
      "Play For Keeps" text cropped off so the crown + football silhouette is
      readable at small sizes. Apple/Android icons sit on a #0a0a0a background
@@ -23,7 +74,24 @@
 <link rel="stylesheet" href="/css/styles.css?v=20260502j"/>
 </head>
 <body>
-<div id="root"></div>
+<!-- Pre-render content for crawlers + AI scrapers that don't execute JS.
+     React replaces #root immediately on page load, so users never see this —
+     but Google, ChatGPT, Perplexity, and link-preview bots that ignore
+     JavaScript will read this and learn what the site actually is. -->
+<div id="root">
+  <noscript>
+    <h1>Play For Keeps — Dynasty Fantasy Football Tools</h1>
+    <p>Play For Keeps is a free toolkit for dynasty fantasy football managers. Tools available:</p>
+    <ul>
+      <li><strong>Sleeper Snapshot</strong> — look up any Sleeper user and see their account age, dynasty leagues, trade activity, championship history, and roster value rank.</li>
+      <li><strong>Dispersal Draft</strong> — pool teams from a Sleeper league and run a live, mobile-friendly snake draft for orphans.</li>
+      <li><strong>Trade Finder</strong> — type any rookie pick or player and see every equivalent-value asset grouped by position.</li>
+      <li><strong>Rookie Ranks</strong> — PFK's official 2026 dynasty rookie rankings, plus a custom-list builder.</li>
+      <li><strong>Trade Polls</strong> — create a dynasty trade poll, share the link, and get votes from the community.</li>
+    </ul>
+    <p>Free, no signup required for most tools. Visit <a href="https://playforkeepsdynasty.com/">playforkeepsdynasty.com</a> in any modern browser.</p>
+  </noscript>
+</div>
 <script type="text/babel" src="/js/app.js?v=20260502j"></script>
 </body>
 </html>

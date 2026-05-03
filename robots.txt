@@ -1,0 +1,9 @@
+# Allow all crawlers — search engines (Google, Bing) + AI agents (GPTBot,
+# ClaudeBot, PerplexityBot, etc.) are explicitly welcome to read and index
+# Play For Keeps. PFK is a public dynasty fantasy football toolkit and
+# discovery via search / AI is desired.
+User-agent: *
+Allow: /
+
+# Single sitemap entry — points search engines at the canonical URL list.
+Sitemap: https://playforkeepsdynasty.com/sitemap.xml

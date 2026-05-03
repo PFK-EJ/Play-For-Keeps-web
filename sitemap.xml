@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Homepage / Sleeper Snapshot search -->
+  <url>
+    <loc>https://playforkeepsdynasty.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- Sleeper Snapshot search page (alias for homepage) -->
+  <url>
+    <loc>https://playforkeepsdynasty.com/lookup</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Dispersal Draft setup -->
+  <url>
+    <loc>https://playforkeepsdynasty.com/dispersal</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Trade Finder -->
+  <url>
+    <loc>https://playforkeepsdynasty.com/trade-finder</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Rookie Ranks (legacy App tab) -->
+  <url>
+    <loc>https://playforkeepsdynasty.com/?tab=pfk</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Trade Polls (legacy App tab) -->
+  <url>
+    <loc>https://playforkeepsdynasty.com/?tab=polls</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>
