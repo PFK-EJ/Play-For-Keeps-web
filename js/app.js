@@ -8141,7 +8141,6 @@ function LookupProfile({ identifier }){
           distorted by mid-season data. */}
       <div style={card}>
         <div style={sectionHdr}>🏆 CAREER DYNASTY RECORD</div>
-        <div style={{fontSize:12,color:'#aaa',marginTop:-4,marginBottom:12,lineHeight:1.5,textAlign:'center'}}>Lifetime W/L, ring count, and best title streak — across every completed season of every dynasty league we can chain together.</div>
         {careerLoading && !careerStats && (
           <div style={{padding:'14px',color:'#666',fontSize:13,textAlign:'center'}}>Walking dynasty league chains…</div>
         )}
